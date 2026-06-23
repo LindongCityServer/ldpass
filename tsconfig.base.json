@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ldpass/contracts": ["packages/contracts/src/index.ts"],
+      "@ldpass/contracts/*": ["packages/contracts/src/*"],
+      "@ldpass/event-bus": ["packages/event-bus/src/index.ts"],
+      "@ldpass/event-bus/*": ["packages/event-bus/src/*"],
+      "@ldpass/database": ["packages/database/src/index.ts"],
+      "@ldpass/database/*": ["packages/database/src/*"],
+      "@ldpass/ui": ["packages/ui/src/index.ts"],
+      "@ldpass/ui/*": ["packages/ui/src/*"]
+    }
+  }
+}

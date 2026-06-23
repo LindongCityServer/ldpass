@@ -1,0 +1,1043 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum ActorType {
+  user
+  provider
+  admin
+  system
+}
+
+enum UserStatus {
+  Draft
+  PendingReview
+  Rejected
+  WaitingServerVerification
+  CodeRotated
+  Verified
+  Approved
+  Active
+  Failed
+  Suspended
+  Deleted
+}
+
+enum UserRole {
+  user
+  admin
+  super_admin
+}
+
+enum DeviceSystem {
+  android
+  ios
+  windows
+  macos
+  linux
+  other
+}
+
+enum DeviceLoginApprovalStatus {
+  pending
+  approved
+  rejected
+  expired
+  completed
+}
+
+enum ProviderStatus {
+  PendingReview
+  Rejected
+  Active
+  Suspended
+  Archived
+}
+
+enum ProviderAccountStatus {
+  PendingReview
+  Active
+  Suspended
+  Archived
+}
+
+enum PassCategory {
+  account
+  identity_key
+  ticket
+}
+
+enum BenefitType {
+  amount
+  points
+  times
+}
+
+enum TemplateStatus {
+  Draft
+  PendingReview
+  Rejected
+  Approved
+  Active
+  Suspended
+  Archived
+}
+
+enum PassStatus {
+  Issued
+  Added
+  Active
+  Frozen
+  Expired
+  UsedUp
+  Archived
+}
+
+enum LedgerReason {
+  issue
+  grant
+  use
+  top_up
+  adjustment
+  refund
+  sync
+}
+
+enum VerificationMethod {
+  server_account
+  pin
+}
+
+enum RedemptionStatus {
+  Created
+  WaitingVerification
+  Verified
+  Processing
+  Succeeded
+  Reversed
+  Failed
+  Cancelled
+  Expired
+}
+
+enum PassTopUpStatus {
+  Created
+  WaitingVerification
+  Succeeded
+  Failed
+  Cancelled
+  Expired
+  Reversed
+}
+
+enum DisputeStatus {
+  Submitted
+  InReview
+  NeedMoreInfo
+  Approved
+  Rejected
+  Reversed
+  Closed
+}
+
+enum AddPassTokenStatus {
+  Active
+  Claimed
+  Expired
+  Revoked
+}
+
+enum WalletActionLinkKind {
+  use
+  top_up
+}
+
+enum WalletActionLinkStatus {
+  Active
+  Consumed
+  Expired
+  Revoked
+}
+
+enum PassTransferStatus {
+  Pending
+  Accepted
+  Rejected
+  Cancelled
+  Expired
+}
+
+enum PassTicketUpdateRequestStatus {
+  PendingReview
+  Approved
+  Rejected
+}
+
+enum ProviderProfileChangeRequestStatus {
+  PendingReview
+  Approved
+  Rejected
+}
+
+enum ProviderApiKeyChangeRequestStatus {
+  PendingReview
+  Approved
+  Rejected
+}
+
+enum ProviderApiKeyChangeRequestKind {
+  CreateApiKey
+  RotateApiKey
+  RevokeApiKey
+}
+
+enum ProviderWebhookChangeRequestStatus {
+  PendingReview
+  Approved
+  Rejected
+}
+
+enum ProviderWebhookChangeRequestKind {
+  CreateEndpoint
+  UpdateEndpoint
+  RotateSecret
+  DeleteEndpoint
+}
+
+enum ThemeAccentTone {
+  teal
+  red
+  gray
+}
+
+enum LegalDocumentKey {
+  terms
+  privacy
+  provider_agreement
+}
+
+enum PlatformNoticeTone {
+  info
+  warning
+  critical
+}
+
+enum UserNotificationKind {
+  pass_expiration
+}
+
+enum ServerVerificationPurpose {
+  registration
+  login_device
+  server_account_rebind
+  pass_use
+  pass_top_up
+}
+
+model User {
+  id                     String     @id @default(uuid())
+  username               String     @unique
+  email                  String     @unique
+  passwordHash           String
+  role                   UserRole   @default(user)
+  pinHash                String?
+  status                 UserStatus @default(PendingReview)
+  reviewInfo             String?
+  reviewRejectedReason   String?
+  registrationIp         String?
+  registrationIpRegion   Json?
+  serverAccountName      String?
+  serverAccountVerified  Boolean    @default(false)
+  expirationReminderDays Int        @default(7)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  devices               Device[]
+  deviceLoginApprovals  DeviceLoginApproval[]
+  sessions              AuthSession[]
+  serverChallenges      ServerVerificationChallenge[]
+  passes                Pass[]
+  claimedAddPassTokens  AddPassToken[]                @relation("ClaimedAddPassTokens")
+  ledgerEntries         LedgerEntry[]
+  redemptionRequests    RedemptionRequest[]
+  disputes              Dispute[]
+  sentPassTransfers     PassTransfer[]                @relation("SentPassTransfers")
+  receivedPassTransfers PassTransfer[]                @relation("ReceivedPassTransfers")
+  notifications         UserNotification[]
+  consumedActionLinks   WalletActionLink[]            @relation("ConsumedActionLinks")
+  topUpRequests         PassTopUpRequest[]
+
+  @@index([status, createdAt])
+  @@index([role, status])
+}
+
+model AuthSession {
+  id        String    @id @default(uuid())
+  userId    String
+  deviceId  String?
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([deviceId])
+}
+
+model Device {
+  id              String       @id @default(uuid())
+  userId          String
+  system          DeviceSystem
+  label           String?
+  fingerprintHash String
+  trustedUntil    DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions AuthSession[]
+
+  @@unique([userId, fingerprintHash])
+  @@index([userId, system, revokedAt])
+}
+
+model DeviceLoginApproval {
+  id              String                    @id @default(uuid())
+  userId          String
+  fingerprintHash String
+  deviceSystem    DeviceSystem
+  deviceLabel     String?
+  ipAddress       String?
+  status          DeviceLoginApprovalStatus @default(pending)
+  expiresAt       DateTime
+  respondedAt     DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
+  @@index([fingerprintHash])
+}
+
+model ClientApplication {
+  id               String   @id @default(uuid())
+  clientId         String   @unique
+  name             String
+  allowedRedirects Json
+  allowedOrigins   Json
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ServerVerificationChallenge {
+  id                String                    @id @default(uuid())
+  userId            String
+  serverId          String
+  purpose           ServerVerificationPurpose @default(registration)
+  codeHash          String
+  status            String                    @default("active")
+  attempts          Int                       @default(0)
+  lastCheckedChatId Int                       @default(-1)
+  expiresAt         DateTime
+  referenceType     String?
+  referenceId       String?
+  rotatedFromId     String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([serverId, status, expiresAt])
+  @@index([userId, status])
+  @@index([purpose, referenceType, referenceId, status])
+}
+
+model Provider {
+  id           String         @id @default(uuid())
+  name         String
+  slug         String         @unique
+  status       ProviderStatus @default(PendingReview)
+  source       String         @default("open_registration")
+  logoUrl      String?
+  introductionUrl String?
+  contactName  String?
+  contactEmail String?
+  businessInfo String?
+  reviewReason String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  templates                 PassTemplate[]
+  passes                    Pass[]
+  accounts                  ProviderAccount[]
+  apiKeys                   ProviderApiKey[]
+  apiKeyChangeRequests      ProviderApiKeyChangeRequest[]
+  webhookEndpoints          ProviderWebhookEndpoint[]
+  webhookChangeRequests     ProviderWebhookChangeRequest[]
+  openApiIdempotencyRecords OpenApiIdempotencyRecord[]
+  openApiRateLimitBuckets   OpenApiRateLimitBucket[]
+  ledgerEntries             LedgerEntry[]
+  redemptionRequests        RedemptionRequest[]
+  actionLinks               WalletActionLink[]
+  ticketUpdateRequests      PassTicketUpdateRequest[]
+  profileChangeRequests     ProviderProfileChangeRequest[]
+
+  @@index([status, createdAt])
+}
+
+model ProviderAccount {
+  id           String                @id @default(uuid())
+  providerId   String
+  email        String                @unique
+  displayName  String
+  passwordHash String
+  status       ProviderAccountStatus @default(PendingReview)
+  role         String                @default("owner")
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  provider         Provider                  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  sessions         ProviderAuthSession[]
+  apiKeys          ProviderApiKey[]
+  apiKeyChangeRequests ProviderApiKeyChangeRequest[]
+  webhookEndpoints ProviderWebhookEndpoint[]
+  webhookChangeRequests ProviderWebhookChangeRequest[]
+  profileChangeRequests ProviderProfileChangeRequest[]
+
+  @@index([providerId, status])
+}
+
+model ProviderAuthSession {
+  id                String    @id @default(uuid())
+  providerAccountId String
+  tokenHash         String    @unique
+  userAgent         String?
+  ipAddress         String?
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  providerAccount ProviderAccount @relation(fields: [providerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([providerAccountId, revokedAt, expiresAt])
+}
+
+model ProviderApiKey {
+  id          String    @id @default(uuid())
+  providerId  String
+  createdById String?
+  name        String
+  keyPrefix   String
+  tokenHash   String    @unique
+  scopes      Json
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  provider           Provider                   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdBy          ProviderAccount?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  changeRequest      ProviderApiKeyChangeRequest?
+  idempotencyRecords OpenApiIdempotencyRecord[]
+  rateLimitBuckets   OpenApiRateLimitBucket[]
+
+  @@index([providerId, revokedAt, createdAt])
+  @@index([keyPrefix])
+}
+
+model ProviderApiKeyChangeRequest {
+  id                    String                            @id @default(uuid())
+  providerId            String
+  requestedById         String?
+  status                ProviderApiKeyChangeRequestStatus @default(PendingReview)
+  kind                  ProviderApiKeyChangeRequestKind   @default(CreateApiKey)
+  proposedName          String
+  proposedScopes        Json
+  proposedExpiresAt     DateTime?
+  reason                String?
+  targetApiKeyId        String?
+  apiKeyId              String?                           @unique
+  plainApiKeyCiphertext String?
+  plainApiKeyViewedAt   DateTime?
+  reviewedById          String?
+  reviewReason          String?
+  reviewedAt            DateTime?
+  createdAt             DateTime                          @default(now())
+  updatedAt             DateTime                          @updatedAt
+
+  provider    Provider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  requestedBy ProviderAccount? @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  apiKey      ProviderApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([providerId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([targetApiKeyId, status])
+}
+
+model OpenApiIdempotencyRecord {
+  id             String   @id @default(uuid())
+  providerId     String
+  apiKeyId       String
+  idempotencyKey String
+  requestHash    String
+  route          String
+  status         String   @default("processing")
+  response       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  provider Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  apiKey   ProviderApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, apiKeyId, idempotencyKey])
+  @@index([providerId, createdAt])
+}
+
+model OpenApiRateLimitBucket {
+  id              String   @id @default(uuid())
+  providerId      String
+  apiKeyId        String
+  scope           String
+  windowStartedAt DateTime
+  count           Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  provider Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  apiKey   ProviderApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, scope])
+  @@index([providerId, updatedAt])
+}
+
+model ProviderWebhookEndpoint {
+  id                      String    @id @default(uuid())
+  providerId              String
+  createdById             String?
+  name                    String
+  url                     String
+  eventTypes              Json
+  enabled                 Boolean   @default(true)
+  signingSecretCiphertext String
+  lastSuccessAt           DateTime?
+  lastFailureAt           DateTime?
+  lastError               String?
+  deletedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  provider   Provider                  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdBy  ProviderAccount?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries ProviderWebhookDelivery[]
+  changeRequests ProviderWebhookChangeRequest[]
+
+  @@index([providerId, deletedAt, enabled, createdAt])
+}
+
+model ProviderWebhookChangeRequest {
+  id                      String                             @id @default(uuid())
+  providerId              String
+  requestedById           String?
+  status                  ProviderWebhookChangeRequestStatus @default(PendingReview)
+  kind                    ProviderWebhookChangeRequestKind   @default(CreateEndpoint)
+  proposedName            String
+  proposedUrl             String
+  proposedEventTypes      Json
+  proposedEnabled         Boolean                            @default(true)
+  reason                  String?
+  endpointId              String?
+  signingSecretCiphertext String?
+  signingSecretViewedAt   DateTime?
+  reviewedById            String?
+  reviewReason            String?
+  reviewedAt              DateTime?
+  createdAt               DateTime                           @default(now())
+  updatedAt               DateTime                           @updatedAt
+
+  provider    Provider                 @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  requestedBy ProviderAccount?         @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  endpoint    ProviderWebhookEndpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
+
+  @@index([providerId, status, createdAt])
+  @@index([endpointId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model ProviderWebhookDelivery {
+  id             String    @id @default(uuid())
+  endpointId     String
+  outboxEventId  String
+  status         String    @default("Pending")
+  attemptCount   Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  lastAttemptAt  DateTime?
+  responseStatus Int?
+  error          String?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  endpoint    ProviderWebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  outboxEvent OutboxEvent             @relation(fields: [outboxEventId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, outboxEventId])
+  @@index([status, nextAttemptAt])
+  @@index([outboxEventId])
+}
+
+model CardTemplateVariant {
+  id          String       @id @default(uuid())
+  key         String       @unique
+  name        String
+  category    PassCategory
+  enabled     Boolean      @default(true)
+  config      Json
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model PassTemplate {
+  id              String         @id @default(uuid())
+  providerId      String
+  category        PassCategory
+  benefitType     BenefitType
+  displayName     String
+  status          TemplateStatus @default(Draft)
+  activeVersionId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  provider  Provider              @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  versions  PassTemplateVersion[]
+  passes    Pass[]
+  addTokens AddPassToken[]
+
+  @@index([providerId, status])
+}
+
+model PassTemplateVersion {
+  id                 String         @id @default(uuid())
+  templateId         String
+  version            Int
+  status             TemplateStatus @default(PendingReview)
+  title              String
+  description        String?
+  cardStyle          Json
+  fields             Json
+  rules              Json
+  locationRules      Json?
+  ticketRules        Json?
+  backgroundImageUrl String?
+  logoUrl            String?
+  submittedById      String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  reviewReason       String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  template PassTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  passes   Pass[]
+
+  @@unique([templateId, version])
+  @@index([status, createdAt])
+}
+
+model Pass {
+  id                String     @id @default(uuid())
+  userId            String?
+  providerId        String
+  templateId        String
+  templateVersionId String
+  status            PassStatus @default(Issued)
+  publicNumber      String?
+  maskedNumber      String?
+  balanceValue      Decimal    @default(0)
+  frozenValue       Decimal    @default(0)
+  overdraftLimit    Decimal    @default(0)
+  expiresAt         DateTime?
+  addedAt           DateTime?
+  archivedAt        DateTime?
+  sortOrder         Int        @default(0)
+  metadata          Json?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider           Provider            @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  template           PassTemplate        @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  templateVersion    PassTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  ledgerEntries      LedgerEntry[]
+  redemptionRequests RedemptionRequest[]
+  disputes           Dispute[]
+  transfers          PassTransfer[]
+  notifications      UserNotification[]
+  actionLinks        WalletActionLink[]  @relation("ActionLinkTargetPass")
+  sourceTopUpRequests PassTopUpRequest[] @relation("SourceTopUpPass")
+  targetTopUpRequests PassTopUpRequest[] @relation("TargetTopUpPass")
+  ticketUpdateRequests PassTicketUpdateRequest[]
+
+  @@index([userId, status, sortOrder])
+  @@index([userId, archivedAt, sortOrder])
+  @@index([providerId, templateId, status])
+  @@unique([providerId, publicNumber])
+}
+
+model UserNotification {
+  id        String               @id @default(uuid())
+  userId    String
+  passId    String?
+  kind      UserNotificationKind
+  title     String
+  body      String
+  metadata  Json?
+  dedupeKey String               @unique
+  readAt    DateTime?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pass Pass? @relation(fields: [passId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt, createdAt])
+  @@index([passId])
+}
+
+model AddPassToken {
+  id                        String             @id @default(uuid())
+  tokenHash                 String             @unique
+  claimCodeTail             String?
+  providerId                String
+  templateId                String
+  passId                    String?
+  status                    AddPassTokenStatus @default(Active)
+  requireServerVerifiedUser Boolean            @default(false)
+  expiresAt                 DateTime
+  claimedByUserId           String?
+  claimedAt                 DateTime?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+
+  template      PassTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  claimedByUser User?        @relation("ClaimedAddPassTokens", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([providerId, status, expiresAt])
+  @@index([claimedByUserId])
+}
+
+model WalletActionLink {
+  id                 String                 @id @default(uuid())
+  tokenHash          String                 @unique
+  kind               WalletActionLinkKind
+  status             WalletActionLinkStatus @default(Active)
+  providerId         String
+  targetPassId       String
+  requestedValue     Decimal
+  verificationMethod VerificationMethod
+  note               String?
+  expiresAt          DateTime
+  consumedByUserId   String?
+  consumedAt         DateTime?
+  revokedAt          DateTime?
+  revokedByType      ActorType?
+  revokedById        String?
+  revokeReason       String?
+  createdByType      ActorType
+  createdById        String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  provider       Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  targetPass     Pass     @relation("ActionLinkTargetPass", fields: [targetPassId], references: [id], onDelete: Cascade)
+  consumedByUser User?    @relation("ConsumedActionLinks", fields: [consumedByUserId], references: [id], onDelete: SetNull)
+  topUpRequests  PassTopUpRequest[]
+
+  @@index([providerId, status, expiresAt])
+  @@index([targetPassId, status])
+  @@index([consumedByUserId])
+}
+
+model LedgerEntry {
+  id             String       @id @default(uuid())
+  passId         String
+  userId         String?
+  providerId     String
+  benefitType    BenefitType
+  reason         LedgerReason
+  beforeValue    Decimal
+  changeValue    Decimal
+  afterValue     Decimal
+  idempotencyKey String       @unique
+  referenceType  String?
+  referenceId    String?
+  note           String?
+  createdByType  ActorType
+  createdById    String?
+  createdAt      DateTime     @default(now())
+
+  pass     Pass     @relation(fields: [passId], references: [id], onDelete: Restrict)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  @@index([passId, createdAt])
+  @@index([providerId, createdAt])
+}
+
+model RedemptionRequest {
+  id                       String             @id @default(uuid())
+  passId                   String
+  userId                   String?
+  providerId               String
+  status                   RedemptionStatus   @default(Created)
+  verificationMethod       VerificationMethod
+  requestedValue           Decimal?
+  idempotencyKey           String             @unique
+  expiresAt                DateTime
+  verificationFailureCount Int                @default(0)
+  maxVerificationAttempts  Int                @default(3)
+  failureCode              String?
+  failureMessage           String?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  pass     Pass     @relation(fields: [passId], references: [id], onDelete: Restrict)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  @@index([passId, status, createdAt])
+  @@index([providerId, status, createdAt])
+}
+
+model PassTopUpRequest {
+  id                  String             @id @default(uuid())
+  userId              String
+  sourcePassId        String
+  targetPassId        String
+  actionLinkId        String?
+  sourceProviderId    String
+  providerId          String
+  status              PassTopUpStatus    @default(Created)
+  verificationMethod  VerificationMethod
+  requestedValue      Decimal
+  note                String?
+  sourceLedgerEntryId String?
+  targetLedgerEntryId String?
+  failureCode         String?
+  failureMessage      String?
+  expiresAt           DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  reversedAt          DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  user       User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sourcePass Pass @relation("SourceTopUpPass", fields: [sourcePassId], references: [id], onDelete: Restrict)
+  targetPass Pass @relation("TargetTopUpPass", fields: [targetPassId], references: [id], onDelete: Restrict)
+  actionLink WalletActionLink? @relation(fields: [actionLinkId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, createdAt])
+  @@index([sourcePassId, status, createdAt])
+  @@index([targetPassId, status, createdAt])
+  @@index([actionLinkId, status, createdAt])
+  @@index([providerId, status, createdAt])
+}
+
+model Dispute {
+  id             String        @id @default(uuid())
+  status         DisputeStatus @default(Submitted)
+  userId         String?
+  passId         String?
+  ledgerEntryId  String?
+  subjectType    String
+  subjectId      String
+  reason         String
+  resolutionNote String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  pass Pass? @relation(fields: [passId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([subjectType, subjectId])
+}
+
+model PassTransfer {
+  id             String             @id @default(uuid())
+  passId         String
+  fromUserId     String
+  toUserId       String
+  status         PassTransferStatus @default(Pending)
+  note           String?
+  responseReason String?
+  expiresAt      DateTime
+  respondedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  pass     Pass @relation(fields: [passId], references: [id], onDelete: Restrict)
+  fromUser User @relation("SentPassTransfers", fields: [fromUserId], references: [id], onDelete: Restrict)
+  toUser   User @relation("ReceivedPassTransfers", fields: [toUserId], references: [id], onDelete: Restrict)
+
+  @@index([fromUserId, status, createdAt])
+  @@index([toUserId, status, createdAt])
+  @@index([passId, status])
+}
+
+model PassTicketUpdateRequest {
+  id                 String                        @id @default(uuid())
+  passId             String
+  providerId         String
+  requestedById      String?
+  status             PassTicketUpdateRequestStatus @default(PendingReview)
+  currentTicketInfo  Json?
+  proposedTicketInfo Json
+  reason             String?
+  reviewedById       String?
+  reviewReason       String?
+  reviewedAt         DateTime?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  pass     Pass     @relation(fields: [passId], references: [id], onDelete: Restrict)
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  @@index([providerId, status, createdAt])
+  @@index([passId, status, createdAt])
+}
+
+model ProviderProfileChangeRequest {
+  id                          String                             @id @default(uuid())
+  providerId                  String
+  requestedById               String?
+  status                      ProviderProfileChangeRequestStatus @default(PendingReview)
+  currentName                 String
+  currentLogoUrl              String?
+  currentIntroductionUrl      String?
+  currentContactName          String?
+  currentContactEmail         String?
+  currentBusinessInfo         String?
+  proposedName                String
+  proposedLogoUrl             String?
+  proposedIntroductionUrl     String?
+  proposedContactName         String
+  proposedContactEmail        String
+  proposedBusinessInfo        String?
+  reason                      String?
+  reviewedById                String?
+  reviewReason                String?
+  reviewedAt                  DateTime?
+  createdAt                   DateTime                           @default(now())
+  updatedAt                   DateTime                           @updatedAt
+
+  provider    Provider         @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  requestedBy ProviderAccount? @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([providerId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model AuditLog {
+  id              String    @id @default(uuid())
+  eventType       String
+  actorType       ActorType
+  actorId         String?
+  subjectType     String?
+  subjectId       String?
+  traceId         String?
+  summary         Json
+  context         Json?
+  contextHash     String?
+  retentionPolicy String    @default("permanent")
+  createdAt       DateTime  @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([actorType, actorId, createdAt])
+  @@index([subjectType, subjectId, createdAt])
+}
+
+model OutboxEvent {
+  id                String                    @id @default(uuid())
+  type              String
+  payload           Json
+  traceId           String?
+  publishedAt       DateTime?
+  failedCount       Int                       @default(0)
+  lastError         String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  webhookDeliveries ProviderWebhookDelivery[]
+
+  @@index([publishedAt, createdAt])
+  @@index([type, createdAt])
+}
+
+model StorageAlert {
+  id             String    @id @default(uuid())
+  drive          String
+  freeBytes      BigInt
+  totalBytes     BigInt
+  thresholdBytes BigInt?
+  thresholdRatio Decimal?
+  status         String    @default("active")
+  createdAt      DateTime  @default(now())
+  resolvedAt     DateTime?
+
+  @@index([status, createdAt])
+}
+
+model PlatformThemeScheduleEntry {
+  id          String          @id @default(uuid())
+  effectiveAt DateTime
+  tone        ThemeAccentTone
+  enabled     Boolean         @default(true)
+  note        String?
+  updatedById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([effectiveAt])
+  @@index([enabled, effectiveAt])
+}
+
+model LegalDocument {
+  key         LegalDocumentKey @id
+  title       String
+  content     String
+  updatedById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([updatedAt])
+}
+
+model PlatformStatus {
+  key                 String             @id
+  announcementEnabled Boolean            @default(false)
+  announcementTitle   String?
+  announcementBody    String?
+  announcementTone    PlatformNoticeTone @default(info)
+  maintenanceEnabled  Boolean            @default(false)
+  maintenanceTitle    String?
+  maintenanceBody     String?
+  updatedById         String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@ldpass/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "check": "pnpm typecheck",
+    "dev": "next dev -p 3200",
+    "lint": "pnpm typecheck",
+    "start": "next start -p 3200",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ldpass/contracts": "workspace:*",
+    "@ldpass/ui": "workspace:*",
+    "next": "^15.3.4",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6"
+  }
+}

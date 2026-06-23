@@ -1,0 +1,24 @@
+{
+  "name": "ldpass",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "build": "pnpm db:generate && pnpm -r build",
+    "check": "pnpm -r check",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm db:generate && pnpm -r typecheck",
+    "format": "prettier --write .",
+    "db:generate": "pnpm --filter @ldpass/database db:generate",
+    "db:migrate": "pnpm --filter @ldpass/database db:migrate",
+    "db:deploy": "pnpm --filter @ldpass/database db:deploy",
+    "db:push": "pnpm --filter @ldpass/database db:push",
+    "db:studio": "pnpm --filter @ldpass/database db:studio",
+    "seed:super-admin": "pnpm --filter @ldpass/database seed:super-admin"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3"
+  }
+}

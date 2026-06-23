@@ -1,0 +1,35 @@
+{
+  "name": "@ldpass/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm db:generate && tsc -b tsconfig.json",
+    "check": "pnpm typecheck",
+    "lint": "pnpm typecheck",
+    "typecheck": "pnpm db:generate && tsc -b tsconfig.json",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "seed:super-admin": "tsx src/seed-super-admin.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-libsql": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "prisma": "^7.8.0",
+    "tsx": "^4.20.3"
+  }
+}

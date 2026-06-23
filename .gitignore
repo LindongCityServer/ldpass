@@ -1,0 +1,29 @@
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 构建产物
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# 环境变量
+.env
+.env.*
+!.env.example
+
+# 日志
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# Prisma
+packages/database/generated/
+packages/database/src/generated/
