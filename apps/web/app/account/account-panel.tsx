@@ -7,6 +7,7 @@ interface SessionResponse {
   user: {
     username: string;
     email: string;
+    role: 'user' | 'admin' | 'super_admin';
     status: string;
     reviewInfo: string | null;
     reviewRejectedReason: string | null;
@@ -18,6 +19,18 @@ interface SessionResponse {
   } | null;
 }
 
+interface ProviderSessionResponse {
+  providerAccount: {
+    providerName: string;
+    providerSlug: string;
+    providerStatus: string;
+    email: string;
+    displayName: string;
+    status: string;
+    role: string;
+  } | null;
+}
+
 interface AccountDevice {
   id: string;
   system: 'android' | 'ios' | 'windows' | 'macos' | 'linux' | 'other';
@@ -25,8 +38,19 @@ interface AccountDevice {
   trustedUntil: string | null;
   revokedAt: string | null;
   activeSessionCount: number;
+  lastLoginIp: string | null;
+  lastLoginIpRegion: IpRegionLike | null;
+  lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface IpRegionLike {
+  country?: string;
+  provinceOrState?: string;
+  city?: string;
+  address?: string;
+  source: string;
 }
 
 interface AccountDevicesResponse {
@@ -38,6 +62,7 @@ interface DeviceLoginApproval {
   deviceSystem: AccountDevice['system'];
   deviceLabel: string | null;
   ipAddress: string | null;
+  ipRegion: IpRegionLike | null;
   expiresAt: string;
   createdAt: string;
 }
@@ -74,6 +99,7 @@ interface ServerAccountRebindCheckResponse {
 
 type AccountDialog =
   | 'preferences'
+  | 'password'
   | 'pin'
   | 'server'
   | 'deviceApprovals'
@@ -102,6 +128,7 @@ function UserAvatar({ avatarUrl, fallbackUrl }: { avatarUrl: string | null; fall
 
 export function AccountPanel() {
   const [session, setSession] = useState<SessionResponse['user']>(null);
+  const [providerAccount, setProviderAccount] = useState<ProviderSessionResponse['providerAccount']>(null);
   const [devices, setDevices] = useState<AccountDevice[]>([]);
   const [deviceApprovals, setDeviceApprovals] = useState<DeviceLoginApproval[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -109,6 +136,7 @@ export function AccountPanel() {
   const [isDevicesLoading, setIsDevicesLoading] = useState(false);
   const [isDeviceApprovalsLoading, setIsDeviceApprovalsLoading] = useState(false);
   const [isSettingPin, setIsSettingPin] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [isStartingServerRebind, setIsStartingServerRebind] = useState(false);
   const [isCheckingServerRebind, setIsCheckingServerRebind] = useState(false);
@@ -124,14 +152,24 @@ export function AccountPanel() {
 
     const loadAccount = async () => {
       try {
-        const result = await getJson<SessionResponse>('/api/auth/session');
+        const [result, providerSession] = await Promise.all([
+          getJson<SessionResponse>('/api/auth/session'),
+          getJson<ProviderSessionResponse>('/api/providers/auth/session').catch(() => ({
+            providerAccount: null,
+          })),
+        ]);
         if (!isMounted) {
           return;
         }
 
         setSession(result.user);
+        setProviderAccount(providerSession.providerAccount);
         if (!result.user) {
-          setMessage('请先登录后再管理账户。');
+          setMessage(
+            providerSession.providerAccount
+              ? '当前已登录发卡方账户，可进入发卡方后台；如需管理个人账户请先登录。'
+              : '请先登录后再管理账户。',
+          );
           return;
         }
 
@@ -180,6 +218,11 @@ export function AccountPanel() {
     window.location.href = '/login';
   };
 
+  const logoutProvider = async () => {
+    await postJson('/api/providers/auth/logout');
+    window.location.href = '/provider/login';
+  };
+
   const deleteAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -212,7 +255,8 @@ export function AccountPanel() {
   const setPin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const password = String(form.get('pinPassword') ?? '');
     const pin = String(form.get('pin') ?? '');
 
@@ -229,13 +273,50 @@ export function AccountPanel() {
         password,
         pin,
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage('PIN 已设置，可用于确认卡券消耗等敏感操作。');
       setActiveDialog(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '设置 PIN 失败。');
     } finally {
       setIsSettingPin(false);
+    }
+  };
+
+  const changePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const currentPassword = String(form.get('currentPassword') ?? '');
+    const nextPassword = String(form.get('nextPassword') ?? '');
+    const confirmPassword = String(form.get('confirmPassword') ?? '');
+
+    if (!currentPassword || !nextPassword || !confirmPassword) {
+      setMessage('请输入当前密码和新密码。');
+      return;
+    }
+
+    if (nextPassword !== confirmPassword) {
+      setMessage('两次输入的新密码不一致。');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setMessage(null);
+
+    try {
+      await postJson('/api/auth/account/password', {
+        currentPassword,
+        nextPassword,
+      });
+      formElement.reset();
+      setMessage('密码已修改，下次登录请使用新密码。');
+      setActiveDialog(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '修改密码失败。');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -425,6 +506,29 @@ export function AccountPanel() {
     : '未登录';
   const activeDeviceCount = devices.filter((device) => !device.revokedAt).length;
   const activeDialogTitle = activeDialog ? getAccountDialogTitle(activeDialog) : '';
+  const isAdminAccount = session?.status === 'Active' && (session.role === 'admin' || session.role === 'super_admin');
+  const backofficeEntrances = [
+    ...(isAdminAccount
+      ? [
+          {
+            href: '/admin',
+            icon: 'admin_panel_settings',
+            title: '平台管理',
+            detail: `${formatUserRole(session?.role ?? 'user')} · 管理用户、发卡方和平台配置`,
+          },
+        ]
+      : []),
+    ...(providerAccount
+      ? [
+          {
+            href: '/provider/dashboard',
+            icon: 'storefront',
+            title: '发卡方后台',
+            detail: `${providerAccount.providerName} · ${formatProviderAccountStatus(providerAccount)}`,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <section className="account-page" aria-labelledby="account-title">
@@ -434,11 +538,23 @@ export function AccountPanel() {
           <h1 id="account-title">账户</h1>
         </div>
         <div className="account-titlebar-actions">
+          {backofficeEntrances.map((entry) => (
+            <a className="secondary-action" href={entry.href} key={entry.href}>
+              <span className="material-symbols-rounded" aria-hidden="true">
+                {entry.icon}
+              </span>
+              <span>{entry.title}</span>
+            </a>
+          ))}
           <a className="secondary-action" href="/">
             返回钱包
           </a>
-          <button className="secondary-action" type="button" onClick={() => void logout()}>
-            退出登录
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => void (session ? logout() : logoutProvider())}
+          >
+            {session ? '退出登录' : providerAccount ? '退出发卡方' : '退出登录'}
           </button>
         </div>
       </div>
@@ -482,6 +598,25 @@ export function AccountPanel() {
             ) : null}
           </section>
 
+          {backofficeEntrances.length ? (
+            <section className="account-settings-grid account-backoffice-grid" aria-label="后台入口">
+              {backofficeEntrances.map((entry) => (
+                <a className="account-setting-item" href={entry.href} key={entry.href}>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    {entry.icon}
+                  </span>
+                  <div>
+                    <strong>{entry.title}</strong>
+                    <small>{entry.detail}</small>
+                  </div>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    chevron_right
+                  </span>
+                </a>
+              ))}
+            </section>
+          ) : null}
+
           {canUseAccountSettings ? (
             <section className="account-settings-grid" aria-label="账户设置">
               <button className="account-setting-item" type="button" onClick={() => setActiveDialog('preferences')}>
@@ -503,6 +638,18 @@ export function AccountPanel() {
                 <div>
                   <strong>PIN</strong>
                   <small>用于确认核销、充值等敏感操作</small>
+                </div>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  chevron_right
+                </span>
+              </button>
+              <button className="account-setting-item" type="button" onClick={() => setActiveDialog('password')}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  password
+                </span>
+                <div>
+                  <strong>密码</strong>
+                  <small>使用当前密码确认后自助修改</small>
                 </div>
                 <span className="material-symbols-rounded" aria-hidden="true">
                   chevron_right
@@ -582,6 +729,14 @@ export function AccountPanel() {
         </>
       ) : !isLoading ? (
         <div className="form-actions">
+          {providerAccount ? (
+            <a className="primary-action" href="/provider/dashboard">
+              <span className="material-symbols-rounded" aria-hidden="true">
+                storefront
+              </span>
+              <span>进入发卡方后台</span>
+            </a>
+          ) : null}
           <a className="primary-action" href="/login">
             <span className="material-symbols-rounded" aria-hidden="true">
               login
@@ -655,6 +810,28 @@ export function AccountPanel() {
               </form>
             ) : null}
 
+            {activeDialog === 'password' ? (
+              <form className="stacked-form" onSubmit={changePassword} noValidate>
+                <label>
+                  <span>当前密码</span>
+                  <input type="password" name="currentPassword" autoComplete="current-password" required />
+                </label>
+                <label>
+                  <span>新密码</span>
+                  <input type="password" name="nextPassword" autoComplete="new-password" minLength={8} required />
+                </label>
+                <label>
+                  <span>确认新密码</span>
+                  <input type="password" name="confirmPassword" autoComplete="new-password" minLength={8} required />
+                </label>
+                <div className="form-actions">
+                  <button className="primary-action" type="submit" disabled={isChangingPassword}>
+                    {isChangingPassword ? '保存中' : '保存'}
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
             {activeDialog === 'server' ? (
               <form className="stacked-form" onSubmit={startServerRebind} noValidate>
                 <label>
@@ -689,7 +866,10 @@ export function AccountPanel() {
                     <article className="account-device-item" key={approval.id}>
                       <div>
                         <strong>{approval.deviceLabel ?? formatDeviceSystem(approval.deviceSystem)}</strong>
-                        <span>{formatDeviceSystem(approval.deviceSystem)} · IP {approval.ipAddress ?? '未知'}</span>
+                        <span>
+                          {formatDeviceSystem(approval.deviceSystem)} · IP {approval.ipAddress ?? '未知'} · 属地：
+                          {formatIpRegion(approval.ipRegion)}
+                        </span>
                         <span>发起时间：{new Date(approval.createdAt).toLocaleString('zh-CN')}</span>
                         <span>有效期至：{new Date(approval.expiresAt).toLocaleString('zh-CN')}</span>
                       </div>
@@ -716,6 +896,9 @@ export function AccountPanel() {
                       <div>
                         <strong>{device.label ?? formatDeviceSystem(device.system)}</strong>
                         <span>{formatDeviceSystem(device.system)} · {device.revokedAt ? '已撤销' : `${device.activeSessionCount} 个活动会话`}</span>
+                        <span>
+                          最近登录：IP {device.lastLoginIp ?? '未知'} · 属地：{formatIpRegion(device.lastLoginIpRegion)}
+                        </span>
                         <span>最近更新：{new Date(device.updatedAt).toLocaleString('zh-CN')}</span>
                       </div>
                       <button
@@ -773,6 +956,7 @@ export function AccountPanel() {
 function getAccountDialogTitle(dialog: AccountDialog): string {
   const labels: Record<AccountDialog, string> = {
     preferences: '提醒偏好',
+    password: '密码',
     pin: 'PIN',
     server: '服务器账号',
     deviceApprovals: '新设备确认',
@@ -795,6 +979,49 @@ function formatDeviceSystem(system: AccountDevice['system']): string {
   };
 
   return labels[system];
+}
+
+function formatIpRegion(region: IpRegionLike | null): string {
+  if (!region) {
+    return '未知';
+  }
+
+  const parts = [region.country, region.provinceOrState, region.city, region.address]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+
+  return parts.length > 0 ? Array.from(new Set(parts)).join(' / ') : '未知';
+}
+
+function formatUserRole(role: NonNullable<SessionResponse['user']>['role']): string {
+  const labels: Record<NonNullable<SessionResponse['user']>['role'], string> = {
+    user: '普通账户',
+    admin: '管理员',
+    super_admin: '超级管理员',
+  };
+
+  return labels[role];
+}
+
+function formatProviderAccountStatus(account: NonNullable<ProviderSessionResponse['providerAccount']>): string {
+  const accountStatus = formatShortStatus(account.status);
+  const providerStatus = formatShortStatus(account.providerStatus);
+
+  return account.status === account.providerStatus
+    ? accountStatus
+    : `账号 ${accountStatus} / 发卡方 ${providerStatus}`;
+}
+
+function formatShortStatus(status: string): string {
+  const labels: Record<string, string> = {
+    Active: '可用',
+    PendingReview: '待审核',
+    Rejected: '已驳回',
+    Suspended: '已停用',
+    Archived: '已归档',
+  };
+
+  return labels[status] ?? status;
 }
 
 function formatInactiveAccountMessage(status: string): string {

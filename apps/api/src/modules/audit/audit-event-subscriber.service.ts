@@ -26,7 +26,7 @@ const auditedEventTypes: DomainEventType[] = [
   'UserUnsuspended',
   'UserDeletedByAdmin',
   'UserPreferencesUpdated',
-  'UserPinResetByAdmin',
+  'CredentialChanged',
   'ProviderSubmitted',
   'ProviderCreatedByAdmin',
   'ProviderAccountCreated',

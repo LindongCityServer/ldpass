@@ -146,6 +146,9 @@ export function AuditLogPanel() {
           />
         </label>
         <div className="audit-filter-actions">
+          <button className="secondary-action" type="button" onClick={() => void loadLogs(filters)}>
+            刷新
+          </button>
           <button className="secondary-action" type="button" onClick={clearFilters}>
             清空
           </button>
@@ -209,7 +212,47 @@ function readSummaryText(summary: unknown): string {
     return '无摘要。';
   }
 
-  return JSON.stringify(payload).slice(0, 220);
+  const entries = Object.entries(payload as Record<string, unknown>)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .slice(0, 8)
+    .map(([key, value]) => `${formatPayloadKey(key)}：${formatPayloadValue(value)}`);
+
+  return entries.length > 0 ? entries.join('；') : '无摘要。';
+}
+
+function formatPayloadKey(key: string): string {
+  const labels: Record<string, string> = {
+    userId: '用户 ID',
+    providerId: '发卡方 ID',
+    passId: '卡券 ID',
+    templateId: '模板 ID',
+    versionId: '版本 ID',
+    status: '状态',
+    reason: '原因',
+    subjectId: '对象 ID',
+    subjectType: '对象类型',
+    actorId: '操作者 ID',
+    email: '邮箱',
+    username: '用户名',
+    providerName: '发卡方',
+    displayName: '名称',
+    publicNumber: '卡号',
+    maskedNumber: '掩码卡号',
+  };
+
+  return labels[key] ?? key;
+}
+
+function formatPayloadValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.map(formatPayloadValue).join('、') : '空列表';
+  }
+
+  if (value && typeof value === 'object') {
+    return '包含结构化信息';
+  }
+
+  return String(value);
 }
 
 async function readExportError(response: Response): Promise<string> {

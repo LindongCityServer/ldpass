@@ -111,6 +111,8 @@ export function ProviderIssuePanel() {
   const [issueMode, setIssueMode] = useState<IssueMode>('single');
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<IssueResult | null>(null);
+  const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false);
+  const [detailToken, setDetailToken] = useState<ProviderAddPassTokenSummary | null>(null);
   const [tokens, setTokens] = useState<ProviderAddPassTokenSummary[]>([]);
   const [tokenKeyword, setTokenKeyword] = useState('');
   const [tokenStatusFilter, setTokenStatusFilter] = useState<TokenStatusFilter>('all');
@@ -220,13 +222,14 @@ export function ProviderIssuePanel() {
         });
         const firstExpiresAt = response.tokens[0]?.expiresAt;
         const firstPassExpiresAt = response.tokens[0]?.passExpiresAt ?? null;
-        setMessage(
-          firstExpiresAt
+      setMessage(
+        firstExpiresAt
             ? `已生成 ${response.total} 个领取码，领取码有效期至 ${formatDate(firstExpiresAt)}，卡券有效期：${firstPassExpiresAt ? formatDate(firstPassExpiresAt) : '长期有效'}。`
             : '批量发放已提交，但没有返回领取码。',
-        );
-        void loadTokens();
-        return;
+      );
+      setIsIssueDialogOpen(false);
+      void loadTokens();
+      return;
       }
 
       const response = await postJson<CreateProviderTokenResponse>('/api/provider/issuing/add-pass-tokens', payload);
@@ -237,6 +240,7 @@ export function ProviderIssuePanel() {
       setMessage(
         `领取码已生成，领取码有效期至 ${formatDate(response.expiresAt)}，卡券有效期：${response.passExpiresAt ? formatDate(response.passExpiresAt) : '长期有效'}。`,
       );
+      setIsIssueDialogOpen(false);
       void loadTokens();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '生成领取码失败。');
@@ -334,6 +338,12 @@ export function ProviderIssuePanel() {
           <h1 id="provider-issue-title">生成领取码</h1>
         </div>
         <div className="admin-list-actions">
+          <button className="primary-action" type="button" onClick={() => setIsIssueDialogOpen(true)} disabled={templates.length === 0}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              add_card
+            </span>
+            <span>发放领取码</span>
+          </button>
           <button
             className="secondary-action"
             type="button"
@@ -356,46 +366,79 @@ export function ProviderIssuePanel() {
       {message ? (
         <div className="flow-notice" role="status" aria-live="polite">
           <span>{message}</span>
-          {result?.mode === 'single' ? <strong>{result.token.claimCode}</strong> : null}
-          {result?.mode === 'single' ? <span>对应卡号：{formatPassNumber(result.token)}</span> : null}
-          {result?.mode === 'batch' ? <strong>{result.total} 个领取码</strong> : null}
         </div>
       ) : null}
 
-      {result?.mode === 'single' && claimLink ? (
-        <ClaimLinkTools claimCode={result.token.claimCode} claimLink={claimLink} onMessage={setMessage} />
-      ) : null}
-
-      {result?.mode === 'batch' ? (
-        <div className="account-summary">
-          <strong>批量发放结果</strong>
-          <span>批次：{result.issueBatchId}</span>
-          <div className="form-actions">
-            <button className="secondary-action" type="button" onClick={() => void copyBatchLinks()}>
-              复制全部链接
-            </button>
-            <a className="primary-action" href="/provider/passes">
-              查看卡券
-            </a>
-          </div>
-          <div className="admin-list compact-list">
-            {result.tokens.map((item) => (
-              <article className="admin-list-item" key={item.passId}>
-                <div>
-                  <h2>{item.claimCode}</h2>
-                  <p>{origin ? `${origin}${item.claimPath}` : item.claimPath}</p>
-                  <p>对应卡号：{formatPassNumber(item)}</p>
-                  <p>领取码有效期至：{formatDate(item.expiresAt)}</p>
-                  <p>卡券有效期：{item.passExpiresAt ? formatDate(item.passExpiresAt) : '长期有效'}</p>
+      {result ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setResult(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="完整领取码">
+            <div className="admin-dialog-heading">
+              <h2>{result.mode === 'single' ? '完整领取码' : '批量发放结果'}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setResult(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            {result.mode === 'single' && claimLink ? (
+              <>
+                <div className="flow-notice flow-notice-warning" role="status">
+                  <span>完整领取码只能在本弹窗中查看一次，关闭后列表只保留尾号。</span>
+                  <strong>{result.token.claimCode}</strong>
+                  <span>对应卡号：{formatPassNumber(result.token)}</span>
                 </div>
-                <div className="admin-list-actions">
-                  <a className="secondary-action" href={item.claimPath}>
-                    打开
+                <ClaimLinkTools claimCode={result.token.claimCode} claimLink={claimLink} onMessage={setMessage} />
+              </>
+            ) : null}
+            {result.mode === 'batch' ? (
+              <div className="account-summary">
+                <div className="flow-notice flow-notice-warning" role="status">
+                  <span>完整领取码只能在本弹窗中查看一次，关闭后列表只保留尾号。</span>
+                </div>
+                <strong>{result.total} 个领取码</strong>
+                <span>批次：{result.issueBatchId}</span>
+                <div className="form-actions">
+                  <button className="secondary-action" type="button" onClick={() => void copyBatchLinks()}>
+                    复制全部链接
+                  </button>
+                  <a className="primary-action" href="/provider/passes">
+                    查看卡券
                   </a>
                 </div>
-              </article>
-            ))}
-          </div>
+                <div className="admin-list compact-list">
+                  {result.tokens.map((item) => (
+                    <article className="admin-list-item" key={item.passId}>
+                      <div>
+                        <h2>{item.claimCode}</h2>
+                        <p>{origin ? `${origin}${item.claimPath}` : item.claimPath}</p>
+                        <p>对应卡号：{formatPassNumber(item)}</p>
+                        <p>领取码有效期至：{formatDate(item.expiresAt)}</p>
+                        <p>卡券有效期：{item.passExpiresAt ? formatDate(item.passExpiresAt) : '长期有效'}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
+      {detailToken ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setDetailToken(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="领取码详情">
+            <div className="admin-dialog-heading">
+              <h2>{detailToken.maskedClaimCode ?? '旧领取码（无尾号）'}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setDetailToken(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <ProviderTokenDetail token={detailToken} />
+          </section>
         </div>
       ) : null}
 
@@ -457,21 +500,13 @@ export function ProviderIssuePanel() {
                 <div>
                   <h2>{item.maskedClaimCode ?? '旧领取码（无尾号）'}</h2>
                   <p>
-                    {item.templateName} · {categoryLabels[item.category] ?? item.category} ·{' '}
-                    {benefitLabels[item.benefitType] ?? item.benefitType}
-                  </p>
-                  <p>对应卡号：{formatPassNumber(item)}</p>
-                  <p>
-                    状态：{statusLabels[item.status] ?? item.status} · 领取码有效期：{formatDate(item.expiresAt)}
-                  </p>
-                  <p>
-                    {item.claimedByUser
-                      ? `领取人：${item.claimedByUser.username}（${item.claimedByUser.email}）`
-                      : '尚未领取'}
-                    {item.requireServerVerifiedUser ? ' · 需要服务器账号验证' : ''}
+                    {item.templateName} · {statusLabels[item.status] ?? item.status}
                   </p>
                 </div>
                 <div className="admin-list-actions">
+                  <button className="secondary-action" type="button" onClick={() => setDetailToken(item)}>
+                    详情
+                  </button>
                   {item.passId ? (
                     <a className="secondary-action" href={`/provider/passes?keyword=${encodeURIComponent(item.passId)}`}>
                       查看卡券
@@ -505,7 +540,19 @@ export function ProviderIssuePanel() {
         <p className="empty-note">还没有可发放的模板。请先创建模板并等待管理员审核通过。</p>
       ) : null}
 
-      <form className="stacked-form" onSubmit={createToken} noValidate>
+      {isIssueDialogOpen ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsIssueDialogOpen(false)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="发放领取码">
+            <div className="admin-dialog-heading">
+              <h2>发放领取码</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsIssueDialogOpen(false)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+      <form className="admin-dialog-form" onSubmit={createToken} noValidate>
         <div className="segmented-control" aria-label="发放方式">
           <button
             className={issueMode === 'single' ? 'is-selected' : ''}
@@ -630,7 +677,57 @@ export function ProviderIssuePanel() {
           </button>
         </div>
       </form>
+          </section>
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function ProviderTokenDetail({ token }: { token: ProviderAddPassTokenSummary }) {
+  return (
+    <dl className="admin-detail-list">
+      <div>
+        <dt>模板</dt>
+        <dd>{token.templateName}</dd>
+      </div>
+      <div>
+        <dt>分类</dt>
+        <dd>{categoryLabels[token.category] ?? token.category}</dd>
+      </div>
+      <div>
+        <dt>权益类型</dt>
+        <dd>{benefitLabels[token.benefitType] ?? token.benefitType}</dd>
+      </div>
+      <div>
+        <dt>状态</dt>
+        <dd>{statusLabels[token.status] ?? token.status}</dd>
+      </div>
+      <div>
+        <dt>对应卡号</dt>
+        <dd>{formatPassNumber(token)}</dd>
+      </div>
+      <div>
+        <dt>领取人</dt>
+        <dd>{token.claimedByUser ? `${token.claimedByUser.username}（${token.claimedByUser.email}）` : '尚未领取'}</dd>
+      </div>
+      <div>
+        <dt>服务器验证</dt>
+        <dd>{token.requireServerVerifiedUser ? '需要' : '不需要'}</dd>
+      </div>
+      <div>
+        <dt>领取码有效期</dt>
+        <dd>{formatDate(token.expiresAt)}</dd>
+      </div>
+      <div>
+        <dt>领取时间</dt>
+        <dd>{token.claimedAt ? formatDate(token.claimedAt) : '尚未领取'}</dd>
+      </div>
+      <div>
+        <dt>创建时间</dt>
+        <dd>{formatDate(token.createdAt)}</dd>
+      </div>
+    </dl>
   );
 }
 

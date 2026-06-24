@@ -116,6 +116,7 @@ export interface IpRegion {
   country?: string;
   provinceOrState?: string;
   city?: string;
+  address?: string;
   source: string;
 }
 

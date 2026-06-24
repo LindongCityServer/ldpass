@@ -223,7 +223,7 @@ export interface UserDeletedByAdmin extends BaseEvent {
     userId: string;
     deletedBy: string;
     reason: string;
-    deletionMode: 'soft_delete';
+    deletionMode: 'soft_delete' | 'anonymize_and_release';
   };
 }
 
@@ -236,11 +236,12 @@ export interface UserPreferencesUpdated extends BaseEvent {
   };
 }
 
-export interface UserPinResetByAdmin extends BaseEvent {
-  type: 'UserPinResetByAdmin';
+export interface CredentialChanged extends BaseEvent {
+  type: 'CredentialChanged';
   payload: {
     userId: string;
-    resetBy: string;
+    credentialType: 'password' | 'pin';
+    changedBy: 'self' | 'admin';
   };
 }
 
@@ -1208,7 +1209,7 @@ export type DomainEvent =
   | UserUnsuspended
   | UserDeletedByAdmin
   | UserPreferencesUpdated
-  | UserPinResetByAdmin
+  | CredentialChanged
   | ProviderSubmitted
   | ProviderCreatedByAdmin
   | ProviderAccountCreated

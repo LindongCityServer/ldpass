@@ -1,12 +1,16 @@
 import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type { Prisma } from '@ldpass/database';
+import { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import type { AuthenticatedUser } from '../../shared/auth/session-auth.service.js';
 import { SecretHashService } from '../../shared/auth/secret-hash.service.js';
+import {
+  anonymizeUserAuditLogs,
+  createDeletedUserIdentity,
+} from '../../shared/auth/user-anonymization.js';
 import { PrismaService } from '../../shared/database/prisma.service.js';
-import type { AdminUserSensitiveActionDto, AdminUsersQueryDto } from './dto.js';
+import type { AdminUserSensitiveActionDto, AdminUsersQueryDto, ResetUserPasswordDto } from './dto.js';
 
 @Injectable()
 export class AdminUsersService {
@@ -234,35 +238,34 @@ export class AdminUsersService {
     };
   }
 
-  async resetUserPin(userId: string, pin: string, admin: AuthenticatedUser) {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-    });
+  async resetUserPassword(userId: string, dto: ResetUserPasswordDto, admin: AuthenticatedUser) {
+    const user = await this.readGovernableUser(userId, admin);
 
-    if (!user) {
-      throw new NotFoundException('用户不存在。');
+    if (user.status === 'Deleted') {
+      throw new BadRequestException('已删除用户不能重置密码。');
     }
 
+    const now = new Date();
+    await this.verifyAdminPin(admin, dto.secondFactor, randomUUID(), now);
     const updated = await this.prisma.user.update({
       where: {
         id: userId,
       },
       data: {
-        pinHash: await this.secretHash.hashSecret(pin, 'pin'),
+        passwordHash: await this.secretHash.hashSecret(dto.password, 'password'),
       },
     });
 
     await this.eventBus.publish({
-      type: 'UserPinResetByAdmin',
+      type: 'CredentialChanged',
       eventId: randomUUID(),
-      occurredAt: new Date().toISOString(),
+      occurredAt: now.toISOString(),
       actorType: 'admin',
       actorId: admin.id,
       payload: {
         userId,
-        resetBy: admin.id,
+        credentialType: 'password',
+        changedBy: 'admin',
       },
     });
 
@@ -387,6 +390,7 @@ export class AdminUsersService {
     const reason = dto.reason.trim();
     const now = new Date();
     await this.verifyAdminPin(admin, dto.secondFactor, randomUUID(), now);
+    const deletedIdentity = createDeletedUserIdentity(userId);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const nextUser = await tx.user.update({
@@ -394,8 +398,27 @@ export class AdminUsersService {
           id: userId,
         },
         data: {
+          username: deletedIdentity.username,
+          email: deletedIdentity.email,
+          passwordHash: deletedIdentity.passwordHash,
+          pinHash: null,
           status: 'Deleted',
+          reviewInfo: null,
           reviewRejectedReason: reason,
+          registrationIp: null,
+          registrationIpRegion: Prisma.JsonNull,
+          serverAccountName: null,
+          serverAccountVerified: false,
+        },
+      });
+
+      await tx.serverVerificationChallenge.updateMany({
+        where: {
+          userId,
+          status: 'active',
+        },
+        data: {
+          status: 'cancelled',
         },
       });
 
@@ -419,6 +442,8 @@ export class AdminUsersService {
         },
       });
 
+      await anonymizeUserAuditLogs(tx, user, deletedIdentity);
+
       return nextUser;
     });
 
@@ -432,7 +457,7 @@ export class AdminUsersService {
         userId,
         deletedBy: admin.id,
         reason,
-        deletionMode: 'soft_delete',
+        deletionMode: 'anonymize_and_release',
       },
     });
 
@@ -447,6 +472,8 @@ export class AdminUsersService {
         reason: 'admin_removed',
       },
     });
+
+    await anonymizeUserAuditLogs(this.prisma, user, deletedIdentity);
 
     return {
       user: this.toPublicUser(updated),

@@ -101,6 +101,9 @@ export function ProviderApiKeysPanel() {
   const [scopes, setScopes] = useState<ProviderApiKeyScope[]>([]);
   const [selectedScopes, setSelectedScopes] = useState<ProviderApiKeyScope[]>(['add_pass_token:create']);
   const [plainApiKey, setPlainApiKey] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [detailApiKey, setDetailApiKey] = useState<ProviderApiKey | null>(null);
+  const [detailChangeRequest, setDetailChangeRequest] = useState<ProviderApiKeyChangeRequest | null>(null);
   const [rateLimit, setRateLimit] = useState<ApiKeysResponse['rateLimit'] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -146,7 +149,8 @@ export function ProviderApiKeysPanel() {
 
   const createApiKey = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const name = String(form.get('name') ?? '');
     const expiresInDaysRaw = String(form.get('expiresInDays') ?? '').trim();
     const reason = String(form.get('reason') ?? '').trim();
@@ -169,7 +173,8 @@ export function ProviderApiKeysPanel() {
       });
       setPlainApiKey(result.plainApiKey ?? null);
       setMessage('API 密钥创建申请已提交，等待管理员审核。');
-      event.currentTarget.reset();
+      setIsCreateDialogOpen(false);
+      formElement.reset();
       setSelectedScopes(['add_pass_token:create']);
       await loadApiKeys();
     } catch (error) {
@@ -255,6 +260,12 @@ export function ProviderApiKeysPanel() {
           <h1 id="provider-api-keys-title">API 密钥</h1>
         </div>
         <div className="admin-list-actions">
+          <button className="primary-action" type="button" onClick={() => setIsCreateDialogOpen(true)}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              key
+            </span>
+            <span>提交申请</span>
+          </button>
           <button className="secondary-action" type="button" onClick={() => void loadApiKeys()} disabled={isLoading}>
             刷新
           </button>
@@ -271,21 +282,79 @@ export function ProviderApiKeysPanel() {
       ) : null}
 
       {plainApiKey ? (
-        <div className="account-summary api-key-secret-panel">
-          <strong>新密钥只显示一次</strong>
-          <code>{plainApiKey}</code>
-          <div className="form-actions">
-            <button className="primary-action" type="button" onClick={() => void copyPlainApiKey()}>
-              <span className="material-symbols-rounded" aria-hidden="true">
-                content_copy
-              </span>
-              <span>复制密钥</span>
-            </button>
-          </div>
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setPlainApiKey(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="新 API 密钥">
+            <div className="admin-dialog-heading">
+              <h2>新密钥只显示一次</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setPlainApiKey(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <div className="api-key-secret-panel">
+              <code>{plainApiKey}</code>
+              <div className="form-actions">
+                <button className="primary-action" type="button" onClick={() => void copyPlainApiKey()}>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    content_copy
+                  </span>
+                  <span>复制密钥</span>
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
       ) : null}
 
-      <form className="stacked-form account-summary" onSubmit={createApiKey} noValidate>
+      {detailApiKey ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setDetailApiKey(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="API 密钥详情">
+            <div className="admin-dialog-heading">
+              <h2>{detailApiKey.name}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setDetailApiKey(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <ApiKeyDetail apiKey={detailApiKey} />
+          </section>
+        </div>
+      ) : null}
+
+      {detailChangeRequest ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setDetailChangeRequest(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="API 密钥申请详情">
+            <div className="admin-dialog-heading">
+              <h2>{formatApiKeyChangeKind(detailChangeRequest.kind)}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setDetailChangeRequest(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <ApiKeyChangeRequestDetail request={detailChangeRequest} />
+          </section>
+        </div>
+      ) : null}
+
+      {isCreateDialogOpen ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="提交 API 密钥申请">
+            <div className="admin-dialog-heading">
+              <h2>提交 API 密钥申请</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+      <form className="admin-dialog-form" onSubmit={createApiKey} noValidate>
         <strong>提交 API 密钥申请</strong>
         <span>管理员通过后才会创建密钥；明文密钥只允许查看一次。</span>
         <label>
@@ -321,6 +390,9 @@ export function ProviderApiKeysPanel() {
           </button>
         </div>
       </form>
+          </section>
+        </div>
+      ) : null}
 
       <section className="admin-list-section" aria-labelledby="provider-api-key-requests-title">
         <div className="detail-section-heading">
@@ -336,15 +408,12 @@ export function ProviderApiKeysPanel() {
                 <p>
                   状态：{formatApiKeyChangeStatus(request.status)} · 提交时间：{formatDate(request.createdAt)}
                 </p>
-                {request.targetApiKeyId ? <p>目标密钥：{request.targetApiKeyId}</p> : null}
-                {request.kind === 'RevokeApiKey' ? null : <p>权限：{request.proposed.scopes.map((scope) => scopeLabels[scope]).join('、')}</p>}
-                {request.kind === 'RevokeApiKey' ? null : <p>有效期：{request.proposed.expiresAt ? formatDate(request.proposed.expiresAt) : '长期有效'}</p>}
-                {request.reason ? <p>申请说明：{request.reason}</p> : null}
-                {request.reviewReason ? <p>审核说明：{request.reviewReason}</p> : null}
-                {request.plainApiKeyViewedAt ? <p>明文密钥已于 {formatDate(request.plainApiKeyViewedAt)} 查看。</p> : null}
               </div>
-              {request.canClaimPlainApiKey ? (
-                <div className="admin-list-actions">
+              <div className="admin-list-actions">
+                <button className="secondary-action" type="button" onClick={() => setDetailChangeRequest(request)}>
+                  详情
+                </button>
+                {request.canClaimPlainApiKey ? (
                   <button
                     className="primary-action"
                     type="button"
@@ -356,8 +425,8 @@ export function ProviderApiKeysPanel() {
                     </span>
                     <span>{claimingRequestId === request.id ? '读取中' : '查看 API 密钥'}</span>
                   </button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </article>
           ))}
         </div>
@@ -372,17 +441,16 @@ export function ProviderApiKeysPanel() {
             <div>
               <h2>{apiKey.name}</h2>
               <p>
-                前缀：{apiKey.keyPrefix} · 状态：{formatApiKeyStatus(apiKey.status)} · 创建时间：
-                {new Date(apiKey.createdAt).toLocaleString('zh-CN')}
-              </p>
-              <p>权限：{apiKey.scopes.map((scope) => scopeLabels[scope]).join('、')}</p>
-              <p>
-                有效期：{apiKey.expiresAt ? new Date(apiKey.expiresAt).toLocaleString('zh-CN') : '长期有效'} · 最近使用：
-                {apiKey.lastUsedAt ? new Date(apiKey.lastUsedAt).toLocaleString('zh-CN') : '尚未使用'}
+                前缀：{apiKey.keyPrefix} · 状态：{formatApiKeyStatus(apiKey.status)} · 最近使用：
+                {apiKey.lastUsedAt ? formatDate(apiKey.lastUsedAt) : '尚未使用'}
               </p>
             </div>
-            {apiKey.status === 'active' ? (
-              <div className="admin-list-actions">
+            <div className="admin-list-actions">
+              <button className="secondary-action" type="button" onClick={() => setDetailApiKey(apiKey)}>
+                详情
+              </button>
+              {apiKey.status === 'active' ? (
+                <>
                 <button className="secondary-action" type="button" onClick={() => void revokeApiKey(apiKey.id)}>
                   申请停用
                 </button>
@@ -392,8 +460,9 @@ export function ProviderApiKeysPanel() {
                   </span>
                   <span>申请轮换</span>
                 </button>
-              </div>
-            ) : null}
+                </>
+              ) : null}
+            </div>
           </article>
         ))}
       </div>
@@ -407,6 +476,100 @@ export function ProviderApiKeysPanel() {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ApiKeyChangeRequestDetail({ request }: { request: ProviderApiKeyChangeRequest }) {
+  return (
+    <dl className="admin-detail-list">
+      <div>
+        <dt>名称</dt>
+        <dd>{request.proposed.name}</dd>
+      </div>
+      <div>
+        <dt>状态</dt>
+        <dd>{formatApiKeyChangeStatus(request.status)}</dd>
+      </div>
+      <div>
+        <dt>目标密钥</dt>
+        <dd>{request.targetApiKeyId ?? '新密钥'}</dd>
+      </div>
+      {request.kind === 'RevokeApiKey' ? null : (
+        <>
+          <div>
+            <dt>权限</dt>
+            <dd>{request.proposed.scopes.map((scope) => scopeLabels[scope]).join('、')}</dd>
+          </div>
+          <div>
+            <dt>有效期</dt>
+            <dd>{request.proposed.expiresAt ? formatDate(request.proposed.expiresAt) : '长期有效'}</dd>
+          </div>
+        </>
+      )}
+      <div>
+        <dt>申请说明</dt>
+        <dd>{request.reason || '未填写'}</dd>
+      </div>
+      <div>
+        <dt>审核说明</dt>
+        <dd>{request.reviewReason || '暂无'}</dd>
+      </div>
+      <div>
+        <dt>明文查看</dt>
+        <dd>{request.plainApiKeyViewedAt ? formatDate(request.plainApiKeyViewedAt) : '尚未查看或不可查看'}</dd>
+      </div>
+      <div>
+        <dt>提交人</dt>
+        <dd>{request.requestedBy ? `${request.requestedBy.displayName}（${request.requestedBy.email}）` : '未知'}</dd>
+      </div>
+      <div>
+        <dt>提交时间</dt>
+        <dd>{formatDate(request.createdAt)}</dd>
+      </div>
+      <div>
+        <dt>更新时间</dt>
+        <dd>{formatDate(request.updatedAt)}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function ApiKeyDetail({ apiKey }: { apiKey: ProviderApiKey }) {
+  return (
+    <dl className="admin-detail-list">
+      <div>
+        <dt>前缀</dt>
+        <dd>{apiKey.keyPrefix}</dd>
+      </div>
+      <div>
+        <dt>状态</dt>
+        <dd>{formatApiKeyStatus(apiKey.status)}</dd>
+      </div>
+      <div>
+        <dt>权限</dt>
+        <dd>{apiKey.scopes.map((scope) => scopeLabels[scope]).join('、')}</dd>
+      </div>
+      <div>
+        <dt>有效期</dt>
+        <dd>{apiKey.expiresAt ? formatDate(apiKey.expiresAt) : '长期有效'}</dd>
+      </div>
+      <div>
+        <dt>最近使用</dt>
+        <dd>{apiKey.lastUsedAt ? formatDate(apiKey.lastUsedAt) : '尚未使用'}</dd>
+      </div>
+      <div>
+        <dt>停用时间</dt>
+        <dd>{apiKey.revokedAt ? formatDate(apiKey.revokedAt) : '未停用'}</dd>
+      </div>
+      <div>
+        <dt>创建时间</dt>
+        <dd>{formatDate(apiKey.createdAt)}</dd>
+      </div>
+      <div>
+        <dt>更新时间</dt>
+        <dd>{formatDate(apiKey.updatedAt)}</dd>
+      </div>
+    </dl>
   );
 }
 

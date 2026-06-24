@@ -402,7 +402,7 @@ model Provider {
 model ProviderAccount {
   id           String                @id @default(uuid())
   providerId   String
-  email        String                @unique
+  email        String
   displayName  String
   passwordHash String
   status       ProviderAccountStatus @default(PendingReview)
@@ -418,6 +418,8 @@ model ProviderAccount {
   webhookChangeRequests ProviderWebhookChangeRequest[]
   profileChangeRequests ProviderProfileChangeRequest[]
 
+  @@unique([providerId, email])
+  @@index([email, status])
   @@index([providerId, status])
 }
 

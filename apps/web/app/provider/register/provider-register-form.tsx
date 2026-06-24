@@ -27,7 +27,8 @@ export function ProviderRegisterForm() {
 
   const submitProvider = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const password = String(form.get('password') ?? '');
     const confirmPassword = String(form.get('confirmPassword') ?? '');
 
@@ -53,7 +54,7 @@ export function ProviderRegisterForm() {
           ? `已重新提交「${result.provider.name}」的入驻申请。审核通过后可使用 ${result.account.email} 登录发卡方后台。`
           : `已提交「${result.provider.name}」的入驻申请。审核通过后可使用 ${result.account.email} 登录发卡方后台。`,
       );
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '提交提供方申请失败。');
     } finally {

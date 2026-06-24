@@ -1,6 +1,14 @@
 'use client';
 
-import { type FormEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type FormEvent,
+  type MouseEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { brandAssets } from '@ldpass/ui';
 import { getJson, postJson } from './api-client';
 import {
@@ -454,11 +462,14 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
   const [sessionUser, setSessionUser] = useState<SessionResponse['user']>(null);
   const [passes, setPasses] = useState<WalletPass[]>([]);
   const [walletMessage, setWalletMessage] = useState<string | null>(null);
+  const [hasLoadedWallet, setHasLoadedWallet] = useState(false);
   const [isUsingOfflineSnapshot, setIsUsingOfflineSnapshot] = useState(false);
   const [offlineSnapshotAt, setOfflineSnapshotAt] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [selectedPassId, setSelectedPassId] = useState<string | null>(null);
+  const [isDetailClosing, setIsDetailClosing] = useState(false);
+  const detailCloseTimerRef = useRef<number | null>(null);
   const [passDetail, setPassDetail] = useState<WalletPassDetailResponse | null>(null);
   const [activeDetailModule, setActiveDetailModule] = useState<DetailModule | null>(null);
   const [ledgerEntries, setLedgerEntries] = useState<WalletLedgerEntry[]>([]);
@@ -614,6 +625,10 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
         setIsUsingOfflineSnapshot(false);
         setOfflineSnapshotAt(null);
         setWalletMessage(error instanceof Error ? error.message : '读取钱包失败。');
+      } finally {
+        if (isMounted) {
+          setHasLoadedWallet(true);
+        }
       }
     }
 
@@ -973,8 +988,33 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
     window.history.replaceState(null, '', getCategoryHref(categoryKey));
   };
 
+  const clearDetailCloseTimer = () => {
+    if (detailCloseTimerRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(detailCloseTimerRef.current);
+    detailCloseTimerRef.current = null;
+  };
+
   const selectPass = (passId: string) => {
+    clearDetailCloseTimer();
+    setIsDetailClosing(false);
     setSelectedPassId(passId);
+  };
+
+  const closeSelectedPass = () => {
+    if (!selectedPassId) {
+      return;
+    }
+
+    clearDetailCloseTimer();
+    setIsDetailClosing(true);
+    detailCloseTimerRef.current = window.setTimeout(() => {
+      setSelectedPassId(null);
+      setIsDetailClosing(false);
+      detailCloseTimerRef.current = null;
+    }, 180);
   };
 
   const openNotificationPass = (notification: WalletNotification) => {
@@ -1015,6 +1055,12 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
   };
 
   useEffect(() => {
+    return () => {
+      clearDetailCloseTimer();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isDetailOpen) {
       return undefined;
     }
@@ -1036,7 +1082,7 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && mediaQuery.matches) {
-        setSelectedPassId(null);
+        closeSelectedPass();
       }
     };
 
@@ -2007,59 +2053,60 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
     }
   };
 
+  const isGuestLanding = !sessionUser && hasLoadedWallet;
+
   return (
-    <main className={`wallet-shell${isDetailOpen ? ' wallet-detail-open' : ''}`}>
+    <main
+      className={`wallet-shell${isGuestLanding ? ' wallet-guest-shell' : ''}${isDetailOpen ? ' wallet-detail-open' : ''}${isDetailClosing ? ' wallet-detail-closing' : ''}`}
+    >
       <header className="topbar">
         <a className="brand" href="/" aria-label="临东通首页">
           <img src={brandAssets.colorLogo} alt="" width={36} height={36} />
-          <span>钱包</span>
+          <span>{sessionUser ? '钱包' : '临东通'}</span>
         </a>
-        <nav className="topbar-actions" aria-label="钱包操作">
+        <nav className="topbar-actions" aria-label={sessionUser ? '钱包操作' : '页面设置'}>
           <ThemeSettings />
-          <button
-            className={`icon-button${isSearchOpen ? ' is-active' : ''}`}
-            type="button"
-            aria-label="搜索"
-            title="搜索"
-            aria-expanded={isSearchOpen}
-            onClick={toggleSearch}
-          >
-            <span className="material-symbols-rounded" aria-hidden="true">
-              search
-            </span>
-          </button>
-          <a className="icon-button" href="/add" aria-label="添加卡券" title="添加卡券">
-            <span className="material-symbols-rounded" aria-hidden="true">
-              add
-            </span>
-          </a>
-          <button
-            className={`icon-button${isEditing ? ' is-active' : ''}`}
-            type="button"
-            aria-label="编辑"
-            title="编辑"
-            aria-expanded={isEditing}
-            onClick={toggleEditing}
-          >
-            <span className="material-symbols-rounded" aria-hidden="true">
-              edit
-            </span>
-          </button>
           {sessionUser ? (
-            <a className="account-entry" href="/account" aria-label="账户">
-              <UserAvatar avatarUrl={sessionUser.avatarUrl} fallbackUrl={sessionUser.avatarFallbackUrl} />
-              <span>{sessionUser.username}</span>
-            </a>
-          ) : (
-            <a className="account-entry" href="/login" aria-label="账户">
-              <span className="avatar" aria-hidden="true" />
-              <span>账户</span>
-            </a>
-          )}
+            <>
+              <button
+                className={`icon-button${isSearchOpen ? ' is-active' : ''}`}
+                type="button"
+                aria-label="搜索"
+                title="搜索"
+                aria-expanded={isSearchOpen}
+                onClick={toggleSearch}
+              >
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  search
+                </span>
+              </button>
+              <a className="icon-button" href="/add" aria-label="添加卡券" title="添加卡券">
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  add
+                </span>
+              </a>
+              <button
+                className={`icon-button${isEditing ? ' is-active' : ''}`}
+                type="button"
+                aria-label="编辑"
+                title="编辑"
+                aria-expanded={isEditing}
+                onClick={toggleEditing}
+              >
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  edit
+                </span>
+              </button>
+              <a className="account-entry" href="/account" aria-label="账户">
+                <UserAvatar avatarUrl={sessionUser.avatarUrl} fallbackUrl={sessionUser.avatarFallbackUrl} />
+                <span>{sessionUser.username}</span>
+              </a>
+            </>
+          ) : null}
         </nav>
       </header>
 
-      {isSearchOpen ? (
+      {sessionUser && isSearchOpen ? (
         <section className="wallet-search" aria-label="搜索卡券">
           <span className="material-symbols-rounded" aria-hidden="true">
             search
@@ -2086,6 +2133,9 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
         </section>
       ) : null}
 
+      {isGuestLanding ? (
+        <UnauthenticatedHome message={walletMessage} />
+      ) : (
       <section
         className={`wallet-layout ${selectedPass ? 'wallet-layout-has-detail' : 'wallet-layout-empty'}`}
         aria-label="卡包"
@@ -2214,72 +2264,82 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             </section>
           ) : null}
           {filteredPasses.length > 0 ? (
-            <div className="pass-card-list">
-              {filteredPasses.map((pass) => {
+            <div className={`pass-card-list${!isEditing ? ' pass-card-list-stacked' : ''}`}>
+              {filteredPasses.map((pass, visibleIndex) => {
                 const categoryIndex = selectedCategoryPasses.findIndex(
                   (item) => item.id === pass.id,
                 );
                 const isFirst = categoryIndex <= 0;
                 const isLast = categoryIndex >= selectedCategoryPasses.length - 1;
-                const cardClassName = `wallet-pass-card wallet-pass-card-${pass.category}${pass.backgroundImageUrl ? ' wallet-pass-card-has-image' : ''}${pass.hideTitle === true ? ' wallet-pass-card-title-hidden' : ''}${selectedPass?.id === pass.id ? ' is-selected' : ''}`;
+                const isSelected = selectedPass?.id === pass.id;
+                const isAfterSelected =
+                  visibleIndex > 0 && filteredPasses[visibleIndex - 1]?.id === selectedPass?.id;
+                const cardClassName = `wallet-pass-card wallet-pass-card-${pass.category}${pass.backgroundImageUrl ? ' wallet-pass-card-has-image' : ''}${pass.hideTitle === true ? ' wallet-pass-card-title-hidden' : ''}${isSelected ? ' is-selected' : ''}`;
+                const slotClassName = `pass-card-stack-slot${isSelected ? ' is-expanded' : ''}${isAfterSelected ? ' is-after-expanded' : ''}${isEditing ? ' is-editing' : ''}`;
+                const slotStyle = {
+                  '--stack-z': String(visibleIndex + 1),
+                } as CSSProperties;
 
-                return isEditing ? (
-                  <article className={`${cardClassName} wallet-pass-card-editable`} key={pass.id}>
-                    <button
-                      className="wallet-pass-card-main"
-                      type="button"
-                      onClick={() => selectPass(pass.id)}
-                    >
-                      <PassCardContent pass={pass} />
-                    </button>
-                    <div className="pass-edit-actions" aria-label={`${pass.displayName} 编辑操作`}>
+                return (
+                  <div className={slotClassName} key={pass.id} style={slotStyle}>
+                    {isEditing ? (
+                      <article className={`${cardClassName} wallet-pass-card-editable`}>
+                        <button
+                          className="wallet-pass-card-main"
+                          type="button"
+                          onClick={() => selectPass(pass.id)}
+                        >
+                          <PassCardContent pass={pass} />
+                        </button>
+                        <div className="pass-edit-actions" aria-label={`${pass.displayName} 编辑操作`}>
+                          <button
+                            className="mini-icon-button"
+                            type="button"
+                            aria-label="上移"
+                            title="上移"
+                            disabled={!canReorder || isFirst || isSavingEdit}
+                            onClick={() => void movePass(pass.id, 'up')}
+                          >
+                            <span className="material-symbols-rounded" aria-hidden="true">
+                              keyboard_arrow_up
+                            </span>
+                          </button>
+                          <button
+                            className="mini-icon-button"
+                            type="button"
+                            aria-label="下移"
+                            title="下移"
+                            disabled={!canReorder || isLast || isSavingEdit}
+                            onClick={() => void movePass(pass.id, 'down')}
+                          >
+                            <span className="material-symbols-rounded" aria-hidden="true">
+                              keyboard_arrow_down
+                            </span>
+                          </button>
+                          <button
+                            className="mini-icon-button mini-icon-button-danger"
+                            type="button"
+                            aria-label="移除"
+                            title="移除"
+                            disabled={isSavingEdit}
+                            onClick={() => void archivePass(pass)}
+                          >
+                            <span className="material-symbols-rounded" aria-hidden="true">
+                              delete
+                            </span>
+                          </button>
+                        </div>
+                      </article>
+                    ) : (
                       <button
-                        className="mini-icon-button"
+                        className={cardClassName}
                         type="button"
-                        aria-label="上移"
-                        title="上移"
-                        disabled={!canReorder || isFirst || isSavingEdit}
-                        onClick={() => void movePass(pass.id, 'up')}
+                        onClick={() => selectPass(pass.id)}
                       >
-                        <span className="material-symbols-rounded" aria-hidden="true">
-                          keyboard_arrow_up
-                        </span>
+                        <PassCardContent pass={pass} />
                       </button>
-                      <button
-                        className="mini-icon-button"
-                        type="button"
-                        aria-label="下移"
-                        title="下移"
-                        disabled={!canReorder || isLast || isSavingEdit}
-                        onClick={() => void movePass(pass.id, 'down')}
-                      >
-                        <span className="material-symbols-rounded" aria-hidden="true">
-                          keyboard_arrow_down
-                        </span>
-                      </button>
-                      <button
-                        className="mini-icon-button mini-icon-button-danger"
-                        type="button"
-                        aria-label="移除"
-                        title="移除"
-                        disabled={isSavingEdit}
-                        onClick={() => void archivePass(pass)}
-                      >
-                        <span className="material-symbols-rounded" aria-hidden="true">
-                          delete
-                        </span>
-                      </button>
-                    </div>
-                  </article>
-                ) : (
-                  <button
-                    className={cardClassName}
-                    type="button"
-                    key={pass.id}
-                    onClick={() => selectPass(pass.id)}
-                  >
-                    <PassCardContent pass={pass} />
-                  </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -2304,24 +2364,31 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             type="button"
             tabIndex={-1}
             aria-label="关闭卡券详情背景"
-            onClick={() => setSelectedPassId(null)}
+            onClick={closeSelectedPass}
           />
         ) : null}
 
         {selectedPass ? (
-          <aside className="detail-panel" aria-label="卡券详情">
+          <aside className={`detail-panel${isDetailClosing ? ' is-closing' : ''}`} aria-label="卡券详情">
             <div className="detail-panel-heading">
               <h2>{passDetail?.pass.displayName ?? selectedPass.displayName}</h2>
               <button
                 className="detail-close-button"
                 type="button"
                 aria-label="关闭卡券详情"
-                onClick={() => setSelectedPassId(null)}
+                onClick={closeSelectedPass}
               >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   close
                 </span>
               </button>
+            </div>
+            <div className="detail-selected-card-face" aria-hidden="true">
+              <div
+                className={`wallet-pass-card wallet-pass-card-${selectedPass.category}${selectedPass.backgroundImageUrl ? ' wallet-pass-card-has-image' : ''}${selectedPass.hideTitle === true ? ' wallet-pass-card-title-hidden' : ''}`}
+              >
+                <PassCardContent pass={selectedPass} />
+              </div>
             </div>
             <div className="detail-balance">
               <span>当前余额</span>
@@ -2534,10 +2601,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
                   ) : null}
                   {activeDetailModule === 'provider' ? (
                     <section className="detail-provider" aria-label="发卡方信息">
-                      <div className="detail-section-heading">
-                        <h3>发卡方</h3>
-                        <span>资料</span>
-                      </div>
                       <div className="detail-provider-card">
                         <div>
                           <strong>{passDetail?.pass.providerName ?? selectedPass.providerName}</strong>
@@ -2560,10 +2623,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
                   ) : null}
             {activeDetailModule === 'ticket' && (passDetail?.pass.ticketInfo || selectedPass.category === 'ticket') ? (
               <section className="detail-ticket" aria-label="票券信息">
-                <div className="detail-section-heading">
-                  <h3>票券信息</h3>
-                  <span>{formatTicketStatus(passDetail?.pass.ticketInfo ?? null)}</span>
-                </div>
                 <dl className="detail-list">
                   <div>
                     <dt>活动</dt>
@@ -2590,12 +2649,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'location' && selectedPass.category === 'identity_key' ? (
               <section className="detail-location" aria-label="位置核验">
-                <div className="detail-section-heading">
-                  <h3>位置核验</h3>
-                  <span>
-                    {passDetail?.pass.locationVerification?.required ? '已配置' : '未配置'}
-                  </span>
-                </div>
                 {passDetail?.pass.locationVerification?.rules?.rules.length ? (
                   <dl className="detail-list">
                     {passDetail.pass.locationVerification.rules.rules.map((rule) => (
@@ -2641,10 +2694,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'topUp' ? (
             <section className="detail-top-up" aria-label="额度补充">
-              <div className="detail-section-heading">
-                <h3>额度补充</h3>
-                <span>{canTopUpSelectedPass ? '开放' : '关闭'}</span>
-              </div>
               {!passDetail && isPassDetailLoading ? (
                 <p className="detail-status">正在读取额度补充规则...</p>
               ) : null}
@@ -2827,10 +2876,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'topUpSource' ? (
             <section className="detail-top-up-source" aria-label="选择来源卡">
-              <div className="detail-section-heading">
-                <h3>选择来源卡</h3>
-                <span>{topUpSourcePasses.length}</span>
-              </div>
               {topUpSourcePasses.length ? (
                 <div className="top-up-source-list">
                   {topUpSourcePasses.map((pass) => (
@@ -2868,10 +2913,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'transfer' ? (
             <section className="detail-transfers" aria-label="卡券转赠">
-              <div className="detail-section-heading">
-                <h3>转赠</h3>
-                <span>{canTransferSelectedPass ? '开放' : '关闭'}</span>
-              </div>
               {!passDetail && isPassDetailLoading ? (
                 <p className="detail-status">正在读取转赠规则...</p>
               ) : null}
@@ -2941,10 +2982,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'use' ? (
             <section className="detail-use" aria-label="发起消耗">
-              <div className="detail-section-heading">
-                <h3>发起消耗</h3>
-                <span>{canUseSelectedPass ? '可用' : '不可用'}</span>
-              </div>
               {redemptionMessage ? <p className="detail-status">{redemptionMessage}</p> : null}
               <form
                 className="detail-use-form"
@@ -3004,10 +3041,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'redemptions' ? (
             <section className="detail-redemptions" aria-label="待确认核销请求">
-              <div className="detail-section-heading">
-                <h3>待确认消耗</h3>
-                <span>{redemptionRequests.length}</span>
-              </div>
               {isRedemptionsLoading ? <p className="detail-status">正在读取待确认请求...</p> : null}
               {redemptionMessage ? <p className="detail-status">{redemptionMessage}</p> : null}
               {redemptionRequests.length ? (
@@ -3104,10 +3137,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'createDispute' ? (
             <section className="detail-disputes" aria-label="提交新的争议">
-              <div className="detail-section-heading">
-                <h3>提交新的争议</h3>
-                <span>{disputeSubjectType === 'pass_top_up' ? '补充' : '卡券'}</span>
-              </div>
               {disputeMessage ? <p className="detail-status">{disputeMessage}</p> : null}
               <form className="detail-dispute-form" onSubmit={(event) => void submitDispute(event)}>
                 <label>
@@ -3184,10 +3213,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'disputes' ? (
             <section className="detail-disputes" aria-label="争议记录">
-              <div className="detail-section-heading">
-                <h3>争议记录</h3>
-                <span>{disputes.length}</span>
-              </div>
               {isDisputesLoading ? <p className="detail-status">正在读取争议记录...</p> : null}
               {disputeMessage ? <p className="detail-status">{disputeMessage}</p> : null}
               <div className="form-actions compact-actions">
@@ -3225,10 +3250,6 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
             ) : null}
             {activeDetailModule === 'ledger' ? (
             <section className="detail-ledger" aria-label="交易记录">
-              <div className="detail-section-heading">
-                <h3>交易记录</h3>
-                <span>{transactionRecords.length}</span>
-              </div>
               {isLedgerLoading ? <p className="detail-status">正在读取交易记录...</p> : null}
               {isTopUpHistoryLoading ? <p className="detail-status">正在读取额度补充记录...</p> : null}
               {ledgerMessage ? <p className="detail-status detail-status-error">{ledgerMessage}</p> : null}
@@ -3288,6 +3309,7 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
           </aside>
         ) : null}
       </section>
+      )}
     </main>
   );
 }
@@ -3434,6 +3456,61 @@ function PassCardContent({ pass }: { pass: WalletPass }) {
       {shouldShowFallbackInfo ? <b>{formatBenefitValue(pass.balanceValue, pass.benefitType)}</b> : null}
       <small>{formatPassTailNumber(pass.maskedNumber) ?? '****'}</small>
     </>
+  );
+}
+
+function UnauthenticatedHome({ message }: { message: string | null }) {
+  return (
+    <section className="guest-home" aria-labelledby="guest-home-title">
+      <div className="guest-home-copy">
+        <span className="account-kicker">临东通</span>
+        <h1 id="guest-home-title">
+          <span>在一处</span>
+          <span>行遍天地间</span>
+          <span>就是现在</span>
+        </h1>
+        <p>把卡券、证件、票券和领取码收进同一个卡包，登录后即可同步到你的设备。</p>
+        {message ? (
+          <div className="flow-notice" role="status" aria-live="polite">
+            <span>{message}</span>
+          </div>
+        ) : null}
+        <div className="form-actions">
+          <a className="primary-action" href="/register">
+            <span className="material-symbols-rounded" aria-hidden="true">
+              person_add
+            </span>
+            <span>注册</span>
+          </a>
+          <a className="secondary-action" href="/login">
+            登录
+          </a>
+          <a className="secondary-action" href="/add">
+            使用领取码
+          </a>
+        </div>
+      </div>
+      <div className="guest-home-visual" aria-hidden="true">
+        <div className="wallet-pass-card wallet-pass-card-account">
+          <span>临东通</span>
+          <strong>城市通行卡</strong>
+          <b>128</b>
+          <small>**** 2026</small>
+        </div>
+        <div className="wallet-pass-card wallet-pass-card-ticket">
+          <span>票券</span>
+          <strong>天地间观光线</strong>
+          <b>1</b>
+          <small>**** 0624</small>
+        </div>
+        <div className="wallet-pass-card wallet-pass-card-identity_key">
+          <span>身份钥匙</span>
+          <strong>临东港口通行证</strong>
+          <b>OK</b>
+          <small>**** LD</small>
+        </div>
+      </div>
+    </section>
   );
 }
 

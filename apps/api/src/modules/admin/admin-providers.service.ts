@@ -155,65 +155,59 @@ export class AdminProvidersService {
     const slug = dto.slug.trim().toLowerCase();
     const contactEmail = dto.contactEmail.trim().toLowerCase();
     const ownerEmail = dto.ownerEmail.trim().toLowerCase();
-    const [existingProvider, existingAccount] = await Promise.all([
-      this.prisma.provider.findUnique({
-        where: {
-          slug,
-        },
-        select: {
-          id: true,
-        },
-      }),
-      this.prisma.providerAccount.findUnique({
-        where: {
-          email: ownerEmail,
-        },
-        select: {
-          id: true,
-        },
-      }),
-    ]);
+    const existingProvider = await this.prisma.provider.findUnique({
+      where: {
+        slug,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (existingProvider) {
       throw new ConflictException('提供方标识已被占用。');
     }
 
-    if (existingAccount) {
-      throw new ConflictException('负责人邮箱已被其他发卡方账号使用。');
-    }
-
     const passwordHash = await this.secretHash.hashSecret(dto.ownerPassword, 'provider-password');
     const now = new Date();
-    const { provider, account } = await this.prisma.$transaction(async (transaction) => {
-      const createdProvider = await transaction.provider.create({
-        data: {
-          name: dto.name.trim(),
-          slug,
-          status: 'Active',
-          source: 'admin_created',
-          contactName: dto.contactName.trim(),
-          contactEmail,
-          businessInfo: dto.businessInfo?.trim() || null,
-          reviewReason: null,
-        },
-      });
+    const { provider, account } = await this.prisma
+      .$transaction(async (transaction) => {
+        const createdProvider = await transaction.provider.create({
+          data: {
+            name: dto.name.trim(),
+            slug,
+            status: 'Active',
+            source: 'admin_created',
+            contactName: dto.contactName.trim(),
+            contactEmail,
+            businessInfo: dto.businessInfo?.trim() || null,
+            reviewReason: null,
+          },
+        });
 
-      const createdAccount = await transaction.providerAccount.create({
-        data: {
-          providerId: createdProvider.id,
-          email: ownerEmail,
-          displayName: dto.ownerDisplayName.trim(),
-          passwordHash,
-          status: 'Active',
-          role: 'owner',
-        },
-      });
+        const createdAccount = await transaction.providerAccount.create({
+          data: {
+            providerId: createdProvider.id,
+            email: ownerEmail,
+            displayName: dto.ownerDisplayName.trim(),
+            passwordHash,
+            status: 'Active',
+            role: 'owner',
+          },
+        });
 
-      return {
-        provider: createdProvider,
-        account: createdAccount,
-      };
-    });
+        return {
+          provider: createdProvider,
+          account: createdAccount,
+        };
+      })
+      .catch((error: unknown) => {
+        if (isProviderAccountEmailUniqueError(error)) {
+          throw new ConflictException('当前数据库仍保留旧的发卡方邮箱唯一约束，请同步数据库结构后重试。');
+        }
+
+        throw error;
+      });
 
     await this.eventBus.publish({
       type: 'ProviderCreatedByAdmin',
@@ -983,4 +977,15 @@ function startsWithSpreadsheetFormula(value: string): boolean {
 
 function formatCsvDate(value: Date | null | undefined): string {
   return value ? value.toISOString() : '';
+}
+
+function isProviderAccountEmailUniqueError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+  const target = (error as { meta?: { target?: unknown } } | null)?.meta?.target;
+
+  return (
+    Boolean(error) &&
+    typeof error === 'object' &&
+    (error as { code?: unknown }).code === 'P2002' &&
+    ((Array.isArray(target) && target.includes('email')) || target === 'ProviderAccount_email_key')
+  );
 }

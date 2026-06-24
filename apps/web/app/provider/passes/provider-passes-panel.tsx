@@ -177,11 +177,20 @@ interface BatchRevokeActionLinksResponse {
 
 type ActionLinkKindFilter = 'all' | ProviderActionLink['kind'];
 type ActionLinkStatusFilter = 'all' | 'Active' | 'Consumed' | 'Expired' | 'Revoked';
+type ProviderPassDialogKind =
+  | 'detail'
+  | 'adjust'
+  | 'redemption'
+  | 'actionLink'
+  | 'status'
+  | 'ticketUpdate'
+  | 'ticketRequests';
 
 export function ProviderPassesPanel() {
   const [passes, setPasses] = useState<ProviderPass[]>([]);
   const [redemptionRequests, setRedemptionRequests] = useState<ProviderRedemptionRequest[]>([]);
   const [selectedPassId, setSelectedPassId] = useState<string | null>(null);
+  const [activePassDialog, setActivePassDialog] = useState<ProviderPassDialogKind | null>(null);
   const [keyword, setKeyword] = useState('');
   const [changeValue, setChangeValue] = useState('');
   const [reason, setReason] = useState('');
@@ -389,6 +398,45 @@ export function ProviderPassesPanel() {
     setTicketUpdateReason('');
   }, [selectedPass?.id, selectedPass?.ticketInfo]);
 
+  const openPassDialog = (pass: ProviderPass, dialogKind: ProviderPassDialogKind) => {
+    setSelectedPassId(pass.id);
+    setActivePassDialog(dialogKind);
+
+    if (dialogKind === 'adjust') {
+      setChangeValue('');
+      setReason('');
+      setNote('');
+    }
+
+    if (dialogKind === 'redemption') {
+      setConsumeValue('');
+      setConsumeMethod('server_account');
+      setConsumeExpiresInSeconds('120');
+      setConsumeMaxVerificationAttempts('3');
+    }
+
+    if (dialogKind === 'actionLink') {
+      setActionLinkKind('use');
+      setActionLinkValue('');
+      setActionLinkMethod('pin');
+      setActionLinkExpiresInSeconds('900');
+      setActionLinkNote('');
+      setLatestActionLink(null);
+      setActionLinkScope('current');
+    }
+
+    if (dialogKind === 'ticketUpdate') {
+      const ticketInfo = pass.ticketInfo;
+      setTicketEventName(ticketInfo?.eventName ?? '');
+      setTicketVenue(ticketInfo?.venue ?? '');
+      setTicketStartsAt(toDateTimeLocalValue(ticketInfo?.startsAt ?? null));
+      setTicketSeatLabel(ticketInfo?.seatLabel ?? '');
+      setTicketCheckInStatus(ticketInfo?.checkInStatus ?? 'not_checked_in');
+      setTicketChangeStatus(ticketInfo?.changeStatus ?? 'none');
+      setTicketUpdateReason('');
+    }
+  };
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void loadPasses(keyword);
@@ -465,6 +513,7 @@ export function ProviderPassesPanel() {
       setMessage(
         `已调整权益：${formatSignedValue(result.ledgerEntry.changeValue, result.pass.benefitType)}，当前值 ${formatBenefitValue(result.pass.balanceValue, result.pass.benefitType)}。`,
       );
+      setActivePassDialog(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '调整权益失败。');
     } finally {
@@ -506,6 +555,7 @@ export function ProviderPassesPanel() {
       );
       setConsumeValue('');
       setMessage(`已发起消耗请求，等待 ${selectedPass.user.username} 确认。`);
+      setActivePassDialog(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '发起消耗请求失败。');
     } finally {
@@ -725,6 +775,7 @@ export function ProviderPassesPanel() {
       ]);
       setTicketUpdateReason('');
       setMessage('票券字段变更已提交，等待管理员审核后生效。');
+      setActivePassDialog(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '提交票券字段变更失败。');
     } finally {
@@ -871,6 +922,7 @@ export function ProviderPassesPanel() {
           ? `已取消卡券，撤销 ${result.revokedAddPassTokens ?? 0} 个未使用领取码。`
           : `已${actionLabel}卡券。`,
       );
+      setActivePassDialog(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : `${actionLabel}卡券失败。`);
     } finally {
@@ -946,8 +998,20 @@ export function ProviderPassesPanel() {
         </div>
       ) : null}
 
-      {selectedPass ? (
-        <>
+      {selectedPass && activePassDialog ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setActivePassDialog(null)} />
+          <section className="admin-dialog-panel admin-pass-dialog-panel" role="dialog" aria-modal="true" aria-label={readProviderPassDialogTitle(activePassDialog, selectedPass)}>
+            <div className="admin-dialog-heading">
+              <h2>{readProviderPassDialogTitle(activePassDialog, selectedPass)}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setActivePassDialog(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            {activePassDialog === 'detail' ? <ProviderPassDetail pass={selectedPass} /> : null}
+            {activePassDialog === 'adjust' ? (
           <form className="admin-adjustment-panel" onSubmit={submitAdjustment}>
             <div>
               <p>正在调整</p>
@@ -992,7 +1056,9 @@ export function ProviderPassesPanel() {
               <span>{isSubmitting ? '提交中' : '提交调整'}</span>
             </button>
           </form>
+            ) : null}
 
+            {activePassDialog === 'redemption' ? (
           <form
             className="admin-adjustment-panel provider-redemption-form"
             onSubmit={submitRedemptionRequest}
@@ -1059,7 +1125,9 @@ export function ProviderPassesPanel() {
               <span>{isCreatingRedemption ? '发起中' : '发起消耗'}</span>
             </button>
           </form>
+            ) : null}
 
+            {activePassDialog === 'actionLink' ? (
           <form
             className="admin-adjustment-panel provider-redemption-form"
             onSubmit={submitActionLink}
@@ -1296,7 +1364,9 @@ export function ProviderPassesPanel() {
               )}
             </div>
           </form>
+            ) : null}
 
+            {activePassDialog === 'status' ? (
           <div className="admin-adjustment-panel provider-status-panel">
             <div>
               <p>状态管理</p>
@@ -1337,8 +1407,9 @@ export function ProviderPassesPanel() {
               </button>
             </div>
           </div>
+            ) : null}
 
-          {selectedPass.category === 'ticket' ? (
+          {selectedPass.category === 'ticket' && activePassDialog === 'ticketUpdate' ? (
             <form
               className="admin-adjustment-panel provider-ticket-form"
               onSubmit={submitTicketUpdate}
@@ -1428,7 +1499,7 @@ export function ProviderPassesPanel() {
             </form>
           ) : null}
 
-          {selectedPass.category === 'ticket' ? (
+          {selectedPass.category === 'ticket' && activePassDialog === 'ticketRequests' ? (
             <section className="admin-adjustment-panel provider-ticket-review-list" aria-label="票券变更申请">
               <div>
                 <p>票券变更申请</p>
@@ -1469,51 +1540,94 @@ export function ProviderPassesPanel() {
               )}
             </section>
           ) : null}
-        </>
+          </section>
+        </div>
       ) : null}
 
       {isLoading ? <p className="empty-note">正在读取卡券列表。</p> : null}
       {!isLoading && passes.length === 0 ? <p className="empty-note">暂无可调整的卡券。</p> : null}
 
       <div className="admin-list">
-        {passes.map((pass) => (
-          <article
-            className={`admin-list-item${selectedPass?.id === pass.id ? ' is-selected' : ''}`}
-            key={pass.id}
-          >
-            <div>
-              <h2>{pass.displayName}</h2>
-              <p>
-                {pass.title} · {pass.status} · {formatBenefitLabel(pass.benefitType)}
-              </p>
-              <p>
-                持有人：{pass.user ? `${pass.user.username} / ${pass.user.email}` : '尚未领取'} ·
-                编号：
-                {pass.maskedNumber ?? pass.publicNumber ?? '未设置'}
-              </p>
-              <p>
-                当前值：{formatBenefitValue(pass.balanceValue, pass.benefitType)} · 冻结值：
-                {formatBenefitValue(pass.frozenValue, pass.benefitType)}
-              </p>
-              {pass.category === 'ticket' ? (
+        {passes.map((pass) => {
+          const passNumber = pass.maskedNumber ?? pass.publicNumber ?? '未设置';
+          const holder = pass.user ? `${pass.user.username} / ${pass.user.email}` : '尚未领取';
+
+          return (
+            <article
+              className={`admin-list-item${selectedPass?.id === pass.id ? ' is-selected' : ''}`}
+              key={pass.id}
+            >
+              <div>
+                <h2>{pass.displayName}</h2>
                 <p>
-                  票券：{pass.ticketInfo?.eventName ?? '未设置活动'} ·{' '}
-                  {pass.ticketInfo?.seatLabel ?? '未设置座位'} ·{' '}
-                  {formatTicketStatus(pass.ticketInfo)}
+                  {formatPassStatus(pass.status)} · {formatBenefitLabel(pass.benefitType)} · 当前值：
+                  {formatBenefitValue(pass.balanceValue, pass.benefitType)}
                 </p>
-              ) : null}
-            </div>
-            <div className="admin-list-actions">
-              <button
-                className="secondary-action"
-                type="button"
-                onClick={() => setSelectedPassId(pass.id)}
-              >
-                选择
-              </button>
-            </div>
-          </article>
-        ))}
+                <p>
+                  持有人：{holder} · 尾号：{passNumber}
+                </p>
+              </div>
+              <div className="admin-list-actions">
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => openPassDialog(pass, 'detail')}
+                >
+                  详情
+                </button>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => openPassDialog(pass, 'adjust')}
+                >
+                  调整余额
+                </button>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  disabled={!pass.user}
+                  onClick={() => openPassDialog(pass, 'redemption')}
+                >
+                  发起消耗
+                </button>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  disabled={!pass.user}
+                  onClick={() => openPassDialog(pass, 'actionLink')}
+                >
+                  操作链接
+                </button>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  disabled={pass.status === 'Archived'}
+                  onClick={() => openPassDialog(pass, 'status')}
+                >
+                  {pass.status === 'Frozen' ? '解冻' : '冻结'}
+                </button>
+                {pass.category === 'ticket' ? (
+                  <>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      onClick={() => openPassDialog(pass, 'ticketUpdate')}
+                    >
+                      票券字段
+                    </button>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      onClick={() => openPassDialog(pass, 'ticketRequests')}
+                    >
+                      变更记录
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
       </div>
 
       <section className="admin-list-section" aria-labelledby="provider-redemptions-title">
@@ -1569,6 +1683,93 @@ export function ProviderPassesPanel() {
       </section>
     </section>
   );
+}
+
+function ProviderPassDetail({ pass }: { pass: ProviderPass }) {
+  return (
+    <dl className="admin-detail-list">
+      <div>
+        <dt>卡面标题</dt>
+        <dd>{pass.title}</dd>
+      </div>
+      <div>
+        <dt>分类</dt>
+        <dd>{formatCategoryLabel(pass.category)}</dd>
+      </div>
+      <div>
+        <dt>卡号</dt>
+        <dd>{pass.maskedNumber ?? pass.publicNumber ?? pass.id}</dd>
+      </div>
+      <div>
+        <dt>持有人</dt>
+        <dd>{pass.user ? `${pass.user.username} / ${pass.user.email}` : '尚未领取'}</dd>
+      </div>
+      <div>
+        <dt>状态</dt>
+        <dd>{formatPassStatus(pass.status)}</dd>
+      </div>
+      <div>
+        <dt>权益类型</dt>
+        <dd>{formatBenefitLabel(pass.benefitType)}</dd>
+      </div>
+      <div>
+        <dt>当前值</dt>
+        <dd>{formatBenefitValue(pass.balanceValue, pass.benefitType)}</dd>
+      </div>
+      <div>
+        <dt>冻结值</dt>
+        <dd>{formatBenefitValue(pass.frozenValue, pass.benefitType)}</dd>
+      </div>
+      <div>
+        <dt>透支额度</dt>
+        <dd>{formatBenefitValue(pass.overdraftLimit, pass.benefitType)}</dd>
+      </div>
+      {pass.category === 'ticket' ? (
+        <>
+          <div>
+            <dt>票券状态</dt>
+            <dd>{formatTicketStatus(pass.ticketInfo)}</dd>
+          </div>
+          <div>
+            <dt>票券信息</dt>
+            <dd>{formatTicketSummary(pass.ticketInfo)}</dd>
+          </div>
+        </>
+      ) : null}
+      <div>
+        <dt>创建时间</dt>
+        <dd>{formatDate(pass.createdAt)}</dd>
+      </div>
+      <div>
+        <dt>最近更新</dt>
+        <dd>{formatDate(pass.updatedAt)}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function readProviderPassDialogTitle(kind: ProviderPassDialogKind, pass: ProviderPass): string {
+  const labels: Record<ProviderPassDialogKind, string> = {
+    detail: '卡券详情',
+    adjust: '调整余额',
+    redemption: '发起消耗',
+    actionLink: '生成操作链接',
+    status: pass.status === 'Frozen' ? '解冻卡券' : '冻结或取消',
+    ticketUpdate: '票券字段',
+    ticketRequests: '票券变更记录',
+  };
+
+  return `${labels[kind]} · ${pass.displayName}`;
+}
+
+function formatCategoryLabel(category: string): string {
+  const labels: Record<string, string> = {
+    account: '账户/卡',
+    identity_key: '证件/钥匙',
+    ticket: '票券',
+  };
+
+  return labels[category] ?? category;
 }
 
 function formatBenefitLabel(benefitType: ProviderPass['benefitType']): string {

@@ -18,7 +18,7 @@ const toneOptions: Array<{ value: AccentTone; label: string }> = [
   { value: 'gray', label: '灰色' },
 ];
 
-export function ThemeSchedulePanel() {
+export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } = {}) {
   const [entries, setEntries] = useState<EditableThemeEntry[]>([
     { effectiveAt: formatUtc8DateTimeInput(new Date()), tone: 'teal', enabled: true, note: '' },
   ]);
@@ -95,16 +95,23 @@ export function ThemeSchedulePanel() {
   };
 
   return (
-    <section className="admin-panel" aria-labelledby="theme-schedule-title">
-      <div className="admin-panel-heading">
-        <div>
-          <p>平台管理</p>
-          <h1 id="theme-schedule-title">主题计划</h1>
+    <section className={embedded ? 'theme-schedule-embedded' : 'admin-panel'} aria-labelledby="theme-schedule-title">
+      {!embedded ? (
+        <div className="admin-panel-heading">
+          <div>
+            <p>平台管理</p>
+            <h1 id="theme-schedule-title">主题计划</h1>
+          </div>
+          <a className="secondary-action" href="/admin/users">
+            用户审核
+          </a>
         </div>
-        <a className="secondary-action" href="/admin/users">
-          用户审核
-        </a>
-      </div>
+      ) : (
+        <div className="detail-section-heading">
+          <h2 id="theme-schedule-title">主题</h2>
+          <span>{entries.length}</span>
+        </div>
+      )}
 
       {message ? (
         <div className="flow-notice" role="status" aria-live="polite">

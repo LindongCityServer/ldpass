@@ -97,10 +97,15 @@ interface ReverseTopUpResponse {
   }>;
 }
 
+type AdminPassesView = 'passes' | 'tickets';
+type PassDialogKind = 'detail' | 'adjust' | 'freeze' | 'topUpReversal';
+
 export function AdminPassesPanel() {
   const [passes, setPasses] = useState<AdminPass[]>([]);
   const [ticketUpdateRequests, setTicketUpdateRequests] = useState<AdminTicketUpdateRequest[]>([]);
+  const [activeView, setActiveView] = useState<AdminPassesView>('passes');
   const [selectedPassId, setSelectedPassId] = useState<string | null>(null);
+  const [activePassDialog, setActivePassDialog] = useState<PassDialogKind | null>(null);
   const [keyword, setKeyword] = useState('');
   const [changeValue, setChangeValue] = useState('');
   const [reason, setReason] = useState('');
@@ -176,6 +181,26 @@ export function AdminPassesPanel() {
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void loadPasses(keyword);
+  };
+
+  const openPassDialog = (pass: AdminPass, kind: PassDialogKind) => {
+    setSelectedPassId(pass.id);
+    setActivePassDialog(kind);
+    if (kind === 'adjust') {
+      setChangeValue('');
+      setReason('');
+      setNote('');
+      setAdminPin('');
+    }
+    if (kind === 'freeze') {
+      setFreezeReason('');
+      setFreezePin('');
+    }
+    if (kind === 'topUpReversal') {
+      setTopUpIdToReverse('');
+      setTopUpReverseReason('');
+      setTopUpReversePin('');
+    }
   };
 
   const exportCsv = async (type: 'passes' | 'ledger') => {
@@ -401,7 +426,7 @@ export function AdminPassesPanel() {
       <div className="admin-panel-heading">
         <div>
           <p>平台管理</p>
-          <h1 id="admin-passes-title">卡券权益调整</h1>
+          <h1 id="admin-passes-title">卡券列表</h1>
         </div>
         <div className="admin-list-actions">
           <a className="secondary-action" href="/admin/disputes">
@@ -413,54 +438,68 @@ export function AdminPassesPanel() {
         </div>
       </div>
 
-      <form className="audit-filter-grid" onSubmit={submitSearch}>
-        <label>
-          <span>搜索卡券</span>
-          <input
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="卡号、尾号、提供方、用户名"
-          />
-        </label>
-        <div className="audit-filter-actions">
-          <button
-            className="secondary-action"
-            type="button"
-            onClick={() => void loadPasses(keyword)}
-          >
-            刷新
-          </button>
-          <button
-            className="secondary-action"
-            type="button"
-            disabled={exportingType !== null}
-            onClick={() => void exportCsv('passes')}
-          >
-            {exportingType === 'passes' ? '导出中' : '导出卡券 CSV'}
-          </button>
-          <button
-            className="secondary-action"
-            type="button"
-            disabled={exportingType !== null}
-            onClick={() => void exportCsv('ledger')}
-          >
-            {exportingType === 'ledger' ? '导出中' : '导出流水 CSV'}
-          </button>
-          <button className="primary-action" type="submit">
-            <span className="material-symbols-rounded" aria-hidden="true">
-              search
-            </span>
-            <span>搜索</span>
-          </button>
-        </div>
-      </form>
-
       {message ? (
         <div className="flow-notice" role="status" aria-live="polite">
           <span>{message}</span>
         </div>
       ) : null}
 
+      <div className="segmented-control" role="tablist" aria-label="卡券管理视图">
+        <button className={activeView === 'passes' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('passes')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            cards
+          </span>
+          <span>卡券列表</span>
+        </button>
+        <button className={activeView === 'tickets' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('tickets')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            confirmation_number
+          </span>
+          <span>票券变更 {ticketUpdateRequests.length}</span>
+        </button>
+      </div>
+
+      {activeView === 'passes' ? (
+        <form className="audit-filter-grid" onSubmit={submitSearch}>
+          <label>
+            <span>搜索卡券</span>
+            <input
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="卡号、尾号、提供方、用户名"
+            />
+          </label>
+          <div className="audit-filter-actions">
+            <button className="secondary-action" type="button" onClick={() => void loadPasses(keyword)}>
+              刷新
+            </button>
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={exportingType !== null}
+              onClick={() => void exportCsv('passes')}
+            >
+              {exportingType === 'passes' ? '导出中' : '导出卡券 CSV'}
+            </button>
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={exportingType !== null}
+              onClick={() => void exportCsv('ledger')}
+            >
+              {exportingType === 'ledger' ? '导出中' : '导出流水 CSV'}
+            </button>
+            <button className="primary-action" type="submit">
+              <span className="material-symbols-rounded" aria-hidden="true">
+                search
+              </span>
+              <span>搜索</span>
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {activeView === 'tickets' ? (
       <section className="admin-list-section" aria-labelledby="ticket-update-requests-title">
         <div className="detail-section-heading">
           <h2 id="ticket-update-requests-title">待审核票券变更</h2>
@@ -522,10 +561,27 @@ export function AdminPassesPanel() {
           ))}
         </div>
       </section>
+      ) : null}
 
-      {selectedPass ? (
-        <section className="stacked-form" aria-label="卡券管理操作">
-          <form className="admin-adjustment-panel" onSubmit={submitAdjustment}>
+      {activeView === 'passes' ? (
+      <>
+      {selectedPass && activePassDialog ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setActivePassDialog(null)} />
+          <section className="admin-dialog-panel admin-pass-dialog-panel" role="dialog" aria-modal="true" aria-label="卡券详情">
+            <div className="admin-dialog-heading">
+              <h2>{readPassDialogTitle(activePassDialog, selectedPass)}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setActivePassDialog(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            {activePassDialog === 'detail' ? (
+              <PassDetail pass={selectedPass} />
+            ) : null}
+            {activePassDialog === 'adjust' ? (
+              <form className="admin-adjustment-panel" onSubmit={submitAdjustment}>
             <div>
               <p>正在调整</p>
               <h2>{selectedPass.displayName}</h2>
@@ -582,7 +638,8 @@ export function AdminPassesPanel() {
               <span>{isSubmitting ? '提交中' : '提交调整'}</span>
             </button>
           </form>
-
+            ) : null}
+            {activePassDialog === 'freeze' ? (
           <div className="admin-adjustment-panel">
             <div>
               <p>状态操作</p>
@@ -634,52 +691,55 @@ export function AdminPassesPanel() {
               </button>
             )}
           </div>
-        </section>
-      ) : null}
-
-      <form className="admin-adjustment-panel top-up-reversal-panel" onSubmit={submitTopUpReversal}>
-        <div>
-          <p>额度补充冲正</p>
-          <h2>补充 ID</h2>
-          <span>输入用户补充返回的 ID，或已消耗的补充操作链接 ID。</span>
+            ) : null}
+            {activePassDialog === 'topUpReversal' ? (
+              <form className="admin-adjustment-panel top-up-reversal-panel" onSubmit={submitTopUpReversal}>
+                <div>
+                  <p>额度补充冲正</p>
+                  <h2>{selectedPass.displayName}</h2>
+                  <span>输入补充 ID，系统会按原始补充记录冲正对应卡券。</span>
+                </div>
+                <label>
+                  <span>补充 ID</span>
+                  <input
+                    value={topUpIdToReverse}
+                    onChange={(event) => setTopUpIdToReverse(event.target.value)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>原因</span>
+                  <input
+                    value={topUpReverseReason}
+                    onChange={(event) => setTopUpReverseReason(event.target.value)}
+                    placeholder="误补充或争议处理"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>管理员 PIN</span>
+                  <input
+                    type="password"
+                    value={topUpReversePin}
+                    onChange={(event) => setTopUpReversePin(event.target.value)}
+                    inputMode="numeric"
+                    pattern="[0-9]{4,12}"
+                    autoComplete="one-time-code"
+                    required
+                  />
+                </label>
+                <button className="danger-action" type="submit" disabled={isReversingTopUp}>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    undo
+                  </span>
+                  <span>{isReversingTopUp ? '处理中' : '冲正补充'}</span>
+                </button>
+              </form>
+            ) : null}
+          </section>
         </div>
-        <label>
-          <span>补充 ID</span>
-          <input
-            value={topUpIdToReverse}
-            onChange={(event) => setTopUpIdToReverse(event.target.value)}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            required
-          />
-        </label>
-        <label>
-          <span>原因</span>
-          <input
-            value={topUpReverseReason}
-            onChange={(event) => setTopUpReverseReason(event.target.value)}
-            placeholder="误补充或争议处理"
-            required
-          />
-        </label>
-        <label>
-          <span>管理员 PIN</span>
-          <input
-            type="password"
-            value={topUpReversePin}
-            onChange={(event) => setTopUpReversePin(event.target.value)}
-            inputMode="numeric"
-            pattern="[0-9]{4,12}"
-            autoComplete="one-time-code"
-            required
-          />
-        </label>
-        <button className="danger-action" type="submit" disabled={isReversingTopUp}>
-          <span className="material-symbols-rounded" aria-hidden="true">
-            undo
-          </span>
-          <span>{isReversingTopUp ? '处理中' : '冲正补充'}</span>
-        </button>
-      </form>
+      ) : null}
 
       {isLoading ? <p className="empty-note">正在读取卡券列表。</p> : null}
       {!isLoading && passes.length === 0 ? <p className="empty-note">暂无可调整的卡券。</p> : null}
@@ -693,7 +753,7 @@ export function AdminPassesPanel() {
             <div>
               <h2>{pass.displayName}</h2>
               <p>
-                {pass.providerName} · {pass.title} · {formatPassStatus(pass.status)}
+                {pass.providerName} · {pass.title} · <CategoryText category={pass.category} /> · {formatPassStatus(pass.status)}
               </p>
               <p>
                 持有人：{pass.user ? `${pass.user.username} / ${pass.user.email}` : '尚未领取'} ·
@@ -709,15 +769,105 @@ export function AdminPassesPanel() {
               <button
                 className="secondary-action"
                 type="button"
-                onClick={() => setSelectedPassId(pass.id)}
+                onClick={() => openPassDialog(pass, 'detail')}
               >
-                选择
+                详情
+              </button>
+              <button className="secondary-action" type="button" onClick={() => openPassDialog(pass, 'adjust')}>
+                调整余额
+              </button>
+              <button
+                className="secondary-action"
+                type="button"
+                disabled={pass.status === 'Archived'}
+                onClick={() => openPassDialog(pass, 'freeze')}
+              >
+                {pass.status === 'Frozen' ? '解冻' : '冻结'}
+              </button>
+              <button className="secondary-action danger-action" type="button" onClick={() => openPassDialog(pass, 'topUpReversal')}>
+                冲正
               </button>
             </div>
           </article>
         ))}
       </div>
+      </>
+      ) : null}
     </section>
+  );
+}
+
+function PassDetail({ pass }: { pass: AdminPass }) {
+  return (
+    <dl className="admin-detail-list">
+      <div>
+        <dt>发卡方</dt>
+        <dd>{pass.providerName}</dd>
+      </div>
+      <div>
+        <dt>卡面标题</dt>
+        <dd>{pass.title}</dd>
+      </div>
+      <div>
+        <dt>分类</dt>
+        <dd>
+          <CategoryText category={pass.category} />
+        </dd>
+      </div>
+      <div>
+        <dt>卡号</dt>
+        <dd>{pass.maskedNumber ?? pass.publicNumber ?? pass.id}</dd>
+      </div>
+      <div>
+        <dt>领取人</dt>
+        <dd>{pass.user ? `${pass.user.username} / ${pass.user.email}` : '尚未领取'}</dd>
+      </div>
+      <div>
+        <dt>状态</dt>
+        <dd>{formatPassStatus(pass.status)}</dd>
+      </div>
+      <div>
+        <dt>当前值</dt>
+        <dd>{formatBenefitValue(pass.balanceValue, pass.benefitType)}</dd>
+      </div>
+      <div>
+        <dt>冻结值</dt>
+        <dd>{formatBenefitValue(pass.frozenValue, pass.benefitType)}</dd>
+      </div>
+      <div>
+        <dt>透支额度</dt>
+        <dd>{formatBenefitValue(pass.overdraftLimit, pass.benefitType)}</dd>
+      </div>
+      <div>
+        <dt>最近更新</dt>
+        <dd>{formatDate(pass.updatedAt)}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function readPassDialogTitle(kind: PassDialogKind, pass: AdminPass): string {
+  const labels: Record<PassDialogKind, string> = {
+    detail: '卡券详情',
+    adjust: '调整余额',
+    freeze: pass.status === 'Frozen' ? '解冻卡券' : '冻结卡券',
+    topUpReversal: '冲正补充',
+  };
+
+  return `${labels[kind]} · ${pass.displayName}`;
+}
+
+function CategoryText({ category }: { category: string }) {
+  const labels: Record<string, string> = {
+    account: '账户/卡',
+    identity_key: '证件/钥匙',
+    ticket: '票券',
+  };
+
+  return (
+    <span className={`admin-category-tag admin-category-tag-${category}`}>
+      {labels[category] ?? category}
+    </span>
   );
 }
 

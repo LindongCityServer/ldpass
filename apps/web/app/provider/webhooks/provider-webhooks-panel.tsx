@@ -152,11 +152,14 @@ export function ProviderWebhooksPanel() {
   const [eventTypes, setEventTypes] = useState<ProviderWebhookEventType[]>([]);
   const [selectedEventTypes, setSelectedEventTypes] = useState<ProviderWebhookEventType[]>([]);
   const [signingSecret, setSigningSecret] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mutatingEndpointId, setMutatingEndpointId] = useState<string | null>(null);
   const [editingEndpointId, setEditingEndpointId] = useState<string | null>(null);
+  const [detailEndpoint, setDetailEndpoint] = useState<ProviderWebhookEndpoint | null>(null);
+  const [detailChangeRequest, setDetailChangeRequest] = useState<ProviderWebhookChangeRequest | null>(null);
   const [editingEventTypes, setEditingEventTypes] = useState<ProviderWebhookEventType[]>([]);
   const [expandedEndpointId, setExpandedEndpointId] = useState<string | null>(null);
   const [claimingRequestId, setClaimingRequestId] = useState<string | null>(null);
@@ -165,6 +168,10 @@ export function ProviderWebhooksPanel() {
   const [retryingDeliveryId, setRetryingDeliveryId] = useState<string | null>(null);
 
   const defaultSelectedEvents = useMemo(() => eventTypes.slice(0, 4), [eventTypes]);
+  const editingEndpoint = useMemo(
+    () => endpoints.find((endpoint) => endpoint.id === editingEndpointId) ?? null,
+    [editingEndpointId, endpoints],
+  );
 
   const loadEndpoints = async () => {
     setIsLoading(true);
@@ -220,7 +227,8 @@ export function ProviderWebhooksPanel() {
 
   const createEndpoint = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const name = String(form.get('name') ?? '').trim();
     const url = String(form.get('url') ?? '').trim();
     const reason = String(form.get('reason') ?? '').trim();
@@ -243,7 +251,8 @@ export function ProviderWebhooksPanel() {
         reason: reason || undefined,
       });
       setSigningSecret(result.signingSecret ?? null);
-      event.currentTarget.reset();
+      formElement.reset();
+      setIsCreateDialogOpen(false);
       setSelectedEventTypes(defaultSelectedEvents);
       await loadEndpoints();
       setMessage('Webhook 端点创建申请已提交，等待管理员审核。');
@@ -443,6 +452,12 @@ export function ProviderWebhooksPanel() {
           <h1 id="provider-webhooks-title">Webhook 回调</h1>
         </div>
         <div className="admin-list-actions">
+          <button className="primary-action" type="button" onClick={() => setIsCreateDialogOpen(true)}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              webhook
+            </span>
+            <span>提交端点</span>
+          </button>
           <button className="secondary-action" type="button" onClick={() => void loadEndpoints()} disabled={isLoading}>
             刷新
           </button>
@@ -459,21 +474,136 @@ export function ProviderWebhooksPanel() {
       ) : null}
 
       {signingSecret ? (
-        <div className="account-summary api-key-secret-panel">
-          <strong>签名密钥只显示一次</strong>
-          <code>{signingSecret}</code>
-          <div className="form-actions">
-            <button className="primary-action" type="button" onClick={() => void copySigningSecret()}>
-              <span className="material-symbols-rounded" aria-hidden="true">
-                content_copy
-              </span>
-              <span>复制密钥</span>
-            </button>
-          </div>
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setSigningSecret(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="Webhook 签名密钥">
+            <div className="admin-dialog-heading">
+              <h2>签名密钥只显示一次</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setSigningSecret(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <div className="api-key-secret-panel">
+              <code>{signingSecret}</code>
+              <div className="form-actions">
+                <button className="primary-action" type="button" onClick={() => void copySigningSecret()}>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    content_copy
+                  </span>
+                  <span>复制密钥</span>
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
       ) : null}
 
-      <form className="stacked-form account-summary" onSubmit={createEndpoint} noValidate>
+      {detailEndpoint ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setDetailEndpoint(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="Webhook 端点详情">
+            <div className="admin-dialog-heading">
+              <h2>{detailEndpoint.name}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setDetailEndpoint(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <WebhookEndpointDetail endpoint={detailEndpoint} />
+          </section>
+        </div>
+      ) : null}
+
+      {detailChangeRequest ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setDetailChangeRequest(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="Webhook 配置申请详情">
+            <div className="admin-dialog-heading">
+              <h2>{formatWebhookChangeKind(detailChangeRequest.kind)}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setDetailChangeRequest(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <WebhookChangeRequestDetail request={detailChangeRequest} />
+          </section>
+        </div>
+      ) : null}
+
+      {editingEndpoint ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={cancelEditingEndpoint} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="修改 Webhook 配置">
+            <div className="admin-dialog-heading">
+              <h2>修改 Webhook 配置</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={cancelEditingEndpoint}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <form className="admin-dialog-form" onSubmit={(event) => void submitEndpointUpdate(event, editingEndpoint)} noValidate>
+              <label>
+                <span>名称</span>
+                <input name="name" defaultValue={editingEndpoint.name} required minLength={2} maxLength={80} />
+              </label>
+              <label>
+                <span>回调地址</span>
+                <input name="url" type="url" defaultValue={editingEndpoint.url} required maxLength={1000} />
+              </label>
+              <label className="inline-toggle">
+                <input name="enabled" type="checkbox" defaultChecked={editingEndpoint.enabled} />
+                <span>通过后启用端点</span>
+              </label>
+              <label>
+                <span>申请说明</span>
+                <textarea name="reason" maxLength={500} placeholder="说明修改原因、接入系统或事件范围变化" />
+              </label>
+              <div className="api-key-scope-list" aria-label="修改后的回调事件">
+                {eventTypes.map((eventType) => (
+                  <label className="inline-toggle" key={eventType}>
+                    <input
+                      type="checkbox"
+                      checked={editingEventTypes.includes(eventType)}
+                      onChange={(event) => toggleEditingEventType(eventType, event.target.checked)}
+                    />
+                    <span>{eventLabels[eventType]}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="admin-dialog-actions">
+                <button className="secondary-action" type="button" onClick={cancelEditingEndpoint}>
+                  取消
+                </button>
+                <button className="primary-action" type="submit" disabled={mutatingEndpointId === editingEndpoint.id}>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    edit
+                  </span>
+                  <span>{mutatingEndpointId === editingEndpoint.id ? '提交中' : '提交修改申请'}</span>
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {isCreateDialogOpen ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="提交回调端点申请">
+            <div className="admin-dialog-heading">
+              <h2>提交回调端点申请</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+      <form className="admin-dialog-form" onSubmit={createEndpoint} noValidate>
         <strong>提交回调端点申请</strong>
         <span>管理员通过后才会创建端点；签名密钥只允许查看一次。</span>
         <label>
@@ -509,6 +639,9 @@ export function ProviderWebhooksPanel() {
           </button>
         </div>
       </form>
+          </section>
+        </div>
+      ) : null}
 
       <section className="admin-list-section" aria-labelledby="provider-webhook-requests-title">
         <div className="detail-section-heading">
@@ -522,19 +655,14 @@ export function ProviderWebhooksPanel() {
               <div>
                 <h2>{formatWebhookChangeKind(request.kind)}：{request.proposed.name}</h2>
                 <p>
-                  状态：{formatWebhookChangeStatus(request.status)} · {request.proposed.url}
+                  {formatWebhookChangeStatus(request.status)} · 提交时间：{formatDate(request.createdAt)}
                 </p>
-                <p>事件：{request.proposed.eventTypes.map((eventType) => eventLabels[eventType]).join('、')}</p>
-                {request.endpointId ? <p>目标端点 ID：{request.endpointId}</p> : null}
-                <p>
-                  提交：{formatDate(request.createdAt)} · 审核：{formatDate(request.reviewedAt)}
-                </p>
-                {request.reason ? <p>申请说明：{request.reason}</p> : null}
-                {request.reviewReason ? <p>审核说明：{request.reviewReason}</p> : null}
-                {request.signingSecretViewedAt ? <p>签名密钥已于 {formatDate(request.signingSecretViewedAt)} 查看。</p> : null}
               </div>
-              {request.canClaimSigningSecret ? (
-                <div className="admin-list-actions">
+              <div className="admin-list-actions">
+                <button className="secondary-action" type="button" onClick={() => setDetailChangeRequest(request)}>
+                  详情
+                </button>
+                {request.canClaimSigningSecret ? (
                   <button
                     className="primary-action"
                     type="button"
@@ -546,8 +674,8 @@ export function ProviderWebhooksPanel() {
                     </span>
                     <span>{claimingRequestId === request.id ? '读取中' : '查看签名密钥'}</span>
                   </button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </article>
           ))}
         </div>
@@ -562,15 +690,14 @@ export function ProviderWebhooksPanel() {
             <div>
               <h2>{endpoint.name}</h2>
               <p>
-                {endpoint.enabled ? '启用中' : '已停用'} · {endpoint.url}
+                {endpoint.enabled ? '启用中' : '已停用'} · 事件 {endpoint.eventTypes.length} 个 · 最近成功：
+                {formatDate(endpoint.lastSuccessAt)}
               </p>
-              <p>事件：{endpoint.eventTypes.map((eventType) => eventLabels[eventType]).join('、')}</p>
-              <p>
-                最近成功：{formatDate(endpoint.lastSuccessAt)} · 最近失败：{formatDate(endpoint.lastFailureAt)}
-              </p>
-              {endpoint.lastError ? <p>错误：{endpoint.lastError}</p> : null}
             </div>
             <div className="admin-list-actions">
+              <button className="secondary-action" type="button" onClick={() => setDetailEndpoint(endpoint)}>
+                详情
+              </button>
               <button
                 className="secondary-action"
                 type="button"
@@ -612,52 +739,6 @@ export function ProviderWebhooksPanel() {
                 删除
               </button>
             </div>
-            {editingEndpointId === endpoint.id ? (
-              <form className="stacked-form-subsection" onSubmit={(event) => void submitEndpointUpdate(event, endpoint)} noValidate>
-                <div className="detail-section-heading">
-                  <h3>提交修改申请</h3>
-                  <button className="secondary-action" type="button" onClick={cancelEditingEndpoint}>
-                    取消
-                  </button>
-                </div>
-                <label>
-                  <span>名称</span>
-                  <input name="name" defaultValue={endpoint.name} required minLength={2} maxLength={80} />
-                </label>
-                <label>
-                  <span>回调地址</span>
-                  <input name="url" type="url" defaultValue={endpoint.url} required maxLength={1000} />
-                </label>
-                <label className="inline-toggle">
-                  <input name="enabled" type="checkbox" defaultChecked={endpoint.enabled} />
-                  <span>通过后启用端点</span>
-                </label>
-                <label>
-                  <span>申请说明</span>
-                  <textarea name="reason" maxLength={500} placeholder="说明修改原因、接入系统或事件范围变化" />
-                </label>
-                <div className="api-key-scope-list" aria-label="修改后的回调事件">
-                  {eventTypes.map((eventType) => (
-                    <label className="inline-toggle" key={eventType}>
-                      <input
-                        type="checkbox"
-                        checked={editingEventTypes.includes(eventType)}
-                        onChange={(event) => toggleEditingEventType(eventType, event.target.checked)}
-                      />
-                      <span>{eventLabels[eventType]}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="form-actions">
-                  <button className="primary-action" type="submit" disabled={mutatingEndpointId === endpoint.id}>
-                    <span className="material-symbols-rounded" aria-hidden="true">
-                      edit
-                    </span>
-                    <span>{mutatingEndpointId === endpoint.id ? '提交中' : '提交修改申请'}</span>
-                  </button>
-                </div>
-              </form>
-            ) : null}
             {expandedEndpointId === endpoint.id ? (
               <section className="stacked-form-subsection webhook-delivery-panel" aria-label={`${endpoint.name} 投递记录`}>
                 <div className="detail-section-heading">
@@ -720,6 +801,104 @@ export function ProviderWebhooksPanel() {
         </span>
       </div>
     </section>
+  );
+}
+
+function WebhookEndpointDetail({ endpoint }: { endpoint: ProviderWebhookEndpoint }) {
+  return (
+    <dl className="admin-detail-list">
+      <div>
+        <dt>状态</dt>
+        <dd>{endpoint.enabled ? '启用中' : '已停用'}</dd>
+      </div>
+      <div>
+        <dt>回调地址</dt>
+        <dd>{endpoint.url}</dd>
+      </div>
+      <div>
+        <dt>事件</dt>
+        <dd>{endpoint.eventTypes.map((eventType) => eventLabels[eventType]).join('、')}</dd>
+      </div>
+      <div>
+        <dt>最近成功</dt>
+        <dd>{formatDate(endpoint.lastSuccessAt)}</dd>
+      </div>
+      <div>
+        <dt>最近失败</dt>
+        <dd>{formatDate(endpoint.lastFailureAt)}</dd>
+      </div>
+      <div>
+        <dt>最近错误</dt>
+        <dd>{endpoint.lastError ?? '暂无'}</dd>
+      </div>
+      <div>
+        <dt>创建时间</dt>
+        <dd>{formatDate(endpoint.createdAt)}</dd>
+      </div>
+      <div>
+        <dt>更新时间</dt>
+        <dd>{formatDate(endpoint.updatedAt)}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function WebhookChangeRequestDetail({ request }: { request: ProviderWebhookChangeRequest }) {
+  return (
+    <dl className="admin-detail-list">
+      <div>
+        <dt>名称</dt>
+        <dd>{request.proposed.name}</dd>
+      </div>
+      <div>
+        <dt>状态</dt>
+        <dd>{formatWebhookChangeStatus(request.status)}</dd>
+      </div>
+      <div>
+        <dt>回调地址</dt>
+        <dd>{request.proposed.url}</dd>
+      </div>
+      <div>
+        <dt>事件</dt>
+        <dd>{request.proposed.eventTypes.map((eventType) => eventLabels[eventType]).join('、')}</dd>
+      </div>
+      <div>
+        <dt>目标端点</dt>
+        <dd>{request.endpointId ?? '新端点'}</dd>
+      </div>
+      <div>
+        <dt>通过后状态</dt>
+        <dd>{request.proposed.enabled ? '启用' : '停用'}</dd>
+      </div>
+      <div>
+        <dt>申请说明</dt>
+        <dd>{request.reason || '未填写'}</dd>
+      </div>
+      <div>
+        <dt>审核说明</dt>
+        <dd>{request.reviewReason || '暂无'}</dd>
+      </div>
+      <div>
+        <dt>签名密钥</dt>
+        <dd>{request.signingSecretViewedAt ? `已于 ${formatDate(request.signingSecretViewedAt)} 查看` : '尚未查看或不可查看'}</dd>
+      </div>
+      <div>
+        <dt>提交人</dt>
+        <dd>{request.requestedBy ? `${request.requestedBy.displayName}（${request.requestedBy.email}）` : '未知'}</dd>
+      </div>
+      <div>
+        <dt>提交时间</dt>
+        <dd>{formatDate(request.createdAt)}</dd>
+      </div>
+      <div>
+        <dt>审核时间</dt>
+        <dd>{formatDate(request.reviewedAt)}</dd>
+      </div>
+      <div>
+        <dt>更新时间</dt>
+        <dd>{formatDate(request.updatedAt)}</dd>
+      </div>
+    </dl>
   );
 }
 

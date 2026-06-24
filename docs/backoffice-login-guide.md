@@ -73,7 +73,7 @@ POST /api/auth/admin/login
 | 页面                            | 用途                                                                             |
 | ------------------------------- | -------------------------------------------------------------------------------- |
 | `/admin`                        | 查看后台概览、待办数量、关键数字和最近审计                                       |
-| `/admin/users`                  | 审核普通用户注册申请、搜索和导出用户目录、封禁/解封/软删除用户、管理员介入重置用户 PIN |
+| `/admin/users`                  | 审核普通用户注册申请、搜索和导出用户目录、封禁/解封/删除用户、管理员介入重置用户密码 |
 | `/admin/providers`              | 手动创建发卡方和 owner 账号、审核发卡方入驻申请、审核资料变更、审核 API 密钥和 Webhook 创建申请、搜索和导出提供方目录、停用/恢复/归档发卡方 |
 | `/admin/pass-templates`         | 审核发卡方提交的卡券模板                                                         |
 | `/admin/card-template-variants` | 维护平台提供的卡面模板变体                                                       |
@@ -95,7 +95,7 @@ POST /api/auth/admin/login
 
 在 `/admin/passes` 提交余额/权益调整、冻结或解冻卡券时，需要再次输入管理员 PIN。后端会校验 PIN 后才写入流水、更新卡券权益或改变卡券状态；PIN 错误不会产生调整或状态变更记录。冻结卡券后，发卡方不能再对该卡券发起消耗请求。
 
-`/admin/users` 的用户目录支持按用户名、邮箱或服务器 ID 搜索用户，也可以按当前关键词导出用户目录 CSV。导出内容包含用户状态、注册 IP / IP 属地、服务器 ID、服务器账号验证状态和 PIN 设置状态，不包含密码哈希、PIN 哈希或会话 token。管理员可以为用户设置新的 4 到 12 位数字 PIN，后端只保存哈希并写入 `UserPinResetByAdmin` 审计事件。管理员还可以封禁、解封或软删除普通用户；这些敏感操作需要填写原因和管理员 PIN，成功后会撤销目标用户现有会话和设备，并写入 `PinVerificationSucceeded`、`UserSuspended`、`UserUnsuspended` 或 `UserDeletedByAdmin` 审计事件。
+`/admin/users` 的用户目录支持按用户名、邮箱或服务器 ID 搜索用户，也可以按当前关键词导出用户目录 CSV。导出内容包含用户状态、注册 IP / IP 属地、服务器 ID、服务器账号验证状态和 PIN 设置状态，不包含密码哈希、PIN 哈希或会话 token。用户 PIN 由用户自助设置或修改，管理员后台只保留重置登录密码能力。管理员还可以封禁、解封或删除普通用户；这些敏感操作需要填写原因和管理员 PIN，成功后会撤销目标用户现有会话和设备，删除账户时释放用户名、邮箱和服务器 ID，并将审计记录匿名化为同一删除主体。相关操作会写入 `PinVerificationSucceeded`、`CredentialChanged`、`UserSuspended`、`UserUnsuspended` 或 `UserDeletedByAdmin` 审计事件。
 
 `/admin/providers` 支持按名称、标识、联系人、联系邮箱或业务说明搜索提供方，也可以按当前关键词导出提供方目录 CSV。导出内容包含提供方状态、来源、联系人、审核/处置原因、账号数量、有效 API 密钥数和启用 Webhook 端点数，不包含负责人密码哈希、API 密钥明文、Webhook 签名密钥等敏感材料。
 
@@ -392,7 +392,7 @@ POST /api/providers/webhooks/deliveries/:deliveryId/retry
 
 ### 3.7 卡券查看与权益调整
 
-发卡方可以在 `/provider/passes` 查看自己名下的卡券，支持按卡号、尾号、卡券名称、持有人用户名或邮箱搜索。发卡方专用登录态访问 `/add` 时会进入核销模式；如果同一浏览器同时存在普通用户和发卡方 session，需要显式访问 `/add?mode=redeem` 才进入核销模式。核销模式可输入或通过参数传入卡券 `publicNumber`、领取码或添加链接并发起核销；模板规则里的允许核销方名单为空时，仅原发卡方自身可核销。
+发卡方可以在 `/provider/passes` 查看自己名下的卡券，支持按卡号、尾号、卡券名称、持有人用户名或邮箱搜索。现场核销使用独立的 `/provider/redemptions` 页面，只按已领取卡片的完整卡号读取和发起核销；领取码和添加链接只用于用户添加卡券，不再作为核销定位凭据。模板规则里的允许核销方名单为空时，仅原发卡方自身可核销。核销链接格式见 `docs/provider-redemption-link-format.md`。
 
 搜索区域提供两个 CSV 导出入口：
 

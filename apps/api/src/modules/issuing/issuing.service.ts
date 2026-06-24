@@ -5,7 +5,7 @@ import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import type { AuthenticatedProviderAccount } from '../../shared/auth/provider-auth.service.js';
 import { PrismaService } from '../../shared/database/prisma.service.js';
-import { hashClaimCode } from '../wallet/claim-code.js';
+import { createClaimCode, hashClaimCode } from '../wallet/claim-code.js';
 import type {
   AdjustProviderPassBalanceDto,
   ChangeProviderPassStatusDto,
@@ -87,7 +87,7 @@ export class IssuingService {
 
   async createAddPassToken(dto: CreateProviderAddPassTokenDto, providerAccount: AuthenticatedProviderAccount) {
     const now = new Date();
-    const code = this.createClaimCode();
+    const code = createClaimCode();
     const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * (dto.expiresInDays ?? 30));
     const passExpiresAt = readPassExpiresAt(now, dto.passExpiresInDays);
     const template = await this.prisma.passTemplate.findFirst({
@@ -262,7 +262,7 @@ export class IssuingService {
     const ticketInfo = this.buildTicketInfoFromIssueDto(dto, template.category);
     const requireServerVerifiedUser = this.readTemplateRequiresServerVerifiedUser(activeVersion.rules) || (dto.requireServerVerifiedUser ?? false);
     const generatedItems = Array.from({ length: dto.count }, () => ({
-      claimCode: this.createClaimCode(),
+      claimCode: createClaimCode(),
     }));
 
     const results = await this.prisma.$transaction(async (transaction) => {
@@ -516,7 +516,7 @@ export class IssuingService {
     }
 
     const now = new Date();
-    const code = this.createClaimCode();
+    const code = createClaimCode();
     const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * (dto.expiresInDays ?? 30));
 
     const result = await this.prisma.$transaction(async (transaction) => {
@@ -1228,10 +1228,6 @@ export class IssuingService {
     }
 
     return (rules as { requireServerVerifiedUser?: unknown }).requireServerVerifiedUser === true;
-  }
-
-  private createClaimCode(): string {
-    return `LD-${randomBytes(9).toString('base64url').toUpperCase()}`;
   }
 
   private createPublicNumber(): string {

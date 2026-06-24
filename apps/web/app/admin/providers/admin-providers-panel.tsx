@@ -131,13 +131,20 @@ interface ProviderGovernanceInput {
 }
 
 type ProviderGovernanceAction = 'suspend' | 'unsuspend' | 'archive';
+type ProviderAdminView = 'providers' | 'profile' | 'api' | 'webhook';
+type ProviderDialog =
+  | { kind: 'detail'; provider: AdminProvider }
+  | { kind: 'governance'; provider: AdminProvider; action: ProviderGovernanceAction };
 
 export function AdminProvidersPanel() {
   const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [profileChangeRequests, setProfileChangeRequests] = useState<ProviderProfileChangeRequest[]>([]);
   const [webhookChangeRequests, setWebhookChangeRequests] = useState<ProviderWebhookChangeRequest[]>([]);
   const [apiKeyChangeRequests, setApiKeyChangeRequests] = useState<ProviderApiKeyChangeRequest[]>([]);
+  const [activeView, setActiveView] = useState<ProviderAdminView>('providers');
   const [keyword, setKeyword] = useState('');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [activeDialog, setActiveDialog] = useState<ProviderDialog | null>(null);
   const [governanceInputs, setGovernanceInputs] = useState<Record<string, ProviderGovernanceInput>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -256,7 +263,8 @@ export function AdminProvidersPanel() {
 
   const createProvider = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setMessage(null);
     setIsCreating(true);
 
@@ -271,7 +279,8 @@ export function AdminProvidersPanel() {
         ownerDisplayName: String(form.get('ownerDisplayName') ?? ''),
         ownerPassword: String(form.get('ownerPassword') ?? ''),
       });
-      event.currentTarget.reset();
+      formElement.reset();
+      setIsCreateDialogOpen(false);
       setMessage(`已创建提供方 ${result.provider.name}，负责人账号 ${result.account.email} 可直接登录发卡方后台。`);
       await loadProviders();
     } catch (error) {
@@ -454,10 +463,6 @@ export function AdminProvidersPanel() {
       return;
     }
 
-    if (!window.confirm(`确定要${actionLabel} ${provider.name} 吗？`)) {
-      return;
-    }
-
     const actionKey = `${provider.id}:${action}`;
     setGovernanceActionKey(actionKey);
     setMessage(null);
@@ -475,6 +480,7 @@ export function AdminProvidersPanel() {
         },
       }));
       setMessage(`已${actionLabel} ${provider.name}。`);
+      setActiveDialog(null);
       await loadProviders();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : `${actionLabel}提供方失败。`);
@@ -488,9 +494,15 @@ export function AdminProvidersPanel() {
       <div className="admin-panel-heading">
         <div>
           <p>平台管理</p>
-          <h1 id="admin-providers-title">提供方管理</h1>
+          <h1 id="admin-providers-title">发卡方</h1>
         </div>
         <div className="admin-list-actions">
+          <button className="primary-action" type="button" onClick={() => setIsCreateDialogOpen(true)}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              add_business
+            </span>
+            <span>新增发卡方</span>
+          </button>
           <button className="secondary-action" type="button" onClick={() => void loadProviders(keyword)}>
             刷新
           </button>
@@ -512,31 +524,34 @@ export function AdminProvidersPanel() {
         </div>
       ) : null}
 
-      <form className="audit-filter-grid" onSubmit={submitSearch}>
-        <label>
-          <span>搜索提供方</span>
-          <input
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="名称、标识、联系人、邮箱、业务说明"
-          />
-        </label>
-        <div className="audit-filter-actions">
-          <button className="secondary-action" type="button" onClick={() => void loadProviders(keyword)}>
-            刷新列表
-          </button>
-          <button className="secondary-action" type="button" disabled={isExportingProviders} onClick={() => void exportProvidersCsv()}>
-            {isExportingProviders ? '导出中' : '导出提供方 CSV'}
-          </button>
-          <button className="primary-action" type="submit">
-            <span className="material-symbols-rounded" aria-hidden="true">
-              manage_search
-            </span>
-            <span>搜索提供方</span>
-          </button>
-        </div>
-      </form>
+      <div className="segmented-control" role="tablist" aria-label="发卡方管理视图">
+        <button className={activeView === 'providers' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('providers')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            storefront
+          </span>
+          <span>发卡方</span>
+        </button>
+        <button className={activeView === 'profile' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('profile')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            badge
+          </span>
+          <span>资料 {profileChangeRequests.length}</span>
+        </button>
+        <button className={activeView === 'api' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('api')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            key
+          </span>
+          <span>API {apiKeyChangeRequests.length}</span>
+        </button>
+        <button className={activeView === 'webhook' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('webhook')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            webhook
+          </span>
+          <span>Webhook {webhookChangeRequests.length}</span>
+        </button>
+      </div>
 
+      {activeView === 'profile' ? (
       <section className="admin-list-section" aria-labelledby="provider-profile-change-review-title">
         <div className="detail-section-heading">
           <h2 id="provider-profile-change-review-title">资料变更待审</h2>
@@ -615,7 +630,9 @@ export function AdminProvidersPanel() {
           ))}
         </div>
       </section>
+      ) : null}
 
+      {activeView === 'api' ? (
       <section className="admin-list-section" aria-labelledby="provider-api-key-change-review-title">
         <div className="detail-section-heading">
           <h2 id="provider-api-key-change-review-title">API 密钥待审</h2>
@@ -669,7 +686,9 @@ export function AdminProvidersPanel() {
           ))}
         </div>
       </section>
+      ) : null}
 
+      {activeView === 'webhook' ? (
       <section className="admin-list-section" aria-labelledby="provider-webhook-change-review-title">
         <div className="detail-section-heading">
           <h2 id="provider-webhook-change-review-title">Webhook 配置待审</h2>
@@ -724,50 +743,31 @@ export function AdminProvidersPanel() {
           ))}
         </div>
       </section>
+      ) : null}
 
-      <form className="stacked-form account-summary" onSubmit={createProvider} noValidate>
-        <strong>手动创建提供方</strong>
-        <span>创建后提供方和负责人账号会直接启用，负责人密码只会以哈希保存。</span>
-        <div className="admin-adjustment-panel provider-create-form">
-          <label>
-            <span>提供方名称</span>
-            <input type="text" name="name" required minLength={2} maxLength={80} />
-          </label>
-          <label>
-            <span>提供方标识</span>
-            <input type="text" name="slug" placeholder="lowercase-slug" required pattern="[a-z0-9][a-z0-9-]{1,62}[a-z0-9]" />
-          </label>
-          <label>
-            <span>联系人</span>
-            <input type="text" name="contactName" required maxLength={80} />
-          </label>
-          <label>
-            <span>联系邮箱</span>
-            <input type="email" name="contactEmail" required maxLength={160} />
-          </label>
-          <label>
-            <span>负责人邮箱</span>
-            <input type="email" name="ownerEmail" required maxLength={160} />
-          </label>
-          <label>
-            <span>负责人显示名</span>
-            <input type="text" name="ownerDisplayName" required maxLength={80} />
-          </label>
-          <label>
-            <span>初始密码</span>
-            <input type="password" name="ownerPassword" autoComplete="new-password" required minLength={8} maxLength={128} />
-          </label>
-          <label>
-            <span>业务说明</span>
-            <textarea name="businessInfo" maxLength={1000} />
-          </label>
-        </div>
-        <div className="form-actions">
-          <button className="primary-action" type="submit" disabled={isCreating}>
+      {activeView === 'providers' ? (
+      <>
+      <form className="audit-filter-grid" onSubmit={submitSearch}>
+        <label>
+          <span>搜索发卡方</span>
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="名称、标识、联系人、邮箱、业务说明"
+          />
+        </label>
+        <div className="audit-filter-actions">
+          <button className="secondary-action" type="button" onClick={() => void loadProviders(keyword)}>
+            刷新列表
+          </button>
+          <button className="secondary-action" type="button" disabled={isExportingProviders} onClick={() => void exportProvidersCsv()}>
+            {isExportingProviders ? '导出中' : '导出 CSV'}
+          </button>
+          <button className="primary-action" type="submit">
             <span className="material-symbols-rounded" aria-hidden="true">
-              add_business
+              manage_search
             </span>
-            <span>{isCreating ? '创建中' : '创建提供方'}</span>
+            <span>搜索</span>
           </button>
         </div>
       </form>
@@ -786,11 +786,13 @@ export function AdminProvidersPanel() {
               <p>
                 联系人：{provider.contactName ?? '未填写'} · 邮箱：{provider.contactEmail ?? '未填写'}
               </p>
-              {provider.businessInfo ? <p>业务说明：{provider.businessInfo}</p> : null}
-              {provider.reviewReason ? <p>拒绝原因：{provider.reviewReason}</p> : null}
             </div>
-            {isReviewableProvider(provider.status) ? (
-              <div className="admin-list-actions">
+            <div className="admin-list-actions">
+              <button className="secondary-action" type="button" onClick={() => setActiveDialog({ kind: 'detail', provider })}>
+                详情
+              </button>
+              {isReviewableProvider(provider.status) ? (
+                <>
                 <button className="secondary-action" type="button" onClick={() => void rejectProvider(provider.id)}>
                   拒绝
                 </button>
@@ -800,61 +802,240 @@ export function AdminProvidersPanel() {
                   </span>
                   <span>通过</span>
                 </button>
-              </div>
-            ) : null}
-            {provider.status !== 'Archived' ? (
-              <div className="admin-list-actions">
-                <input
-                  className="inline-admin-input inline-admin-input-wide"
-                  value={governanceInputs[provider.id]?.reason ?? ''}
-                  onChange={(event) => updateGovernanceInput(provider.id, { reason: event.target.value })}
-                  placeholder="处置原因"
-                  aria-label={`${provider.name} 的处置原因`}
-                />
-                <input
-                  className="inline-admin-input"
-                  type="password"
-                  inputMode="numeric"
-                  pattern="[0-9]{4,12}"
-                  value={governanceInputs[provider.id]?.secondFactor ?? ''}
-                  onChange={(event) => updateGovernanceInput(provider.id, { secondFactor: event.target.value })}
-                  placeholder="管理员 PIN"
-                  aria-label={`${provider.name} 处置所需管理员 PIN`}
-                />
-                {provider.status === 'Active' ? (
-                  <button
-                    className="secondary-action"
-                    type="button"
-                    disabled={governanceActionKey === `${provider.id}:suspend`}
-                    onClick={() => void changeProviderGovernance(provider, 'suspend')}
-                  >
-                    {governanceActionKey === `${provider.id}:suspend` ? '停用中' : '停用'}
-                  </button>
-                ) : null}
-                {provider.status === 'Suspended' ? (
-                  <button
-                    className="secondary-action"
-                    type="button"
-                    disabled={governanceActionKey === `${provider.id}:unsuspend`}
-                    onClick={() => void changeProviderGovernance(provider, 'unsuspend')}
-                  >
-                    {governanceActionKey === `${provider.id}:unsuspend` ? '恢复中' : '恢复'}
-                  </button>
-                ) : null}
+                </>
+              ) : null}
+              {provider.status === 'Active' ? (
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => {
+                    updateGovernanceInput(provider.id, {});
+                    setActiveDialog({ kind: 'governance', provider, action: 'suspend' });
+                  }}
+                >
+                  停用
+                </button>
+              ) : null}
+              {provider.status === 'Suspended' ? (
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => {
+                    updateGovernanceInput(provider.id, {});
+                    setActiveDialog({ kind: 'governance', provider, action: 'unsuspend' });
+                  }}
+                >
+                  启用
+                </button>
+              ) : null}
+              {provider.status !== 'Archived' ? (
                 <button
                   className="danger-action"
                   type="button"
-                  disabled={governanceActionKey === `${provider.id}:archive`}
-                  onClick={() => void changeProviderGovernance(provider, 'archive')}
+                  onClick={() => {
+                    updateGovernanceInput(provider.id, {});
+                    setActiveDialog({ kind: 'governance', provider, action: 'archive' });
+                  }}
                 >
-                  {governanceActionKey === `${provider.id}:archive` ? '归档中' : '归档'}
+                  归档
                 </button>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </article>
         ))}
       </div>
+      {isCreateDialogOpen ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="新增发卡方">
+            <div className="admin-dialog-heading">
+              <h2>新增发卡方</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <form className="admin-dialog-form" onSubmit={createProvider} noValidate>
+              <label>
+                <span>发卡方名称</span>
+                <input type="text" name="name" required minLength={2} maxLength={80} />
+              </label>
+              <label>
+                <span>发卡方标识</span>
+                <input type="text" name="slug" placeholder="lowercase-slug" required pattern="[a-z0-9][a-z0-9-]{1,62}[a-z0-9]" />
+              </label>
+              <label>
+                <span>联系人</span>
+                <input type="text" name="contactName" required maxLength={80} />
+              </label>
+              <label>
+                <span>联系邮箱</span>
+                <input type="email" name="contactEmail" required maxLength={160} />
+              </label>
+              <label>
+                <span>负责人邮箱</span>
+                <input type="email" name="ownerEmail" required maxLength={160} />
+              </label>
+              <label>
+                <span>负责人显示名</span>
+                <input type="text" name="ownerDisplayName" required maxLength={80} />
+              </label>
+              <label>
+                <span>初始密码</span>
+                <input type="password" name="ownerPassword" autoComplete="new-password" required minLength={8} maxLength={128} />
+              </label>
+              <label>
+                <span>业务说明</span>
+                <textarea name="businessInfo" maxLength={1000} rows={4} />
+              </label>
+              <div className="admin-dialog-actions">
+                <button className="secondary-action" type="button" onClick={() => setIsCreateDialogOpen(false)}>
+                  取消
+                </button>
+                <button className="primary-action" type="submit" disabled={isCreating}>
+                  {isCreating ? '创建中' : '创建'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+      {activeDialog ? (
+        <ProviderDialogPanel
+          dialog={activeDialog}
+          governanceInput={governanceInputs[activeDialog.provider.id] ?? { reason: '', secondFactor: '' }}
+          governanceActionKey={governanceActionKey}
+          onClose={() => setActiveDialog(null)}
+          onGovernanceInputChange={(patch) => updateGovernanceInput(activeDialog.provider.id, patch)}
+          onGovernanceSubmit={() => {
+            if (activeDialog.kind === 'governance') {
+              void changeProviderGovernance(activeDialog.provider, activeDialog.action);
+            }
+          }}
+        />
+      ) : null}
+      </>
+      ) : null}
     </section>
+  );
+}
+
+interface ProviderDialogPanelProps {
+  dialog: ProviderDialog;
+  governanceInput: ProviderGovernanceInput;
+  governanceActionKey: string | null;
+  onClose: () => void;
+  onGovernanceInputChange: (patch: Partial<ProviderGovernanceInput>) => void;
+  onGovernanceSubmit: () => void;
+}
+
+function ProviderDialogPanel({
+  dialog,
+  governanceInput,
+  governanceActionKey,
+  onClose,
+  onGovernanceInputChange,
+  onGovernanceSubmit,
+}: ProviderDialogPanelProps) {
+  const title = dialog.kind === 'detail' ? '发卡方详情' : formatProviderGovernanceAction(dialog.action);
+
+  return (
+    <div className="admin-dialog-layer">
+      <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={onClose} />
+      <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="admin-dialog-heading">
+          <h2>{title}</h2>
+          <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={onClose}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              close
+            </span>
+          </button>
+        </div>
+
+        {dialog.kind === 'detail' ? (
+          <ProviderDetail provider={dialog.provider} />
+        ) : (
+          <form
+            className="admin-dialog-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onGovernanceSubmit();
+            }}
+          >
+            <ProviderDetail provider={dialog.provider} compact />
+            <label>
+              <span>处置原因</span>
+              <textarea
+                value={governanceInput.reason}
+                onChange={(event) => onGovernanceInputChange({ reason: event.target.value })}
+                rows={5}
+              />
+            </label>
+            <label>
+              <span>管理员 PIN</span>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]{4,12}"
+                value={governanceInput.secondFactor}
+                onChange={(event) => onGovernanceInputChange({ secondFactor: event.target.value })}
+              />
+            </label>
+            <div className="admin-dialog-actions">
+              <button className="secondary-action" type="button" onClick={onClose}>
+                取消
+              </button>
+              <button
+                className={dialog.action === 'archive' ? 'danger-action' : 'primary-action'}
+                type="submit"
+                disabled={governanceActionKey === `${dialog.provider.id}:${dialog.action}`}
+              >
+                {governanceActionKey === `${dialog.provider.id}:${dialog.action}` ? '处理中' : formatProviderGovernanceAction(dialog.action)}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ProviderDetail({ provider, compact = false }: { provider: AdminProvider; compact?: boolean }) {
+  const details = [
+    ['名称', provider.name],
+    ['标识', provider.slug],
+    ['状态', formatProviderStatus(provider.status)],
+    ['来源', formatProviderSource(provider.source)],
+    ['联系人', provider.contactName ?? '未填写'],
+    ['联系邮箱', provider.contactEmail ?? '未填写'],
+    ['头像', provider.logoUrl ?? '未设置'],
+    ['介绍链接', provider.introductionUrl ?? '未设置'],
+    ['创建时间', formatDateTime(provider.createdAt)],
+    ['最近更新', formatDateTime(provider.updatedAt)],
+  ];
+
+  return (
+    <dl className={`admin-detail-list${compact ? ' is-compact' : ''}`}>
+      {details.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+      {provider.businessInfo ? (
+        <div>
+          <dt>业务说明</dt>
+          <dd>{provider.businessInfo}</dd>
+        </div>
+      ) : null}
+      {provider.reviewReason ? (
+        <div>
+          <dt>审核反馈</dt>
+          <dd>{provider.reviewReason}</dd>
+        </div>
+      ) : null}
+    </dl>
   );
 }
 
@@ -865,7 +1046,7 @@ function isReviewableProvider(status: string): boolean {
 function formatProviderGovernanceAction(action: ProviderGovernanceAction): string {
   const labels: Record<ProviderGovernanceAction, string> = {
     suspend: '停用',
-    unsuspend: '恢复',
+    unsuspend: '启用',
     archive: '归档',
   };
 

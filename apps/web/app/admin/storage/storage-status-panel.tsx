@@ -89,7 +89,7 @@ export function StorageStatusPanel() {
       <div className="admin-panel-heading">
         <div>
           <p>平台管理</p>
-          <h1 id="storage-title">存储状态</h1>
+          <h1 id="storage-title">存储情况</h1>
         </div>
         <a className="secondary-action" href="/admin/audit">
           审计日志

@@ -36,15 +36,6 @@ interface AdminDashboardSummary {
     activeActionLinks: number;
     activeStorageAlerts: number;
   };
-  recentAuditLogs: Array<{
-    id: string;
-    eventType: string;
-    actorType: string;
-    actorId: string | null;
-    subjectType: string | null;
-    subjectId: string | null;
-    createdAt: string;
-  }>;
   generatedAt: string;
 }
 
@@ -133,9 +124,10 @@ export function AdminDashboardPanel() {
       },
     ];
   }, [summary]);
+  const pendingActionItems = actionItems.filter((item) => item.count > 0);
 
   return (
-    <section className="admin-panel" aria-labelledby="admin-dashboard-title">
+    <section className="admin-panel admin-dashboard-panel" aria-labelledby="admin-dashboard-title">
       <div className="admin-panel-heading">
         <div>
           <p>平台管理</p>
@@ -145,9 +137,6 @@ export function AdminDashboardPanel() {
           <button className="secondary-action" type="button" onClick={() => void loadSummary()}>
             刷新
           </button>
-          <a className="secondary-action" href="/admin/audit">
-            审计日志
-          </a>
         </div>
       </div>
 
@@ -161,34 +150,11 @@ export function AdminDashboardPanel() {
 
       {summary ? (
         <>
-          <section className="admin-list-section" aria-labelledby="admin-dashboard-actions-title">
-            <div className="detail-section-heading">
-              <h2 id="admin-dashboard-actions-title">待办</h2>
-              <span>更新时间：{formatDateTime(summary.generatedAt)}</span>
-            </div>
-            <div className="admin-list">
-              {actionItems.map((item) => (
-                <article className="admin-list-item" key={item.label}>
-                  <div>
-                    <h2>{item.label}</h2>
-                    <p>{item.detail}</p>
-                  </div>
-                  <div className="admin-list-actions">
-                    <strong>{item.count}</strong>
-                    <a className={item.count > 0 ? 'primary-action' : 'secondary-action'} href={item.href}>
-                      处理
-                    </a>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
           <section className="admin-list-section" aria-labelledby="admin-dashboard-metrics-title">
             <div className="detail-section-heading">
               <h2 id="admin-dashboard-metrics-title">关键数字</h2>
             </div>
-            <dl className="storage-stat-grid">
+            <dl className="storage-stat-grid admin-dashboard-metric-grid">
               <div>
                 <dt>可用用户</dt>
                 <dd>{summary.users.active}</dd>
@@ -232,30 +198,38 @@ export function AdminDashboardPanel() {
             </dl>
           </section>
 
-          <section className="admin-list-section" aria-labelledby="admin-dashboard-audit-title">
+          <section className="admin-list-section" aria-labelledby="admin-dashboard-actions-title">
             <div className="detail-section-heading">
-              <h2 id="admin-dashboard-audit-title">最近审计</h2>
-              <a className="secondary-action" href="/admin/audit">
-                查看全部
-              </a>
+              <h2 id="admin-dashboard-actions-title">待办</h2>
+              <span>更新时间：{formatDateTime(summary.generatedAt)}</span>
             </div>
-            {summary.recentAuditLogs.length === 0 ? <p className="empty-note">暂无审计记录。</p> : null}
-            <div className="admin-list">
-              {summary.recentAuditLogs.map((log) => (
-                <article className="admin-list-item audit-log-item" key={log.id}>
-                  <div>
-                    <h2>{log.eventType}</h2>
-                    <p>
-                      {log.actorType}
-                      {log.actorId ? ` · ${log.actorId}` : ''} / {log.subjectType ?? 'event'}
-                      {log.subjectId ? ` · ${log.subjectId}` : ''}
-                    </p>
-                    <p>{formatDateTime(log.createdAt)}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
+            {pendingActionItems.length === 0 ? (
+              <p className="empty-note">当前没有需要立即处理的待办。</p>
+            ) : (
+              <>
+                <div className="flow-notice" role="status">
+                  <span>有 {pendingActionItems.reduce((total, item) => total + item.count, 0)} 项待办需要处理。</span>
+                </div>
+                <div className="admin-list">
+                  {pendingActionItems.map((item) => (
+                    <article className="admin-list-item" key={item.label}>
+                      <div>
+                        <h2>{item.label}</h2>
+                        <p>{item.detail}</p>
+                      </div>
+                      <div className="admin-list-actions">
+                        <strong>{item.count}</strong>
+                        <a className="primary-action" href={item.href}>
+                          处理
+                        </a>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
           </section>
+
         </>
       ) : null}
     </section>

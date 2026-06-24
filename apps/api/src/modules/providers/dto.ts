@@ -36,6 +36,11 @@ export class ProviderLoginDto {
   @MaxLength(254)
   identifier!: string;
 
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-z0-9-]{2,48}$/)
+  providerSlug?: string;
+
   @IsString()
   @MinLength(1)
   @MaxLength(128)

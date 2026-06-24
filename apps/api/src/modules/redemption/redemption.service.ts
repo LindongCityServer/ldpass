@@ -13,7 +13,6 @@ import { BdslmClientService } from '../bdslm/bdslm-client.service.js';
 import type { AuthenticatedProviderAccount } from '../../shared/auth/provider-auth.service.js';
 import type { AuthenticatedUser } from '../../shared/auth/session-auth.service.js';
 import { PrismaService } from '../../shared/database/prisma.service.js';
-import { hashClaimCode } from '../wallet/claim-code.js';
 import type {
   AdminReverseRedemptionRequestDto,
   CancelRedemptionRequestDto,
@@ -202,31 +201,19 @@ export class RedemptionService {
     lookupValue: string,
     providerAccount: AuthenticatedProviderAccount,
   ): Promise<ProviderRedemptionPass> {
-    const lookup = readProviderPassLookup(lookupValue);
-    const publicNumber = normalizeCardNumber(lookup.publicNumber);
-    const claimCode = lookup.claimCode;
-    if (!publicNumber && !claimCode) {
-      throw new BadRequestException('请填写卡号或领取码。');
+    const publicNumber = readProviderCardNumberLookup(lookupValue);
+    if (!publicNumber) {
+      throw new BadRequestException('请填写卡号。');
     }
 
-    const passByPublicNumber = publicNumber
-      ? await this.findProviderRedeemablePassByPublicNumber(publicNumber, providerAccount)
-      : null;
+    const passByPublicNumber = await this.findProviderRedeemablePassByPublicNumber(publicNumber, providerAccount);
 
     if (passByPublicNumber) {
       this.assertPassCanReceiveProviderRedemption(passByPublicNumber);
       return passByPublicNumber;
     }
 
-    if (claimCode) {
-      const passByClaimCode = await this.findProviderRedeemablePassByClaimCode(claimCode, providerAccount);
-      if (passByClaimCode) {
-        this.assertPassCanReceiveProviderRedemption(passByClaimCode);
-        return passByClaimCode;
-      }
-    }
-
-    throw new NotFoundException('卡券不存在，或当前发卡方未被允许核销这张卡。');
+    throw new NotFoundException('卡号不存在，或当前发卡方未被允许核销这张卡。');
   }
 
   private async findProviderRedeemablePassByPublicNumber(
@@ -251,37 +238,6 @@ export class RedemptionService {
     }
 
     return authorizedPasses[0]!;
-  }
-
-  private async findProviderRedeemablePassByClaimCode(
-    claimCode: string,
-    providerAccount: AuthenticatedProviderAccount,
-  ): Promise<ProviderRedemptionPass | null> {
-    const addToken = await this.prisma.addPassToken.findUnique({
-      where: {
-        tokenHash: hashClaimCode(claimCode),
-      },
-      select: {
-        passId: true,
-      },
-    });
-
-    if (!addToken?.passId) {
-      return null;
-    }
-
-    const pass = await this.prisma.pass.findUnique({
-      where: {
-        id: addToken.passId,
-      },
-      include: this.providerRedemptionPassInclude(),
-    });
-
-    if (!pass || !this.canProviderRedeemPass(pass, providerAccount)) {
-      return null;
-    }
-
-    return pass;
   }
 
   private providerRedemptionPassInclude() {
@@ -1653,37 +1609,25 @@ function normalizeCardNumber(value: string): string {
   return value.replace(/\s+/g, '').trim().toUpperCase();
 }
 
-function readProviderPassLookup(value: string): { publicNumber: string; claimCode: string } {
+function readProviderCardNumberLookup(value: string): string {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
-    return {
-      publicNumber: '',
-      claimCode: '',
-    };
+    return '';
   }
 
   try {
     const url = new URL(trimmedValue, 'https://ldpass.local');
-    const hasLookupParam =
-      url.searchParams.has('cardNumber') || url.searchParams.has('token') || url.searchParams.has('claimCode');
+    const cardNumber = url.searchParams.get('cardNumber');
 
-    if (hasLookupParam) {
-      const cardNumber = url.searchParams.get('cardNumber') ?? '';
-      const claimCode = url.searchParams.get('token') ?? url.searchParams.get('claimCode') ?? '';
-      return {
-        publicNumber: cardNumber,
-        claimCode,
-      };
+    if (cardNumber) {
+      return normalizeCardNumber(cardNumber);
     }
   } catch {
-    // 解析失败时按原始输入同时尝试卡号和领取码。
+    // 解析失败时按原始输入继续尝试卡号。
   }
 
-  return {
-    publicNumber: trimmedValue,
-    claimCode: trimmedValue,
-  };
+  return normalizeCardNumber(trimmedValue);
 }
 
 function canConsumeValue(balanceValue: string, frozenValue: string, overdraftLimit: string, requestedValue: string): boolean {

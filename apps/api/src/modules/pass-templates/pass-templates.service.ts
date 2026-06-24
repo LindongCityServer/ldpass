@@ -330,8 +330,8 @@ export class PassTemplatesService {
       throw new NotFoundException('卡券模板版本不存在。');
     }
 
-    if (version.status !== 'PendingReview') {
-      throw new BadRequestException('只能审核待审核的卡券模板。');
+    if (version.status !== 'PendingReview' && version.status !== 'Approved') {
+      throw new BadRequestException('只能打回待审核或已过审的卡券模板。');
     }
 
     const updated = await this.prisma.$transaction(async (transaction) => {
@@ -347,14 +347,45 @@ export class PassTemplatesService {
         },
       });
 
-      const template = await transaction.passTemplate.update({
-        where: {
-          id: version.templateId,
-        },
-        data: {
-          status: version.template.activeVersionId ? version.template.status : 'Rejected',
-        },
-      });
+      const shouldRetireActiveVersion = version.template.activeVersionId === version.id;
+      const fallbackVersion = shouldRetireActiveVersion
+        ? await transaction.passTemplateVersion.findFirst({
+            where: {
+              templateId: version.templateId,
+              id: {
+                not: version.id,
+              },
+              status: 'Approved',
+            },
+            orderBy: [
+              {
+                version: 'desc',
+              },
+            ],
+          })
+        : null;
+      const templateData: Prisma.PassTemplateUpdateInput = {};
+
+      if (shouldRetireActiveVersion) {
+        templateData.activeVersionId = fallbackVersion?.id ?? null;
+        templateData.status = fallbackVersion ? 'Active' : 'Rejected';
+
+        if (fallbackVersion) {
+          templateData.displayName = readVersionDisplayName(fallbackVersion.fields) ?? version.template.displayName;
+        }
+      } else if (!version.template.activeVersionId) {
+        templateData.status = 'Rejected';
+      }
+
+      const template =
+        Object.keys(templateData).length > 0
+          ? await transaction.passTemplate.update({
+              where: {
+                id: version.templateId,
+              },
+              data: templateData,
+            })
+          : version.template;
 
       return {
         template,

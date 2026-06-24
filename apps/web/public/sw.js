@@ -1,5 +1,15 @@
-const cacheName = 'ldpass-app-shell-v1';
-const appShellUrls = ['/', '/manifest.webmanifest', '/brand/ldpass_icon_color.svg', '/brand/ldpass_icon.svg'];
+const cacheName = 'ldpass-app-shell-v2';
+const appShellUrls = [
+  '/',
+  '/manifest.webmanifest',
+  '/brand/ldpass_app_icon.svg',
+  '/brand/ldpass_app_icon_192.png',
+  '/brand/ldpass_app_icon_512.png',
+  '/brand/ldpass_apple_touch_icon.png',
+  '/brand/ldpass_icon_color.svg',
+  '/brand/ldpass_icon.svg',
+  '/brand/ldpass_favicon_32.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

@@ -6,16 +6,12 @@ interface AddPassPageProps {
   searchParams?: Promise<{
     token?: string;
     claimCode?: string;
-    cardNumber?: string;
-    mode?: string;
   }>;
 }
 
 export default async function AddPassPage({ searchParams }: AddPassPageProps) {
   const resolvedSearchParams = await searchParams;
   const initialClaimCode = resolvedSearchParams?.token ?? resolvedSearchParams?.claimCode;
-  const initialCardNumber = resolvedSearchParams?.cardNumber;
-  const redemptionMode = resolvedSearchParams?.mode === 'redeem';
 
   return (
     <main className="auth-shell add-pass-shell">
@@ -32,11 +28,7 @@ export default async function AddPassPage({ searchParams }: AddPassPageProps) {
           <span className="material-symbols-rounded">add_card</span>
         </div>
         <h1 id="add-pass-title">添加卡券</h1>
-        <AddPassForm
-          initialClaimCode={initialClaimCode}
-          initialCardNumber={initialCardNumber}
-          redemptionMode={redemptionMode}
-        />
+        <AddPassForm initialClaimCode={initialClaimCode} />
       </section>
     </main>
   );

@@ -22,25 +22,6 @@ interface ProviderSessionResponse {
   } | null;
 }
 
-function formatProfileChangeStatus(status: string): string {
-  const labels: Record<string, string> = {
-    PendingReview: '资料变更待审核',
-    Approved: '资料变更已通过',
-    Rejected: '资料变更已拒绝',
-  };
-
-  return labels[status] ?? status;
-}
-
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 interface ProviderProfile {
   id: string;
   name: string;
@@ -89,6 +70,8 @@ export function ProviderDashboardPanel() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingProfileChange, setIsSubmittingProfileChange] = useState(false);
+  const [isProfileDetailOpen, setIsProfileDetailOpen] = useState(false);
+  const [isProfileChangeDialogOpen, setIsProfileChangeDialogOpen] = useState(false);
 
   useEffect(() => {
     getJson<ProviderSessionResponse>('/api/providers/auth/session')
@@ -128,7 +111,7 @@ export function ProviderDashboardPanel() {
       setProviderProfile(result.provider);
       setProfileChangeRequests(result.requests);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '读取资料变更记录失败。');
+      setMessage(error instanceof Error ? error.message : '读取资料变更状态失败。');
     }
   };
 
@@ -150,6 +133,7 @@ export function ProviderDashboardPanel() {
         reason: String(form.get('reason') ?? ''),
       });
       setMessage('资料变更申请已提交，管理员审核通过后才会生效。');
+      setIsProfileChangeDialogOpen(false);
       await loadProfileChangeRequests();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '提交资料变更申请失败。');
@@ -176,7 +160,7 @@ export function ProviderDashboardPanel() {
   const pendingProfileChange = profileChangeRequests.find((request) => request.status === 'PendingReview');
 
   return (
-    <section className="admin-panel" aria-labelledby="provider-dashboard-title">
+    <section className="admin-panel provider-dashboard-panel" aria-labelledby="provider-dashboard-title">
       <div className="admin-panel-heading">
         <div>
           <p>发卡方后台</p>
@@ -208,94 +192,38 @@ export function ProviderDashboardPanel() {
 
       {providerAccount ? (
         <>
-          <div className="account-summary">
-            {effectiveProfile?.logoUrl ? <img className="avatar" src={effectiveProfile.logoUrl} alt="" width={48} height={48} /> : null}
-            <strong>{providerAccount.providerName}</strong>
-            <span>标识：{providerAccount.providerSlug}</span>
-            <span>负责人：{providerAccount.displayName} · {providerAccount.email}</span>
-            <span>联系人：{effectiveProfile?.contactName ?? '未填写'} · {effectiveProfile?.contactEmail ?? '未填写'}</span>
-            <span>提供方状态：{providerAccount.providerStatus}</span>
-            <span>账号状态：{providerAccount.status} · 权限：{providerAccount.role}</span>
+          <div className="account-summary provider-home-card">
+            {effectiveProfile?.logoUrl ? (
+              <img className="avatar" src={effectiveProfile.logoUrl} alt="" width={48} height={48} />
+            ) : (
+              <span className="provider-home-avatar" aria-hidden="true" />
+            )}
+            <div className="provider-home-main">
+              <h2>
+                {providerAccount.providerName}
+                <span className="admin-status-pill">{formatProviderStatus(providerAccount.providerStatus)}</span>
+              </h2>
+              <p>{providerAccount.providerSlug}</p>
+              <div className="admin-list-actions">
+                <button className="secondary-action" type="button" onClick={() => setIsProfileDetailOpen(true)}>
+                  详情
+                </button>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  disabled={Boolean(pendingProfileChange)}
+                  onClick={() => setIsProfileChangeDialogOpen(true)}
+                >
+                  {pendingProfileChange ? '待审核' : '资料变更'}
+                </button>
+                <button className="danger-action" type="button" onClick={() => void logout()}>
+                  退出
+                </button>
+              </div>
+            </div>
           </div>
 
-          {effectiveProfile ? (
-            <section className="admin-list-section" aria-labelledby="provider-profile-change-title">
-              <div className="detail-section-heading">
-                <h2 id="provider-profile-change-title">资料变更申请</h2>
-                {pendingProfileChange ? <span>已有待审核申请</span> : <span>管理员审核通过后生效</span>}
-              </div>
-              <form
-                className="stacked-form account-summary"
-                key={`${effectiveProfile.name}:${effectiveProfile.logoUrl ?? ''}:${effectiveProfile.introductionUrl ?? ''}:${effectiveProfile.contactName ?? ''}:${effectiveProfile.contactEmail ?? ''}:${effectiveProfile.businessInfo ?? ''}`}
-                onSubmit={submitProfileChange}
-                noValidate
-              >
-                <div className="admin-adjustment-panel provider-create-form">
-                  <label>
-                    <span>提供方名称</span>
-                    <input name="name" defaultValue={effectiveProfile.name} required minLength={2} maxLength={80} />
-                  </label>
-                  <label>
-                    <span>头像图床链接</span>
-                    <input name="logoUrl" type="url" defaultValue={effectiveProfile.logoUrl ?? ''} placeholder="https://example.com/logo.png" maxLength={1000} />
-                  </label>
-                  <label>
-                    <span>介绍链接</span>
-                    <input name="introductionUrl" type="url" defaultValue={effectiveProfile.introductionUrl ?? ''} placeholder="https://example.com/about" maxLength={1000} />
-                  </label>
-                  <label>
-                    <span>联系人</span>
-                    <input name="contactName" defaultValue={effectiveProfile.contactName ?? ''} required maxLength={80} />
-                  </label>
-                  <label>
-                    <span>联系邮箱</span>
-                    <input name="contactEmail" type="email" defaultValue={effectiveProfile.contactEmail ?? ''} required maxLength={160} />
-                  </label>
-                  <label>
-                    <span>变更原因</span>
-                    <input name="reason" maxLength={500} placeholder="可选，便于管理员审核" />
-                  </label>
-                  <label>
-                    <span>业务说明</span>
-                    <textarea name="businessInfo" defaultValue={effectiveProfile.businessInfo ?? ''} required minLength={10} maxLength={2000} />
-                  </label>
-                </div>
-                <div className="form-actions">
-                  <button className="primary-action" type="submit" disabled={isSubmittingProfileChange || Boolean(pendingProfileChange)}>
-                    <span className="material-symbols-rounded" aria-hidden="true">
-                      approval_delegation
-                    </span>
-                    <span>
-                      {pendingProfileChange
-                        ? '等待审核'
-                        : isSubmittingProfileChange
-                          ? '提交中'
-                          : '提交资料变更'}
-                    </span>
-                  </button>
-                </div>
-              </form>
-              {profileChangeRequests.length === 0 ? <p className="empty-note">暂无资料变更申请。</p> : null}
-              <div className="admin-list compact-list">
-                {profileChangeRequests.map((request) => (
-                  <article className="admin-list-item" key={request.id}>
-                    <div>
-                      <h2>{formatProfileChangeStatus(request.status)}</h2>
-                      <p>
-                        {formatDateTime(request.createdAt)} · {request.proposed.name} · {request.proposed.contactEmail ?? '未填写邮箱'}
-                      </p>
-                      <p>头像：{request.current.logoUrl ?? '空白'} → {request.proposed.logoUrl ?? '空白'}</p>
-                      <p>介绍链接：{request.current.introductionUrl ?? '空白'} → {request.proposed.introductionUrl ?? '空白'}</p>
-                      {request.reason ? <p>申请说明：{request.reason}</p> : null}
-                      {request.reviewReason ? <p>审核意见：{request.reviewReason}</p> : null}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <div className="admin-list">
+          <div className="admin-list provider-dashboard-shortcuts">
             <article className="admin-list-item">
               <div>
                 <h2>卡券模板</h2>
@@ -353,8 +281,125 @@ export function ProviderDashboardPanel() {
               </div>
             </article>
           </div>
+
+          {isProfileDetailOpen ? (
+            <div className="admin-dialog-layer">
+              <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsProfileDetailOpen(false)} />
+              <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="发卡方详情">
+                <div className="admin-dialog-heading">
+                  <h2>发卡方详情</h2>
+                  <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsProfileDetailOpen(false)}>
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      close
+                    </span>
+                  </button>
+                </div>
+                <dl className="admin-detail-list">
+                  <div>
+                    <dt>名称</dt>
+                    <dd>{effectiveProfile?.name ?? providerAccount.providerName}</dd>
+                  </div>
+                  <div>
+                    <dt>标识</dt>
+                    <dd>{providerAccount.providerSlug}</dd>
+                  </div>
+                  <div>
+                    <dt>状态</dt>
+                    <dd>{formatProviderStatus(providerAccount.providerStatus)}</dd>
+                  </div>
+                  <div>
+                    <dt>负责人</dt>
+                    <dd>{providerAccount.displayName} · {providerAccount.email}</dd>
+                  </div>
+                  <div>
+                    <dt>联系人</dt>
+                    <dd>{effectiveProfile?.contactName ?? '未填写'} · {effectiveProfile?.contactEmail ?? '未填写'}</dd>
+                  </div>
+                  <div>
+                    <dt>介绍链接</dt>
+                    <dd>{effectiveProfile?.introductionUrl ?? '未设置'}</dd>
+                  </div>
+                  <div>
+                    <dt>业务说明</dt>
+                    <dd>{effectiveProfile?.businessInfo ?? '未填写'}</dd>
+                  </div>
+                </dl>
+              </section>
+            </div>
+          ) : null}
+
+          {isProfileChangeDialogOpen && effectiveProfile ? (
+            <div className="admin-dialog-layer">
+              <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsProfileChangeDialogOpen(false)} />
+              <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="资料变更申请">
+                <div className="admin-dialog-heading">
+                  <h2>资料变更</h2>
+                  <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsProfileChangeDialogOpen(false)}>
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      close
+                    </span>
+                  </button>
+                </div>
+                <form
+                  className="admin-dialog-form"
+                  key={`${effectiveProfile.name}:${effectiveProfile.logoUrl ?? ''}:${effectiveProfile.introductionUrl ?? ''}:${effectiveProfile.contactName ?? ''}:${effectiveProfile.contactEmail ?? ''}:${effectiveProfile.businessInfo ?? ''}`}
+                  onSubmit={submitProfileChange}
+                  noValidate
+                >
+                  <label>
+                    <span>提供方名称</span>
+                    <input name="name" defaultValue={effectiveProfile.name} required minLength={2} maxLength={80} />
+                  </label>
+                  <label>
+                    <span>头像图床链接</span>
+                    <input name="logoUrl" type="url" defaultValue={effectiveProfile.logoUrl ?? ''} placeholder="https://example.com/logo.png" maxLength={1000} />
+                  </label>
+                  <label>
+                    <span>介绍链接</span>
+                    <input name="introductionUrl" type="url" defaultValue={effectiveProfile.introductionUrl ?? ''} placeholder="https://example.com/about" maxLength={1000} />
+                  </label>
+                  <label>
+                    <span>联系人</span>
+                    <input name="contactName" defaultValue={effectiveProfile.contactName ?? ''} required maxLength={80} />
+                  </label>
+                  <label>
+                    <span>联系邮箱</span>
+                    <input name="contactEmail" type="email" defaultValue={effectiveProfile.contactEmail ?? ''} required maxLength={160} />
+                  </label>
+                  <label>
+                    <span>变更原因</span>
+                    <input name="reason" maxLength={500} placeholder="可选，便于管理员审核" />
+                  </label>
+                  <label>
+                    <span>业务说明</span>
+                    <textarea name="businessInfo" defaultValue={effectiveProfile.businessInfo ?? ''} required minLength={10} maxLength={2000} />
+                  </label>
+                  <div className="admin-dialog-actions">
+                    <button className="secondary-action" type="button" onClick={() => setIsProfileChangeDialogOpen(false)}>
+                      取消
+                    </button>
+                    <button className="primary-action" type="submit" disabled={isSubmittingProfileChange}>
+                      {isSubmittingProfileChange ? '提交中' : '提交审核'}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          ) : null}
         </>
       ) : null}
     </section>
   );
+}
+
+function formatProviderStatus(status: string): string {
+  const labels: Record<string, string> = {
+    Active: '活跃',
+    PendingReview: '待审核',
+    Rejected: '已拒绝',
+    Suspended: '已停用',
+    Archived: '已归档',
+  };
+
+  return labels[status] ?? status;
 }

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import type { DeviceSystem, IpRegion } from '@ldpass/contracts';
-import type { Prisma } from '@ldpass/database';
+import { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import { BdslmClientService } from '../bdslm/bdslm-client.service.js';
@@ -17,16 +17,20 @@ import type { AuthenticatedUser } from '../../shared/auth/session-auth.service.j
 import { PrismaService } from '../../shared/database/prisma.service.js';
 import {
   readClientIp,
-  readClientIpRegion,
   readHeader,
   type ApiRequestLike,
 } from '../../shared/auth/request-context.js';
+import { IpRegionService } from '../../shared/auth/ip-region.service.js';
 import {
   readBdslmChatContent,
   readBdslmChatMessageId,
   readBdslmChatSender,
 } from '../../shared/bdslm/chat-message.js';
 import { SecretHashService } from '../../shared/auth/secret-hash.service.js';
+import {
+  anonymizeUserAuditLogs,
+  createDeletedUserIdentity,
+} from '../../shared/auth/user-anonymization.js';
 import type {
   AdminLoginDto,
   LoginDto,
@@ -177,6 +181,7 @@ export class IdentityService {
     private readonly prisma: PrismaService,
     private readonly secretHash: SecretHashService,
     private readonly bdslmClient: BdslmClientService,
+    private readonly ipRegionService: IpRegionService,
     @Inject(EVENT_BUS) private readonly eventBus: EventBus,
   ) {}
 
@@ -191,7 +196,7 @@ export class IdentityService {
     await this.ensureUniqueIdentity(username, email);
 
     const registrationIp = readClientIp(request);
-    const registrationIpRegion = readClientIpRegion(request);
+    const registrationIpRegion = await this.ipRegionService.resolve(registrationIp);
     const user = await this.prisma.user.create({
       data: {
         username,
@@ -241,7 +246,7 @@ export class IdentityService {
     const code = this.createReadableCode();
     const expiresAt = new Date(Date.now() + SERVER_VERIFICATION_TTL_MS);
     const registrationIp = readClientIp(request);
-    const registrationIpRegion = readClientIpRegion(request);
+    const registrationIpRegion = await this.ipRegionService.resolve(registrationIp);
     const user = await this.prisma.user.create({
       data: {
         username,
@@ -547,7 +552,7 @@ export class IdentityService {
 
     const reviewInfo = dto.reviewInfo.trim();
     const registrationIp = readClientIp(request);
-    const registrationIpRegion = readClientIpRegion(request);
+    const registrationIpRegion = await this.ipRegionService.resolve(registrationIp);
     const updatedUser = await this.prisma.user.update({
       where: {
         id: existingUser.id,
@@ -679,14 +684,35 @@ export class IdentityService {
 
     const now = new Date();
 
+    const deletedIdentity = createDeletedUserIdentity(user.id);
+
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: {
           id: user.id,
         },
         data: {
+          username: deletedIdentity.username,
+          email: deletedIdentity.email,
+          passwordHash: deletedIdentity.passwordHash,
+          pinHash: null,
           status: 'Deleted',
+          reviewInfo: null,
           reviewRejectedReason: 'self_requested',
+          registrationIp: null,
+          registrationIpRegion: Prisma.JsonNull,
+          serverAccountName: null,
+          serverAccountVerified: false,
+        },
+      });
+
+      await tx.serverVerificationChallenge.updateMany({
+        where: {
+          userId: user.id,
+          status: 'active',
+        },
+        data: {
+          status: 'cancelled',
         },
       });
 
@@ -709,6 +735,8 @@ export class IdentityService {
           revokedAt: now,
         },
       });
+
+      await anonymizeUserAuditLogs(tx, existingUser, deletedIdentity);
     });
 
     await this.eventBus.publish({
@@ -722,6 +750,8 @@ export class IdentityService {
         reason: 'self_requested',
       },
     });
+
+    await anonymizeUserAuditLogs(this.prisma, existingUser, deletedIdentity);
 
     return {
       ok: true,
@@ -749,6 +779,65 @@ export class IdentityService {
       },
       data: {
         pinHash: await this.secretHash.hashSecret(pin, 'pin'),
+      },
+    });
+
+    await this.eventBus.publish({
+      type: 'CredentialChanged',
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actorType: 'user',
+      actorId: user.id,
+      payload: {
+        userId: user.id,
+        credentialType: 'pin',
+        changedBy: 'self',
+      },
+    });
+
+    return {
+      ok: true,
+    };
+  }
+
+  async changePassword(
+    user: AuthenticatedUser,
+    currentPassword: string,
+    nextPassword: string,
+  ): Promise<{ ok: true }> {
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        id: user.id,
+      },
+    });
+
+    if (!existingUser) {
+      throw new UnauthorizedException('账户不存在或已经被删除。');
+    }
+
+    if (!(await this.secretHash.verifySecret(currentPassword, existingUser.passwordHash, 'password'))) {
+      throw new UnauthorizedException('当前密码不正确，无法修改密码。');
+    }
+
+    await this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        passwordHash: await this.secretHash.hashSecret(nextPassword, 'password'),
+      },
+    });
+
+    await this.eventBus.publish({
+      type: 'CredentialChanged',
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actorType: 'user',
+      actorId: user.id,
+      payload: {
+        userId: user.id,
+        credentialType: 'password',
+        changedBy: 'self',
       },
     });
 
@@ -1039,24 +1128,40 @@ export class IdentityService {
               gt: new Date(),
             },
           },
+          orderBy: {
+            createdAt: 'desc',
+          },
           select: {
             id: true,
+            ipAddress: true,
+            createdAt: true,
           },
         },
       },
     });
+    const ipRegions = await this.ipRegionService.resolveMany(
+      devices.map((device) => device.sessions[0]?.ipAddress),
+    );
 
     return {
-      devices: devices.map((device) => ({
-        id: device.id,
-        system: device.system,
-        label: device.label,
-        trustedUntil: device.trustedUntil?.toISOString() ?? null,
-        revokedAt: device.revokedAt?.toISOString() ?? null,
-        activeSessionCount: device.sessions.length,
-        createdAt: device.createdAt.toISOString(),
-        updatedAt: device.updatedAt.toISOString(),
-      })),
+      devices: devices.map((device) => {
+        const latestSession = device.sessions[0] ?? null;
+        const latestIpAddress = latestSession?.ipAddress ?? null;
+
+        return {
+          id: device.id,
+          system: device.system,
+          label: device.label,
+          trustedUntil: device.trustedUntil?.toISOString() ?? null,
+          revokedAt: device.revokedAt?.toISOString() ?? null,
+          activeSessionCount: device.sessions.length,
+          lastLoginIp: latestIpAddress,
+          lastLoginIpRegion: latestIpAddress ? ipRegions.get(latestIpAddress) ?? null : null,
+          lastLoginAt: latestSession?.createdAt.toISOString() ?? null,
+          createdAt: device.createdAt.toISOString(),
+          updatedAt: device.updatedAt.toISOString(),
+        };
+      }),
     };
   }
 
@@ -1103,6 +1208,7 @@ export class IdentityService {
     approvals: Array<
       LoginDeviceApprovalResult & {
         ipAddress: string | null;
+        ipRegion: IpRegion | null;
         createdAt: string;
       }
     >;
@@ -1121,11 +1227,13 @@ export class IdentityService {
         createdAt: 'desc',
       },
     });
+    const ipRegions = await this.ipRegionService.resolveMany(approvals.map((approval) => approval.ipAddress));
 
     return {
       approvals: approvals.map((approval) => ({
         ...this.toLoginDeviceApproval(approval),
         ipAddress: approval.ipAddress,
+        ipRegion: approval.ipAddress ? ipRegions.get(approval.ipAddress) ?? null : null,
         createdAt: approval.createdAt.toISOString(),
       })),
     };
@@ -2078,6 +2186,7 @@ export class IdentityService {
       ...(region.country ? { country: region.country } : {}),
       ...(region.provinceOrState ? { provinceOrState: region.provinceOrState } : {}),
       ...(region.city ? { city: region.city } : {}),
+      ...(region.address ? { address: region.address } : {}),
     };
   }
 

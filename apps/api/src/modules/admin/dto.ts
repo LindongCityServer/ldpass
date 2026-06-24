@@ -25,6 +25,22 @@ export class ResetUserPinDto {
   pin!: string;
 }
 
+export class ResetUserPasswordDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  reason!: string;
+
+  @IsString()
+  @Matches(/^\d{4,12}$/)
+  secondFactor!: string;
+}
+
 export class AdminUserSensitiveActionDto {
   @IsString()
   @MinLength(1)

@@ -24,6 +24,7 @@ export function ProviderLoginForm() {
     try {
       const result = await postJson<ProviderLoginResponse>('/api/providers/auth/login', {
         identifier: String(form.get('identifier') ?? ''),
+        providerSlug: String(form.get('providerSlug') ?? '').trim() || undefined,
         password: String(form.get('password') ?? ''),
       });
       setMessage(`已登录 ${result.providerAccount.providerName}，正在进入发卡方后台。`);
@@ -40,6 +41,10 @@ export function ProviderLoginForm() {
       <label>
         <span>负责人邮箱</span>
         <input type="email" name="identifier" autoComplete="email" required />
+      </label>
+      <label>
+        <span>发卡方标识</span>
+        <input type="text" name="providerSlug" autoComplete="organization" placeholder="同邮箱有多个账号时填写" />
       </label>
       <label>
         <span>密码</span>

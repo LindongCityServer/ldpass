@@ -11,9 +11,19 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#ffffff',
     icons: [
       {
-        src: '/brand/ldpass_icon_color.svg',
+        src: '/brand/ldpass_app_icon.svg',
         sizes: 'any',
         type: 'image/svg+xml',
+      },
+      {
+        src: '/brand/ldpass_app_icon_192.png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        src: '/brand/ldpass_app_icon_512.png',
+        sizes: '512x512',
+        type: 'image/png',
       },
     ],
   };

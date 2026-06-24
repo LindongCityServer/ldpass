@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
 
 interface CardTemplateVariant {
@@ -31,10 +31,26 @@ const categoryOptions: Array<{ value: CardTemplateVariant['category']; label: st
 
 export function AdminCardTemplateVariantsPanel() {
   const [variants, setVariants] = useState<CardTemplateVariant[]>([]);
+  const [keyword, setKeyword] = useState('');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [detailVariant, setDetailVariant] = useState<CardTemplateVariant | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const filteredVariants = useMemo(() => {
+    const keywordText = keyword.trim().toLowerCase();
+    if (!keywordText) {
+      return variants;
+    }
+
+    return variants.filter((variant) =>
+      [variant.key, variant.name, variant.category, variant.enabled ? '启用' : '停用']
+        .join(' ')
+        .toLowerCase()
+        .includes(keywordText),
+    );
+  }, [keyword, variants]);
 
   const loadVariants = async () => {
     setIsLoading(true);
@@ -56,7 +72,8 @@ export function AdminCardTemplateVariantsPanel() {
 
   const createVariant = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setIsSubmitting(true);
     setMessage(null);
 
@@ -70,12 +87,26 @@ export function AdminCardTemplateVariantsPanel() {
       });
       setVariants((currentVariants) => [result.variant, ...currentVariants]);
       setMessage('卡面模板变体已创建。');
-      event.currentTarget.reset();
+      formElement.reset();
+      setIsCreateDialogOpen(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '创建卡面模板变体失败。');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const exportVariantsCsv = () => {
+    const rows = filteredVariants.map((variant) => ({
+      id: variant.id,
+      key: variant.key,
+      name: variant.name,
+      category: formatCategory(variant.category),
+      enabled: variant.enabled ? '启用' : '停用',
+      updatedAt: variant.updatedAt,
+    }));
+    downloadTextFile('ldpass-admin-card-template-variants.csv', toCsv(rows), 'text/csv;charset=utf-8');
+    setMessage('模板变体 CSV 已生成。');
   };
 
   const updateVariant = async (event: FormEvent<HTMLFormElement>, variant: CardTemplateVariant) => {
@@ -129,8 +160,23 @@ export function AdminCardTemplateVariantsPanel() {
           <h1 id="card-template-variants-title">卡面模板变体</h1>
         </div>
         <div className="admin-list-actions">
+          <button className="primary-action" type="button" onClick={() => setIsCreateDialogOpen(true)}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              add
+            </span>
+            <span>新增模板</span>
+          </button>
           <button className="secondary-action" type="button" onClick={() => void loadVariants()}>
-            刷新
+            <span className="material-symbols-rounded" aria-hidden="true">
+              refresh
+            </span>
+            <span>刷新</span>
+          </button>
+          <button className="secondary-action" type="button" onClick={exportVariantsCsv}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              file_save
+            </span>
+            <span>导出 CSV</span>
           </button>
           <a className="secondary-action" href="/admin/pass-templates">
             模板审核
@@ -144,50 +190,31 @@ export function AdminCardTemplateVariantsPanel() {
         </div>
       ) : null}
 
-      <form className="stacked-form" onSubmit={createVariant}>
-        <div className="admin-adjustment-panel card-template-variant-form">
-          <label>
-            <span>标识</span>
-            <input name="key" placeholder="standard" pattern="[a-z0-9][a-z0-9_-]*" required minLength={2} maxLength={48} />
-          </label>
-          <label>
-            <span>名称</span>
-            <input name="name" placeholder="标准横版" required minLength={2} maxLength={80} />
-          </label>
-          <label>
-            <span>分类</span>
-            <select name="category" defaultValue="account" required>
-              {categoryOptions.map((category) => (
-                <option value={category.value} key={category.value}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="inline-toggle">
-            <input type="checkbox" name="enabled" defaultChecked />
-            <span>启用</span>
-          </label>
-        </div>
+      <form className="audit-filter-grid" onSubmit={(event) => event.preventDefault()}>
         <label>
-          <span>配置 JSON</span>
-          <textarea name="config" defaultValue="{}" rows={4} />
+          <span>搜索模板变体</span>
+          <input
+            type="search"
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="标识、名称、分类、状态"
+          />
         </label>
-        <div className="form-actions">
-          <button className="primary-action" type="submit" disabled={isSubmitting}>
-            <span className="material-symbols-rounded" aria-hidden="true">
-              dashboard_customize
-            </span>
-            <span>{isSubmitting ? '创建中' : '新增变体'}</span>
+        <div className="audit-filter-actions">
+          <button className="secondary-action" type="button" onClick={() => void loadVariants()}>
+            刷新
+          </button>
+          <button className="secondary-action" type="button" onClick={() => setKeyword('')}>
+            重置
           </button>
         </div>
       </form>
 
       {isLoading ? <p className="empty-note">正在读取卡面模板变体。</p> : null}
-      {!isLoading && variants.length === 0 ? <p className="empty-note">还没有卡面模板变体。</p> : null}
+      {!isLoading && filteredVariants.length === 0 ? <p className="empty-note">还没有匹配的卡面模板变体。</p> : null}
 
       <div className="admin-list">
-        {variants.map((variant) => (
+        {filteredVariants.map((variant) => (
           <article className="admin-list-item admin-list-item-review" key={variant.id}>
             {editingVariantId === variant.id ? (
               <form className="stacked-form" onSubmit={(event) => void updateVariant(event, variant)}>
@@ -235,12 +262,17 @@ export function AdminCardTemplateVariantsPanel() {
               <>
                 <div>
                   <h2>{variant.name}</h2>
-                  <p>
-                    {variant.key} · {formatCategory(variant.category)} · {variant.enabled ? '启用' : '停用'}
+                  <p className="admin-meta-line">
+                    <span>{variant.key}</span>
+                    <CategoryTag category={variant.category} />
+                    <span>{variant.enabled ? '启用' : '停用'}</span>
                   </p>
-                  <p className="audit-summary">配置：{JSON.stringify(variant.config)}</p>
+                  <p>最近更新：{new Date(variant.updatedAt).toLocaleString('zh-CN')}</p>
                 </div>
                 <div className="admin-list-actions">
+                  <button className="secondary-action" type="button" onClick={() => setDetailVariant(variant)}>
+                    详情
+                  </button>
                   <button className="secondary-action" type="button" onClick={() => setEditingVariantId(variant.id)}>
                     编辑
                   </button>
@@ -250,6 +282,91 @@ export function AdminCardTemplateVariantsPanel() {
           </article>
         ))}
       </div>
+      {isCreateDialogOpen ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="新增模板变体">
+            <div className="admin-dialog-heading">
+              <h2>新增模板</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <form className="admin-dialog-form" onSubmit={createVariant}>
+              <label>
+                <span>标识</span>
+                <input name="key" placeholder="standard" pattern="[a-z0-9][a-z0-9_-]*" required minLength={2} maxLength={48} />
+              </label>
+              <label>
+                <span>名称</span>
+                <input name="name" placeholder="标准横版" required minLength={2} maxLength={80} />
+              </label>
+              <label>
+                <span>分类</span>
+                <select name="category" defaultValue="account" required>
+                  {categoryOptions.map((category) => (
+                    <option value={category.value} key={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="inline-toggle">
+                <input type="checkbox" name="enabled" defaultChecked />
+                <span>启用</span>
+              </label>
+              <label>
+                <span>配置 JSON</span>
+                <textarea name="config" defaultValue="{}" rows={6} />
+              </label>
+              <div className="admin-dialog-actions">
+                <button className="secondary-action" type="button" onClick={() => setIsCreateDialogOpen(false)}>
+                  取消
+                </button>
+                <button className="primary-action" type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? '创建中' : '创建'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+      {detailVariant ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setDetailVariant(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="模板变体详情">
+            <div className="admin-dialog-heading">
+              <h2>{detailVariant.name}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setDetailVariant(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <dl className="admin-detail-list">
+              <div>
+                <dt>标识</dt>
+                <dd>{detailVariant.key}</dd>
+              </div>
+              <div>
+                <dt>分类</dt>
+                <dd>{formatCategory(detailVariant.category)}</dd>
+              </div>
+              <div>
+                <dt>状态</dt>
+                <dd>{detailVariant.enabled ? '启用' : '停用'}</dd>
+              </div>
+              <div>
+                <dt>更新时间</dt>
+                <dd>{new Date(detailVariant.updatedAt).toLocaleString('zh-CN')}</dd>
+              </div>
+            </dl>
+            <pre className="audit-summary">{toPrettyJson(detailVariant.config)}</pre>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -269,4 +386,37 @@ function toPrettyJson(value: unknown): string {
 
 function formatCategory(category: CardTemplateVariant['category']): string {
   return categoryOptions.find((item) => item.value === category)?.label ?? category;
+}
+
+function CategoryTag({ category }: { category: CardTemplateVariant['category'] }) {
+  return (
+    <span className={`admin-category-tag admin-category-tag-${category}`}>
+      {formatCategory(category)}
+    </span>
+  );
+}
+
+function toCsv(rows: Array<Record<string, string>>): string {
+  if (rows.length === 0) {
+    return '';
+  }
+
+  const headers = Object.keys(rows[0] ?? {});
+  return [headers.join(','), ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(','))].join('\r\n');
+}
+
+function escapeCsvCell(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+function downloadTextFile(filename: string, content: string, type: string): void {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

@@ -4,7 +4,7 @@ import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import type { AuthenticatedUser } from '../../shared/auth/session-auth.service.js';
 import { PrismaService } from '../../shared/database/prisma.service.js';
-import { hashClaimCode } from '../wallet/claim-code.js';
+import { createClaimCode, hashClaimCode } from '../wallet/claim-code.js';
 import type {
   CreateAddPassTokenDto,
   ListAddPassTokensQueryDto,
@@ -26,7 +26,7 @@ export class AddPassTokensService {
 
   async createToken(dto: CreateAddPassTokenDto, admin: AuthenticatedUser) {
     const now = new Date();
-    const code = this.createClaimCode();
+    const code = createClaimCode();
     const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * (dto.expiresInDays ?? 30));
     const passExpiresAt = readPassExpiresAt(now, dto.passExpiresInDays);
     const providerName = dto.providerName.trim();
@@ -360,7 +360,7 @@ export class AddPassTokensService {
     }
 
     const now = new Date();
-    const code = this.createClaimCode();
+    const code = createClaimCode();
     const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * (dto.expiresInDays ?? 30));
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -615,10 +615,6 @@ export class AddPassTokensService {
       createdAt: token.createdAt.toISOString(),
       updatedAt: token.updatedAt.toISOString(),
     };
-  }
-
-  private createClaimCode(): string {
-    return `LD-${randomBytes(9).toString('base64url').toUpperCase()}`;
   }
 
   private createPublicNumber(): string {

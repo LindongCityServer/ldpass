@@ -98,7 +98,7 @@ export function AdminLegalDocumentsPanel() {
       <div className="admin-panel-heading">
         <div>
           <p>平台管理</p>
-          <h1 id="admin-legal-title">协议文档</h1>
+          <h1 id="admin-legal-title">协议</h1>
         </div>
         <div className="admin-list-actions">
           <a className="secondary-action" href="/admin/audit">

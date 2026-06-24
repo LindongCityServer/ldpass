@@ -3,6 +3,7 @@ import { SessionAuthService } from '../../shared/auth/session-auth.service.js';
 import type { ApiRequestLike, ApiResponseLike } from '../../shared/auth/request-context.js';
 import {
   AdminLoginDto,
+  ChangePasswordDto,
   ClientSessionQueryDto,
   DeleteAccountDto,
   LoginRedirectQueryDto,
@@ -184,6 +185,12 @@ export class IdentityController {
   async setPin(@Body() dto: SetPinDto, @Req() request: ApiRequestLike) {
     const user = await this.sessionAuth.requireActiveUser(request);
     return this.identityService.setPin(user, dto.password, dto.pin);
+  }
+
+  @Post('account/password')
+  async changePassword(@Body() dto: ChangePasswordDto, @Req() request: ApiRequestLike) {
+    const user = await this.sessionAuth.requireActiveUser(request);
+    return this.identityService.changePassword(user, dto.currentPassword, dto.nextPassword);
   }
 
   @Post('account/server-account/rebind/start')

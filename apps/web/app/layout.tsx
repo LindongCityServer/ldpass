@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { PlatformStatusBanner } from './platform-status-banner';
 import { ServiceWorkerRegistration } from './service-worker-registration';
+import { SiteLegalFooter } from './site-legal-footer';
 import { ThemeScript } from './theme-script';
 import './globals.css';
 
@@ -8,6 +9,14 @@ export const metadata: Metadata = {
   title: '临东通',
   description: '临东通卡包管理网站',
   applicationName: '临东通',
+  icons: {
+    icon: [
+      { url: '/brand/ldpass_icon_color.svg', type: 'image/svg+xml' },
+      { url: '/brand/ldpass_favicon_32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    shortcut: [{ url: '/brand/ldpass_favicon_32.png', sizes: '32x32', type: 'image/png' }],
+    apple: [{ url: '/brand/ldpass_apple_touch_icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -33,6 +42,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ServiceWorkerRegistration />
         <PlatformStatusBanner />
         {children}
+        <SiteLegalFooter />
       </body>
     </html>
   );

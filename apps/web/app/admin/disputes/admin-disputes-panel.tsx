@@ -5,6 +5,11 @@ import { getJson, postJson } from '../../api-client';
 
 type DisputeStatus = 'Submitted' | 'InReview' | 'NeedMoreInfo' | 'Approved' | 'Rejected' | 'Reversed' | 'Closed';
 type AdminNextDisputeStatus = Exclude<DisputeStatus, 'Submitted'>;
+type DisputeDialog =
+  | { kind: 'detail'; dispute: AdminDispute }
+  | { kind: 'status'; dispute: AdminDispute }
+  | { kind: 'top_up_reverse'; dispute: AdminDispute }
+  | { kind: 'redemption_reverse'; dispute: AdminDispute };
 
 interface AdminDispute {
   id: string;
@@ -74,6 +79,7 @@ export function AdminDisputesPanel() {
     status: '',
     keyword: '',
   });
+  const [activeDialog, setActiveDialog] = useState<DisputeDialog | null>(null);
   const [statusInputs, setStatusInputs] = useState<Record<string, AdminNextDisputeStatus>>({});
   const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
   const [topUpReverseReasons, setTopUpReverseReasons] = useState<Record<string, string>>({});
@@ -146,6 +152,7 @@ export function AdminDisputesPanel() {
         currentDisputes.map((currentDispute) => (currentDispute.id === result.dispute.id ? result.dispute : currentDispute)),
       );
       setResolutionNotes((currentNotes) => ({ ...currentNotes, [dispute.id]: '' }));
+      setActiveDialog(null);
       setMessage(`争议状态已更新为「${formatDisputeStatus(result.dispute.status)}」。`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '更新争议状态失败。');
@@ -208,6 +215,7 @@ export function AdminDisputesPanel() {
       setTopUpReverseReasons((currentReasons) => ({ ...currentReasons, [dispute.id]: '' }));
       setTopUpReversePins((currentPins) => ({ ...currentPins, [dispute.id]: '' }));
       setResolutionNotes((currentNotes) => ({ ...currentNotes, [dispute.id]: '' }));
+      setActiveDialog(null);
       setMessage(
         reverseResult.topUp.alreadyReversed
           ? '这笔额度补充此前已冲正，争议已标记为已反转。'
@@ -274,6 +282,7 @@ export function AdminDisputesPanel() {
       setRedemptionReverseReasons((currentReasons) => ({ ...currentReasons, [dispute.id]: '' }));
       setRedemptionReversePins((currentPins) => ({ ...currentPins, [dispute.id]: '' }));
       setResolutionNotes((currentNotes) => ({ ...currentNotes, [dispute.id]: '' }));
+      setActiveDialog(null);
       setMessage('消耗请求已冲正，争议已标记为已反转。');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '冲正消耗请求失败。');
@@ -287,7 +296,7 @@ export function AdminDisputesPanel() {
       <div className="admin-panel-heading">
         <div>
           <p>平台管理</p>
-          <h1 id="admin-disputes-title">争议处理</h1>
+          <h1 id="admin-disputes-title">争议审核</h1>
         </div>
         <a className="secondary-action" href="/admin/audit">
           审计日志
@@ -320,6 +329,9 @@ export function AdminDisputesPanel() {
           <button className="secondary-action" type="button" onClick={() => void loadDisputes(filters)}>
             刷新
           </button>
+          <button className="secondary-action" type="button" onClick={() => exportDisputesCsv(disputes, setMessage)}>
+            导出 CSV
+          </button>
           <button className="primary-action" type="submit">
             <span className="material-symbols-rounded" aria-hidden="true">
               search
@@ -350,19 +362,95 @@ export function AdminDisputesPanel() {
               {dispute.resolutionNote ? <p className="audit-summary">处理备注：{dispute.resolutionNote}</p> : null}
               <p>{formatDate(dispute.updatedAt)}</p>
             </div>
-            {dispute.subjectType === 'pass_top_up' && dispute.status !== 'Closed' ? (
-              <form
-                className="dispute-status-form"
-                onSubmit={(event) => void reverseTopUpDispute(event, dispute)}
-              >
+            <div className="admin-list-actions">
+              <button className="secondary-action" type="button" onClick={() => setActiveDialog({ kind: 'detail', dispute })}>
+                详情
+              </button>
+              <button className="secondary-action" type="button" onClick={() => setActiveDialog({ kind: 'status', dispute })}>
+                处理
+              </button>
+              {dispute.subjectType === 'pass_top_up' && dispute.status !== 'Closed' ? (
+                <button className="danger-action" type="button" onClick={() => setActiveDialog({ kind: 'top_up_reverse', dispute })}>
+                  补充冲正
+                </button>
+              ) : null}
+              {dispute.subjectType === 'redemption_request' && dispute.status !== 'Closed' ? (
+                <button className="danger-action" type="button" onClick={() => setActiveDialog({ kind: 'redemption_reverse', dispute })}>
+                  核销冲正
+                </button>
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </div>
+      {activeDialog ? (
+        <div className="admin-dialog-layer">
+          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setActiveDialog(null)} />
+          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="争议详情">
+            <div className="admin-dialog-heading">
+              <h2>{readDisputeDialogTitle(activeDialog)}</h2>
+              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setActiveDialog(null)}>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  close
+                </span>
+              </button>
+            </div>
+            <DisputeDetail dispute={activeDialog.dispute} />
+            {activeDialog.kind === 'status' ? (
+              <form className="dispute-status-form" onSubmit={(event) => void updateStatus(event, activeDialog.dispute)}>
+                <label>
+                  <span>下一步状态</span>
+                  <select
+                    value={statusInputs[activeDialog.dispute.id] ?? ''}
+                    onChange={(event) =>
+                      setStatusInputs((currentInputs) => ({
+                        ...currentInputs,
+                        [activeDialog.dispute.id]: event.target.value as AdminNextDisputeStatus,
+                      }))
+                    }
+                  >
+                    <option value="">选择状态</option>
+                    {nextStatusOptions.map((option) => (
+                      <option value={option.value} key={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>处理备注</span>
+                  <textarea
+                    value={resolutionNotes[activeDialog.dispute.id] ?? ''}
+                    onChange={(event) =>
+                      setResolutionNotes((currentNotes) => ({
+                        ...currentNotes,
+                        [activeDialog.dispute.id]: event.target.value,
+                      }))
+                    }
+                    rows={4}
+                    placeholder="可选，说明处理结论或补充要求"
+                  />
+                </label>
+                <div className="admin-dialog-actions">
+                  <button className="secondary-action" type="button" onClick={() => setActiveDialog(null)}>
+                    取消
+                  </button>
+                  <button className="primary-action" type="submit" disabled={updatingId === activeDialog.dispute.id}>
+                    {updatingId === activeDialog.dispute.id ? '更新中' : '更新状态'}
+                  </button>
+                </div>
+              </form>
+            ) : null}
+            {activeDialog.kind === 'top_up_reverse' ? (
+              <form className="dispute-status-form" onSubmit={(event) => void reverseTopUpDispute(event, activeDialog.dispute)}>
                 <label>
                   <span>冲正原因</span>
                   <input
-                    value={topUpReverseReasons[dispute.id] ?? ''}
+                    value={topUpReverseReasons[activeDialog.dispute.id] ?? ''}
                     onChange={(event) =>
                       setTopUpReverseReasons((currentReasons) => ({
                         ...currentReasons,
-                        [dispute.id]: event.target.value,
+                        [activeDialog.dispute.id]: event.target.value,
                       }))
                     }
                     maxLength={200}
@@ -375,41 +463,35 @@ export function AdminDisputesPanel() {
                     type="password"
                     inputMode="numeric"
                     pattern="[0-9]{4,12}"
-                    value={topUpReversePins[dispute.id] ?? ''}
+                    value={topUpReversePins[activeDialog.dispute.id] ?? ''}
                     onChange={(event) =>
                       setTopUpReversePins((currentPins) => ({
                         ...currentPins,
-                        [dispute.id]: event.target.value,
+                        [activeDialog.dispute.id]: event.target.value,
                       }))
                     }
-                    placeholder="用于确认冲正"
                   />
                 </label>
-                <button
-                  className="danger-action"
-                  type="submit"
-                  disabled={reversingTopUpDisputeId === dispute.id}
-                >
-                  <span className="material-symbols-rounded" aria-hidden="true">
-                    undo
-                  </span>
-                  <span>{reversingTopUpDisputeId === dispute.id ? '冲正中' : '冲正并标记已反转'}</span>
-                </button>
+                <div className="admin-dialog-actions">
+                  <button className="secondary-action" type="button" onClick={() => setActiveDialog(null)}>
+                    取消
+                  </button>
+                  <button className="danger-action" type="submit" disabled={reversingTopUpDisputeId === activeDialog.dispute.id}>
+                    {reversingTopUpDisputeId === activeDialog.dispute.id ? '冲正中' : '冲正并标记已反转'}
+                  </button>
+                </div>
               </form>
             ) : null}
-            {dispute.subjectType === 'redemption_request' && dispute.status !== 'Closed' ? (
-              <form
-                className="dispute-status-form"
-                onSubmit={(event) => void reverseRedemptionDispute(event, dispute)}
-              >
+            {activeDialog.kind === 'redemption_reverse' ? (
+              <form className="dispute-status-form" onSubmit={(event) => void reverseRedemptionDispute(event, activeDialog.dispute)}>
                 <label>
                   <span>冲正原因</span>
                   <input
-                    value={redemptionReverseReasons[dispute.id] ?? ''}
+                    value={redemptionReverseReasons[activeDialog.dispute.id] ?? ''}
                     onChange={(event) =>
                       setRedemptionReverseReasons((currentReasons) => ({
                         ...currentReasons,
-                        [dispute.id]: event.target.value,
+                        [activeDialog.dispute.id]: event.target.value,
                       }))
                     }
                     maxLength={200}
@@ -422,74 +504,28 @@ export function AdminDisputesPanel() {
                     type="password"
                     inputMode="numeric"
                     pattern="[0-9]{4,12}"
-                    value={redemptionReversePins[dispute.id] ?? ''}
+                    value={redemptionReversePins[activeDialog.dispute.id] ?? ''}
                     onChange={(event) =>
                       setRedemptionReversePins((currentPins) => ({
                         ...currentPins,
-                        [dispute.id]: event.target.value,
+                        [activeDialog.dispute.id]: event.target.value,
                       }))
                     }
-                    placeholder="用于确认冲正"
                   />
                 </label>
-                <button
-                  className="danger-action"
-                  type="submit"
-                  disabled={reversingRedemptionDisputeId === dispute.id}
-                >
-                  <span className="material-symbols-rounded" aria-hidden="true">
-                    undo
-                  </span>
-                  <span>
-                    {reversingRedemptionDisputeId === dispute.id ? '冲正中' : '冲正并标记已反转'}
-                  </span>
-                </button>
+                <div className="admin-dialog-actions">
+                  <button className="secondary-action" type="button" onClick={() => setActiveDialog(null)}>
+                    取消
+                  </button>
+                  <button className="danger-action" type="submit" disabled={reversingRedemptionDisputeId === activeDialog.dispute.id}>
+                    {reversingRedemptionDisputeId === activeDialog.dispute.id ? '冲正中' : '冲正并标记已反转'}
+                  </button>
+                </div>
               </form>
             ) : null}
-            <form className="dispute-status-form" onSubmit={(event) => void updateStatus(event, dispute)}>
-              <label>
-                <span>下一步状态</span>
-                <select
-                  value={statusInputs[dispute.id] ?? ''}
-                  onChange={(event) =>
-                    setStatusInputs((currentInputs) => ({
-                      ...currentInputs,
-                      [dispute.id]: event.target.value as AdminNextDisputeStatus,
-                    }))
-                  }
-                >
-                  <option value="">选择状态</option>
-                  {nextStatusOptions.map((option) => (
-                    <option value={option.value} key={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>处理备注</span>
-                <textarea
-                  value={resolutionNotes[dispute.id] ?? ''}
-                  onChange={(event) =>
-                    setResolutionNotes((currentNotes) => ({
-                      ...currentNotes,
-                      [dispute.id]: event.target.value,
-                    }))
-                  }
-                  rows={3}
-                  placeholder="可选，说明处理结论或补充要求"
-                />
-              </label>
-              <button className="primary-action" type="submit" disabled={updatingId === dispute.id}>
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  task_alt
-                </span>
-                <span>{updatingId === dispute.id ? '更新中' : '更新状态'}</span>
-              </button>
-            </form>
-          </article>
-        ))}
-      </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -500,6 +536,47 @@ function readDisputePassLabel(dispute: AdminDispute): string {
   }
 
   return `${dispute.pass.providerName} · ${dispute.pass.displayName} · ${dispute.pass.maskedNumber ?? dispute.pass.publicNumber ?? dispute.pass.id}`;
+}
+
+function DisputeDetail({ dispute }: { dispute: AdminDispute }) {
+  const details = [
+    ['状态', formatDisputeStatus(dispute.status)],
+    ['对象', `${formatSubjectType(dispute.subjectType)} · ${dispute.subjectId}`],
+    ['卡券', readDisputePassLabel(dispute)],
+    ['用户', dispute.user ? `${dispute.user.username} / ${dispute.user.email}` : '用户已删除或不可用'],
+    ['更新时间', formatDate(dispute.updatedAt)],
+  ];
+
+  return (
+    <dl className="admin-detail-list">
+      {details.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+      <div>
+        <dt>原因</dt>
+        <dd>{dispute.reason}</dd>
+      </div>
+      {dispute.resolutionNote ? (
+        <div>
+          <dt>处理备注</dt>
+          <dd>{dispute.resolutionNote}</dd>
+        </div>
+      ) : null}
+    </dl>
+  );
+}
+
+function readDisputeDialogTitle(dialog: DisputeDialog): string {
+  if (dialog.kind === 'detail') {
+    return '争议详情';
+  }
+  if (dialog.kind === 'status') {
+    return '处理争议';
+  }
+  return '冲正争议';
 }
 
 function formatSubjectType(subjectType: string): string {
@@ -535,4 +612,46 @@ function formatDate(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function exportDisputesCsv(disputes: AdminDispute[], onMessage: (message: string) => void): void {
+  const rows = disputes.map((dispute) => ({
+    id: dispute.id,
+    status: formatDisputeStatus(dispute.status),
+    subjectType: formatSubjectType(dispute.subjectType),
+    subjectId: dispute.subjectId,
+    user: dispute.user ? `${dispute.user.username} <${dispute.user.email}>` : '',
+    pass: readDisputePassLabel(dispute),
+    reason: dispute.reason,
+    resolutionNote: dispute.resolutionNote ?? '',
+    updatedAt: dispute.updatedAt,
+  }));
+
+  downloadTextFile('ldpass-admin-disputes.csv', toCsv(rows), 'text/csv;charset=utf-8');
+  onMessage('争议 CSV 已生成。');
+}
+
+function toCsv(rows: Array<Record<string, string>>): string {
+  if (rows.length === 0) {
+    return '';
+  }
+
+  const headers = Object.keys(rows[0] ?? {});
+  return [headers.join(','), ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(','))].join('\r\n');
+}
+
+function escapeCsvCell(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+function downloadTextFile(filename: string, content: string, type: string): void {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

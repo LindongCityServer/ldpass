@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { ThemeSchedulePanel } from '../theme/theme-schedule-panel';
 
 type PlatformNoticeTone = 'info' | 'warning' | 'critical';
 
@@ -38,8 +39,11 @@ const emptyEditable: PlatformStatusEditable = {
   maintenanceBody: '',
 };
 
+type PlatformStatusView = 'announcement' | 'maintenance' | 'theme';
+
 export function AdminPlatformStatusPanel() {
   const [editable, setEditable] = useState<PlatformStatusEditable>(emptyEditable);
+  const [activeView, setActiveView] = useState<PlatformStatusView>('announcement');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,13 +98,13 @@ export function AdminPlatformStatusPanel() {
         </div>
         <div className="admin-list-actions">
           <button className="secondary-action" type="button" onClick={() => void loadStatus()} disabled={isLoading}>
-            刷新
+            <span className="material-symbols-rounded" aria-hidden="true">
+              refresh
+            </span>
+            <span>刷新</span>
           </button>
           <a className="secondary-action" href="/admin/audit">
             审计记录
-          </a>
-          <a className="secondary-action" href="/admin/theme">
-            主题计划
           </a>
         </div>
       </div>
@@ -113,7 +117,30 @@ export function AdminPlatformStatusPanel() {
 
       {isLoading ? <p className="empty-note">正在读取平台状态。</p> : null}
 
+      <div className="segmented-control" role="tablist" aria-label="平台状态设置">
+        <button className={activeView === 'announcement' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('announcement')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            campaign
+          </span>
+          <span>公告</span>
+        </button>
+        <button className={activeView === 'maintenance' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('maintenance')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            construction
+          </span>
+          <span>维护</span>
+        </button>
+        <button className={activeView === 'theme' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('theme')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            palette
+          </span>
+          <span>主题</span>
+        </button>
+      </div>
+
+      {activeView !== 'theme' ? (
       <form className="stacked-form platform-status-form" onSubmit={saveStatus} noValidate>
+        {activeView === 'announcement' ? (
         <fieldset>
           <legend>全站公告</legend>
           <label className="inline-toggle">
@@ -154,7 +181,9 @@ export function AdminPlatformStatusPanel() {
             </select>
           </label>
         </fieldset>
+        ) : null}
 
+        {activeView === 'maintenance' ? (
         <fieldset>
           <legend>维护状态</legend>
           <label className="inline-toggle">
@@ -182,6 +211,7 @@ export function AdminPlatformStatusPanel() {
             />
           </label>
         </fieldset>
+        ) : null}
 
         <p className="empty-note">{updatedAt ? `最后更新：${new Date(updatedAt).toLocaleString('zh-CN')}` : '尚未保存平台状态。'}</p>
 
@@ -194,6 +224,9 @@ export function AdminPlatformStatusPanel() {
           </button>
         </div>
       </form>
+      ) : (
+        <ThemeSchedulePanel embedded />
+      )}
     </section>
   );
 }

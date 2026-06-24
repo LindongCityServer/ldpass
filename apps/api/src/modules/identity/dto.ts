@@ -123,6 +123,18 @@ export class SetPinDto {
   pin!: string;
 }
 
+export class ChangePasswordDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  nextPassword!: string;
+}
+
 export class StartServerAccountRebindDto {
   @IsString()
   @MinLength(1)

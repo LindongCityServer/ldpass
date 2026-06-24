@@ -79,7 +79,7 @@ function normalizeClientIp(value: string): string {
   return trimmedValue;
 }
 
-function classifyIpRegion(ip: string): IpRegion {
+export function classifyIpRegion(ip: string): IpRegion {
   const source = 'local-ip-classifier';
 
   if (ip === 'unknown') {

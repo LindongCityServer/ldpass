@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { ProviderStatus } from '@ldpass/contracts';
+import type { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import { SecretHashService } from '../../shared/auth/secret-hash.service.js';
@@ -20,46 +21,49 @@ export class ProvidersService {
     const slug = dto.slug.trim().toLowerCase();
     const contactEmail = dto.contactEmail.trim().toLowerCase();
     const contactName = dto.contactName.trim();
-    const [existingProvider, existingAccount] = await Promise.all([
-      this.prisma.provider.findUnique({
-        where: {
-          slug,
+    const existingProvider = await this.prisma.provider.findUnique({
+      where: {
+        slug,
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        source: true,
+        contactName: true,
+        contactEmail: true,
+        businessInfo: true,
+        introductionUrl: true,
+        createdAt: true,
+        accounts: {
+          where: {
+            role: 'owner',
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          take: 1,
+          select: {
+            id: true,
+            providerId: true,
+            email: true,
+            displayName: true,
+            passwordHash: true,
+            status: true,
+            role: true,
+          },
         },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          status: true,
-          source: true,
-          contactName: true,
-          contactEmail: true,
-          businessInfo: true,
-          introductionUrl: true,
-          createdAt: true,
-        },
-      }),
-      this.prisma.providerAccount.findUnique({
-        where: {
-          email: contactEmail,
-        },
-        select: {
-          id: true,
-          providerId: true,
-          email: true,
-          displayName: true,
-          passwordHash: true,
-          status: true,
-          role: true,
-        },
-      }),
-    ]);
+      },
+    });
 
-    if (!existingProvider && !existingAccount) {
+    if (!existingProvider) {
       return this.createRegistration(dto, slug, contactEmail, contactName);
     }
 
-    if (!existingProvider || !existingAccount || existingProvider.id !== existingAccount.providerId) {
-      throw new ConflictException('提供方标识或联系邮箱已被占用。');
+    const existingAccount = existingProvider.accounts[0];
+    if (!existingAccount) {
+      throw new ConflictException('该提供方已存在，但没有可用于重新提交的负责人账号。');
     }
 
     return this.resubmitRegistration(dto, contactEmail, contactName, existingProvider, existingAccount);
@@ -72,35 +76,43 @@ export class ProvidersService {
     contactName: string,
   ) {
     const passwordHash = await this.secretHash.hashSecret(dto.password, 'provider-password');
-    const { provider, account } = await this.prisma.$transaction(async (transaction) => {
-      const createdProvider = await transaction.provider.create({
-        data: {
-          name: dto.name.trim(),
-          slug,
-          status: 'PendingReview',
-          source: 'open_registration',
-          contactName,
-          contactEmail,
-          businessInfo: dto.businessInfo.trim(),
-        },
-      });
+    const { provider, account } = await this.prisma
+      .$transaction(async (transaction) => {
+        const createdProvider = await transaction.provider.create({
+          data: {
+            name: dto.name.trim(),
+            slug,
+            status: 'PendingReview',
+            source: 'open_registration',
+            contactName,
+            contactEmail,
+            businessInfo: dto.businessInfo.trim(),
+          },
+        });
 
-      const createdAccount = await transaction.providerAccount.create({
-        data: {
-          providerId: createdProvider.id,
-          email: contactEmail,
-          displayName: contactName,
-          passwordHash,
-          status: 'PendingReview',
-          role: 'owner',
-        },
-      });
+        const createdAccount = await transaction.providerAccount.create({
+          data: {
+            providerId: createdProvider.id,
+            email: contactEmail,
+            displayName: contactName,
+            passwordHash,
+            status: 'PendingReview',
+            role: 'owner',
+          },
+        });
 
-      return {
-        provider: createdProvider,
-        account: createdAccount,
-      };
-    });
+        return {
+          provider: createdProvider,
+          account: createdAccount,
+        };
+      })
+      .catch((error: unknown) => {
+        if (isProviderAccountEmailUniqueError(error)) {
+          throw new ConflictException('当前数据库仍保留旧的发卡方邮箱唯一约束，请同步数据库结构后重试。');
+        }
+
+        throw error;
+      });
 
     await this.eventBus.publish({
       type: 'ProviderSubmitted',
@@ -186,6 +198,23 @@ export class ProvidersService {
       throw new UnauthorizedException('负责人密码不正确，不能重新提交该提供方申请。');
     }
 
+    const conflictingAccount = await this.prisma.providerAccount.findFirst({
+      where: {
+        providerId: provider.id,
+        email: contactEmail,
+        id: {
+          not: account.id,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (conflictingAccount) {
+      throw new ConflictException('该联系邮箱已被当前发卡方的其他账号使用。');
+    }
+
     const previousStatus = provider.status;
     const updated = await this.prisma.$transaction(async (transaction) => {
       const updatedProvider = await transaction.provider.update({
@@ -207,6 +236,7 @@ export class ProvidersService {
           id: account.id,
         },
         data: {
+          email: contactEmail,
           displayName: contactName,
           status: 'PendingReview',
         },
@@ -259,17 +289,44 @@ export class ProvidersService {
 
   async login(dto: ProviderLoginDto) {
     const identifier = dto.identifier.trim().toLowerCase();
-    const account = await this.prisma.providerAccount.findUnique({
+    const providerSlug = dto.providerSlug?.trim().toLowerCase();
+    const accounts = await this.prisma.providerAccount.findMany({
       where: {
         email: identifier,
+        ...(providerSlug
+          ? {
+              provider: {
+                slug: providerSlug,
+              },
+            }
+          : {}),
       },
       include: {
         provider: true,
       },
+      orderBy: {
+        createdAt: 'asc',
+      },
     });
 
-    if (!account || !(await this.secretHash.verifySecret(dto.password, account.passwordHash, 'provider-password'))) {
-      throw new UnauthorizedException('邮箱或密码不正确。');
+    const matchedAccounts = [];
+    for (const account of accounts) {
+      if (await this.secretHash.verifySecret(dto.password, account.passwordHash, 'provider-password')) {
+        matchedAccounts.push(account);
+      }
+    }
+
+    if (matchedAccounts.length === 0) {
+      throw new UnauthorizedException('邮箱、发卡方标识或密码不正确。');
+    }
+
+    if (matchedAccounts.length > 1) {
+      throw new BadRequestException('该邮箱匹配多个发卡方账号，请填写发卡方标识后再登录。');
+    }
+
+    const account = matchedAccounts[0];
+    if (!account) {
+      throw new UnauthorizedException('邮箱、发卡方标识或密码不正确。');
     }
 
     if (account.status !== 'Active' || account.provider.status !== 'Active') {
@@ -581,4 +638,15 @@ export class ProvidersService {
   private toProviderSource(source: string): 'admin_created' | 'open_registration' {
     return source === 'admin_created' ? 'admin_created' : 'open_registration';
   }
+}
+
+function isProviderAccountEmailUniqueError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+  const target = (error as { meta?: { target?: unknown } } | null)?.meta?.target;
+
+  return (
+    Boolean(error) &&
+    typeof error === 'object' &&
+    (error as { code?: unknown }).code === 'P2002' &&
+    ((Array.isArray(target) && target.includes('email')) || target === 'ProviderAccount_email_key')
+  );
 }
