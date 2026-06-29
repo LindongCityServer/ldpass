@@ -119,6 +119,9 @@ export interface LoginDeviceResult {
   system: DeviceSystem;
   label: string | null;
   trustedUntil: Date | null;
+  lastLoginIp: string | null;
+  lastLoginIpRegion: IpRegion | null;
+  lastLoginAt: Date | null;
   isNew: boolean;
 }
 
@@ -127,6 +130,9 @@ interface LoginDeviceState {
   label: string;
   fingerprintHash: string;
   trustedUntil: Date;
+  lastLoginIp: string | null;
+  lastLoginIpRegion: IpRegion | null;
+  lastLoginAt: Date;
   existingDevice: {
     id: string;
     revokedAt: Date | null;
@@ -205,7 +211,7 @@ export class IdentityService {
         status: 'PendingReview',
         reviewInfo,
         registrationIp,
-        registrationIpRegion: this.toRegistrationIpRegionJson(registrationIpRegion),
+        registrationIpRegion: this.toIpRegionJson(registrationIpRegion),
       },
     });
 
@@ -255,7 +261,7 @@ export class IdentityService {
         status: 'WaitingServerVerification',
         reviewInfo: `服务器账号验证：${serverId}`,
         registrationIp,
-        registrationIpRegion: this.toRegistrationIpRegionJson(registrationIpRegion),
+        registrationIpRegion: this.toIpRegionJson(registrationIpRegion),
         serverAccountName: serverId,
         serverChallenges: {
           create: {
@@ -345,7 +351,7 @@ export class IdentityService {
     }
 
     if (user.status !== 'Active') {
-      const device = await this.bindLoginDevice(user.id, dto, request);
+      const device = await this.recordLoginDevice(user.id, dto, request);
 
       await this.eventBus.publish({
         type: 'UserLoggedIn',
@@ -400,7 +406,7 @@ export class IdentityService {
       };
     }
 
-    const device = await this.bindLoginDevice(user.id, dto, request);
+    const device = await this.recordLoginDevice(user.id, dto, request);
 
     await this.eventBus.publish({
       type: 'UserLoggedIn',
@@ -519,8 +525,16 @@ export class IdentityService {
             reviewRejectedReason: activeUser.reviewRejectedReason,
             serverAccountName: activeUser.serverAccountName,
             serverAccountVerified: activeUser.serverAccountVerified,
-            avatarUrl: this.buildMinecraftAvatarUrl(activeUser.serverAccountName, activeUser.serverAccountVerified, 'mc-heads'),
-            avatarFallbackUrl: this.buildMinecraftAvatarUrl(activeUser.serverAccountName, activeUser.serverAccountVerified, 'minotar'),
+            avatarUrl: this.buildMinecraftAvatarUrl(
+              activeUser.serverAccountName,
+              activeUser.serverAccountVerified,
+              'mc-heads',
+            ),
+            avatarFallbackUrl: this.buildMinecraftAvatarUrl(
+              activeUser.serverAccountName,
+              activeUser.serverAccountVerified,
+              'minotar',
+            ),
             expirationReminderDays: activeUser.expirationReminderDays,
           }
         : null,
@@ -562,7 +576,7 @@ export class IdentityService {
         reviewInfo,
         reviewRejectedReason: null,
         registrationIp,
-        registrationIpRegion: this.toRegistrationIpRegionJson(registrationIpRegion),
+        registrationIpRegion: this.toIpRegionJson(registrationIpRegion),
       },
     });
 
@@ -626,7 +640,7 @@ export class IdentityService {
       throw new UnauthorizedException('管理员 PIN 不正确。');
     }
 
-    const device = await this.bindLoginDevice(user.id, dto, request);
+    const device = await this.recordLoginDevice(user.id, dto, request);
 
     await this.eventBus.publish({
       type: 'PinVerificationSucceeded',
@@ -815,7 +829,9 @@ export class IdentityService {
       throw new UnauthorizedException('账户不存在或已经被删除。');
     }
 
-    if (!(await this.secretHash.verifySecret(currentPassword, existingUser.passwordHash, 'password'))) {
+    if (
+      !(await this.secretHash.verifySecret(currentPassword, existingUser.passwordHash, 'password'))
+    ) {
       throw new UnauthorizedException('当前密码不正确，无法修改密码。');
     }
 
@@ -1139,29 +1155,21 @@ export class IdentityService {
         },
       },
     });
-    const ipRegions = await this.ipRegionService.resolveMany(
-      devices.map((device) => device.sessions[0]?.ipAddress),
-    );
 
     return {
-      devices: devices.map((device) => {
-        const latestSession = device.sessions[0] ?? null;
-        const latestIpAddress = latestSession?.ipAddress ?? null;
-
-        return {
-          id: device.id,
-          system: device.system,
-          label: device.label,
-          trustedUntil: device.trustedUntil?.toISOString() ?? null,
-          revokedAt: device.revokedAt?.toISOString() ?? null,
-          activeSessionCount: device.sessions.length,
-          lastLoginIp: latestIpAddress,
-          lastLoginIpRegion: latestIpAddress ? ipRegions.get(latestIpAddress) ?? null : null,
-          lastLoginAt: latestSession?.createdAt.toISOString() ?? null,
-          createdAt: device.createdAt.toISOString(),
-          updatedAt: device.updatedAt.toISOString(),
-        };
-      }),
+      devices: devices.map((device) => ({
+        id: device.id,
+        system: device.system,
+        label: device.label,
+        trustedUntil: device.trustedUntil?.toISOString() ?? null,
+        revokedAt: device.revokedAt?.toISOString() ?? null,
+        activeSessionCount: device.sessions.length,
+        lastLoginIp: device.lastLoginIp,
+        lastLoginIpRegion: this.readIpRegionJson(device.lastLoginIpRegion),
+        lastLoginAt: device.lastLoginAt?.toISOString() ?? null,
+        createdAt: device.createdAt.toISOString(),
+        updatedAt: device.updatedAt.toISOString(),
+      })),
     };
   }
 
@@ -1199,6 +1207,19 @@ export class IdentityService {
       }),
     ]);
 
+    await this.eventBus.publish({
+      type: 'LoginDeviceSignedOut',
+      eventId: randomUUID(),
+      occurredAt: now.toISOString(),
+      actorType: 'user',
+      actorId: user.id,
+      payload: {
+        userId: user.id,
+        deviceId: device.id,
+        reason: 'user_revoked',
+      },
+    });
+
     return {
       ok: true,
     };
@@ -1227,13 +1248,15 @@ export class IdentityService {
         createdAt: 'desc',
       },
     });
-    const ipRegions = await this.ipRegionService.resolveMany(approvals.map((approval) => approval.ipAddress));
+    const ipRegions = await this.ipRegionService.resolveMany(
+      approvals.map((approval) => approval.ipAddress),
+    );
 
     return {
       approvals: approvals.map((approval) => ({
         ...this.toLoginDeviceApproval(approval),
         ipAddress: approval.ipAddress,
-        ipRegion: approval.ipAddress ? ipRegions.get(approval.ipAddress) ?? null : null,
+        ipRegion: approval.ipAddress ? (ipRegions.get(approval.ipAddress) ?? null) : null,
         createdAt: approval.createdAt.toISOString(),
       })),
     };
@@ -1560,7 +1583,7 @@ export class IdentityService {
         });
 
         const deviceState = await this.readLoginDeviceState(user.id, dto, request);
-        const device = await this.bindLoginDevice(user.id, dto, request);
+        const device = await this.recordLoginDevice(user.id, dto, request);
         await this.completePendingDeviceLoginApprovals(user.id, deviceState.fingerprintHash);
 
         if (device) {
@@ -1727,7 +1750,7 @@ export class IdentityService {
       throw new UnauthorizedException('新设备确认请求已过期，请重新登录。');
     }
 
-    const device = await this.bindLoginDevice(user.id, dto, request);
+    const device = await this.recordLoginDevice(user.id, dto, request);
     await this.prisma.deviceLoginApproval.update({
       where: {
         id: approval.id,
@@ -1813,6 +1836,9 @@ export class IdentityService {
     const clientDeviceId = dto.clientDeviceId?.trim() || this.createFallbackClientDeviceId(request);
     const fingerprintHash = this.hashDeviceFingerprint(userId, clientDeviceId);
     const trustedUntil = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
+    const lastLoginIp = request ? readClientIp(request) : null;
+    const lastLoginIpRegion = lastLoginIp ? await this.ipRegionService.resolve(lastLoginIp) : null;
+    const lastLoginAt = new Date();
 
     const existingDevice = await this.prisma.device.findUnique({
       where: {
@@ -1851,6 +1877,9 @@ export class IdentityService {
       label,
       fingerprintHash,
       trustedUntil,
+      lastLoginIp,
+      lastLoginIpRegion,
+      lastLoginAt,
       existingDevice,
       activeDeviceCount,
       activeSessionDeviceCount,
@@ -1866,11 +1895,7 @@ export class IdentityService {
       return false;
     }
 
-    if (deviceState.activeDeviceCount >= MAX_ACTIVE_DEVICES_PER_SYSTEM) {
-      throw new UnauthorizedException('该系统下已绑定 2 台设备，请先在账户页撤销旧设备后再登录。');
-    }
-
-    return true;
+    return deviceState.activeDeviceCount > 0;
   }
 
   private async createDeviceLoginApproval(
@@ -2054,24 +2079,51 @@ export class IdentityService {
     };
   }
 
-  private async bindLoginDevice(
+  private async recordLoginDevice(
     userId: string,
     dto: LoginDto,
     request: ApiRequestLike | undefined,
   ): Promise<LoginDeviceResult | null> {
-    const { system, label, fingerprintHash, trustedUntil, existingDevice, activeDeviceCount } =
-      await this.readLoginDeviceState(userId, dto, request);
+    const {
+      system,
+      label,
+      fingerprintHash,
+      trustedUntil,
+      lastLoginIp,
+      lastLoginIpRegion,
+      lastLoginAt,
+      existingDevice,
+      activeDeviceCount,
+    } = await this.readLoginDeviceState(userId, dto, request);
+    const lastLoginIpRegionJson = lastLoginIpRegion
+      ? this.toIpRegionJson(lastLoginIpRegion)
+      : Prisma.JsonNull;
+    const loginSnapshotData = {
+      system,
+      label,
+      trustedUntil,
+      lastLoginIp,
+      lastLoginIpRegion: lastLoginIpRegionJson,
+      lastLoginAt,
+    };
 
     if (existingDevice && !existingDevice.revokedAt) {
       const updatedDevice = await this.prisma.device.update({
         where: {
           id: existingDevice.id,
         },
-        data: {
-          system,
-          label,
-          trustedUntil,
-        },
+        data: loginSnapshotData,
+      });
+
+      await this.publishLoginDeviceRecorded({
+        userId,
+        deviceId: updatedDevice.id,
+        deviceSystem: updatedDevice.system,
+        deviceLabel: updatedDevice.label,
+        lastLoginIp,
+        lastLoginIpRegion,
+        lastLoginAt,
+        isNew: false,
       });
 
       return {
@@ -2079,58 +2131,145 @@ export class IdentityService {
         system: updatedDevice.system,
         label: updatedDevice.label,
         trustedUntil: updatedDevice.trustedUntil,
+        lastLoginIp,
+        lastLoginIpRegion,
+        lastLoginAt: updatedDevice.lastLoginAt,
         isNew: false,
       };
     }
 
-    if (activeDeviceCount >= MAX_ACTIVE_DEVICES_PER_SYSTEM) {
-      throw new UnauthorizedException('该系统下已绑定 2 台设备，请先在账户页撤销旧设备后再登录。');
-    }
+    const recorded = await this.prisma.$transaction(async (tx) => {
+      let replacedDeviceId: string | undefined;
 
-    const device = existingDevice
-      ? await this.prisma.device.update({
+      if (activeDeviceCount >= MAX_ACTIVE_DEVICES_PER_SYSTEM) {
+        const oldestSameSystemDevice = await tx.device.findFirst({
           where: {
-            id: existingDevice.id,
-          },
-          data: {
-            system,
-            label,
-            trustedUntil,
-            revokedAt: null,
-          },
-        })
-      : await this.prisma.device.create({
-          data: {
             userId,
             system,
-            label,
-            fingerprintHash,
-            trustedUntil,
+            revokedAt: null,
+          },
+          orderBy: [{ lastLoginAt: 'asc' }, { createdAt: 'asc' }],
+          select: {
+            id: true,
           },
         });
 
-    await this.eventBus.publish({
-      type: 'DeviceBound',
-      eventId: randomUUID(),
-      occurredAt: new Date().toISOString(),
-      actorType: 'user',
-      actorId: userId,
-      payload: {
-        userId,
-        deviceId: device.id,
-        deviceSystem: device.system,
-        ...(device.label ? { deviceLabel: device.label } : {}),
-        ...(device.trustedUntil ? { trustedUntil: device.trustedUntil.toISOString() } : {}),
-      },
+        if (oldestSameSystemDevice) {
+          replacedDeviceId = oldestSameSystemDevice.id;
+          await tx.device.update({
+            where: {
+              id: oldestSameSystemDevice.id,
+            },
+            data: {
+              revokedAt: lastLoginAt,
+            },
+          });
+          await tx.authSession.updateMany({
+            where: {
+              userId,
+              deviceId: oldestSameSystemDevice.id,
+              revokedAt: null,
+            },
+            data: {
+              revokedAt: lastLoginAt,
+            },
+          });
+        }
+      }
+
+      const device = existingDevice
+        ? await tx.device.update({
+            where: {
+              id: existingDevice.id,
+            },
+            data: {
+              ...loginSnapshotData,
+              revokedAt: null,
+            },
+          })
+        : await tx.device.create({
+            data: {
+              userId,
+              fingerprintHash,
+              ...loginSnapshotData,
+            },
+          });
+
+      return {
+        device,
+        replacedDeviceId,
+      };
+    });
+
+    if (recorded.replacedDeviceId) {
+      await this.eventBus.publish({
+        type: 'LoginDeviceSignedOut',
+        eventId: randomUUID(),
+        occurredAt: lastLoginAt.toISOString(),
+        actorType: 'system',
+        actorId: 'system',
+        payload: {
+          userId,
+          deviceId: recorded.replacedDeviceId,
+          reason: 'device_limit',
+          replacedByDeviceId: recorded.device.id,
+        },
+      });
+    }
+
+    await this.publishLoginDeviceRecorded({
+      userId,
+      deviceId: recorded.device.id,
+      deviceSystem: recorded.device.system,
+      deviceLabel: recorded.device.label,
+      lastLoginIp,
+      lastLoginIpRegion,
+      lastLoginAt,
+      isNew: true,
+      ...(recorded.replacedDeviceId ? { replacedDeviceId: recorded.replacedDeviceId } : {}),
     });
 
     return {
-      id: device.id,
-      system: device.system,
-      label: device.label,
-      trustedUntil: device.trustedUntil,
+      id: recorded.device.id,
+      system: recorded.device.system,
+      label: recorded.device.label,
+      trustedUntil: recorded.device.trustedUntil,
+      lastLoginIp,
+      lastLoginIpRegion,
+      lastLoginAt: recorded.device.lastLoginAt,
       isNew: true,
     };
+  }
+
+  private async publishLoginDeviceRecorded(input: {
+    userId: string;
+    deviceId: string;
+    deviceSystem: DeviceSystem;
+    deviceLabel: string | null;
+    lastLoginIp: string | null;
+    lastLoginIpRegion: IpRegion | null;
+    lastLoginAt: Date;
+    isNew: boolean;
+    replacedDeviceId?: string;
+  }): Promise<void> {
+    await this.eventBus.publish({
+      type: 'LoginDeviceRecorded',
+      eventId: randomUUID(),
+      occurredAt: input.lastLoginAt.toISOString(),
+      actorType: 'user',
+      actorId: input.userId,
+      payload: {
+        userId: input.userId,
+        deviceId: input.deviceId,
+        deviceSystem: input.deviceSystem,
+        ...(input.deviceLabel ? { deviceLabel: input.deviceLabel } : {}),
+        ...(input.lastLoginIp ? { lastLoginIp: input.lastLoginIp } : {}),
+        ...(input.lastLoginIpRegion ? { lastLoginIpRegion: input.lastLoginIpRegion } : {}),
+        lastLoginAt: input.lastLoginAt.toISOString(),
+        isNew: input.isNew,
+        ...(input.replacedDeviceId ? { replacedDeviceId: input.replacedDeviceId } : {}),
+      },
+    });
   }
 
   private hashDeviceFingerprint(userId: string, clientDeviceId: string): string {
@@ -2180,7 +2319,7 @@ export class IdentityService {
     return value.filter((item): item is string => typeof item === 'string');
   }
 
-  private toRegistrationIpRegionJson(region: IpRegion): Prisma.InputJsonObject {
+  private toIpRegionJson(region: IpRegion): Prisma.InputJsonObject {
     return {
       source: region.source,
       ...(region.country ? { country: region.country } : {}),
@@ -2188,6 +2327,31 @@ export class IdentityService {
       ...(region.city ? { city: region.city } : {}),
       ...(region.address ? { address: region.address } : {}),
     };
+  }
+
+  private readIpRegionJson(value: unknown): IpRegion | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+
+    const source = this.readOptionalStringField(value, 'source') ?? 'stored-login-ip-region';
+    const country = this.readOptionalStringField(value, 'country');
+    const provinceOrState = this.readOptionalStringField(value, 'provinceOrState');
+    const city = this.readOptionalStringField(value, 'city');
+    const address = this.readOptionalStringField(value, 'address');
+
+    return {
+      source,
+      ...(country ? { country } : {}),
+      ...(provinceOrState ? { provinceOrState } : {}),
+      ...(city ? { city } : {}),
+      ...(address ? { address } : {}),
+    };
+  }
+
+  private readOptionalStringField(value: object, key: string): string | undefined {
+    const field = (value as Record<string, unknown>)[key];
+    return typeof field === 'string' && field.trim() ? field : undefined;
   }
 
   private createFallbackClientDeviceId(request: ApiRequestLike | undefined): string {
@@ -2368,8 +2532,16 @@ export class IdentityService {
       reviewRejectedReason: user.reviewRejectedReason ?? null,
       serverAccountName: user.serverAccountName ?? null,
       serverAccountVerified: user.serverAccountVerified,
-      avatarUrl: this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'mc-heads'),
-      avatarFallbackUrl: this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'minotar'),
+      avatarUrl: this.buildMinecraftAvatarUrl(
+        user.serverAccountName,
+        user.serverAccountVerified,
+        'mc-heads',
+      ),
+      avatarFallbackUrl: this.buildMinecraftAvatarUrl(
+        user.serverAccountName,
+        user.serverAccountVerified,
+        'minotar',
+      ),
       expirationReminderDays: user.expirationReminderDays,
     };
   }

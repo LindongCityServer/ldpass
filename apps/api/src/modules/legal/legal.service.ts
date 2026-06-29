@@ -5,31 +5,11 @@ import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import type { AuthenticatedUser } from '../../shared/auth/session-auth.service.js';
 import { PrismaService } from '../../shared/database/prisma.service.js';
+import { defaultDocuments } from './default-documents.js';
 import type { UpdateLegalDocumentDto } from './dto.js';
 
 const legalDocumentKeys = ['terms', 'privacy'] as const satisfies LegalDocumentKey[];
 type VisibleLegalDocumentKey = (typeof legalDocumentKeys)[number];
-
-const defaultDocuments: Record<LegalDocumentKey, { title: string; content: string }> = {
-  terms: {
-    title: '服务条款',
-    content:
-      '这是临东通服务条款的初始占位文本。管理员需要在后台补充正式条款后再对外发布。\n\n' +
-      '本项目不接入真实支付通道，卡券余额、积分、次数等权益仅用于平台内记录和核销。',
-  },
-  privacy: {
-    title: '隐私政策',
-    content:
-      '这是临东通隐私政策的初始占位文本。管理员需要在后台补充正式隐私政策后再对外发布。\n\n' +
-      '平台会处理注册信息、登录设备、服务器账号验证信息、卡券持有与核销记录等必要数据。',
-  },
-  provider_agreement: {
-    title: '提供方协议',
-    content:
-      '这是临东通提供方协议的初始占位文本。管理员需要在后台补充正式提供方协议后再对外发布。\n\n' +
-      '提供方提交的卡券模板、权益规则、位置核验范围和展示信息需要经过平台管理员审核。',
-  },
-};
 
 @Injectable()
 export class LegalService {

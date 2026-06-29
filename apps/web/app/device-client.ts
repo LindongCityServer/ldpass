@@ -4,6 +4,17 @@ export type ClientDeviceSystem = 'android' | 'ios' | 'windows' | 'macos' | 'linu
 
 const clientDeviceStorageKey = 'ldpass.clientDeviceId';
 
+type NavigatorWithUserAgentData = Navigator & {
+  userAgentData?: {
+    brands?: Array<{
+      brand: string;
+      version: string;
+    }>;
+    mobile?: boolean;
+    platform?: string;
+  };
+};
+
 export function readClientDevice() {
   return {
     clientDeviceId: readOrCreateClientDeviceId(),
@@ -42,7 +53,12 @@ function detectClientDeviceSystem(): ClientDeviceSystem {
     return 'android';
   }
 
-  if (userAgent.includes('iphone') || userAgent.includes('ipad') || platform.includes('iphone') || platform.includes('ipad')) {
+  if (
+    userAgent.includes('iphone') ||
+    userAgent.includes('ipad') ||
+    platform.includes('iphone') ||
+    platform.includes('ipad')
+  ) {
     return 'ios';
   }
 
@@ -71,6 +87,15 @@ function createClientDeviceLabel(): string {
     other: '未知设备',
   };
   const system = detectClientDeviceSystem();
-  const platform = window.navigator.platform || systemLabels[system];
-  return `${systemLabels[system]} · ${platform}`.slice(0, 80);
+  const navigatorWithUserAgentData = window.navigator as NavigatorWithUserAgentData;
+  const platform =
+    navigatorWithUserAgentData.userAgentData?.platform || window.navigator.platform || '';
+  const browserBrand = navigatorWithUserAgentData.userAgentData?.brands?.find(
+    (brand) => !brand.brand.toLowerCase().includes('not'),
+  )?.brand;
+  const details = Array.from(new Set([platform, browserBrand].filter(Boolean)));
+
+  return (
+    details.length ? `${systemLabels[system]} · ${details.join(' / ')}` : systemLabels[system]
+  ).slice(0, 80);
 }

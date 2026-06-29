@@ -70,21 +70,21 @@ POST /api/auth/admin/login
 
 ### 2.4 当前已实现的管理员页面
 
-| 页面                            | 用途                                                                             |
-| ------------------------------- | -------------------------------------------------------------------------------- |
-| `/admin`                        | 查看后台概览、待办数量、关键数字和最近审计                                       |
-| `/admin/users`                  | 审核普通用户注册申请、搜索和导出用户目录、封禁/解封/删除用户、管理员介入重置用户密码 |
+| 页面                            | 用途                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/admin`                        | 查看后台概览、待办数量、关键数字和最近审计                                                                                                  |
+| `/admin/users`                  | 审核普通用户注册申请、搜索和导出用户目录、封禁/解封/删除用户、管理员介入重置用户密码                                                        |
 | `/admin/providers`              | 手动创建发卡方和 owner 账号、审核发卡方入驻申请、审核资料变更、审核 API 密钥和 Webhook 创建申请、搜索和导出提供方目录、停用/恢复/归档发卡方 |
-| `/admin/pass-templates`         | 审核发卡方提交的卡券模板                                                         |
-| `/admin/card-template-variants` | 维护平台提供的卡面模板变体                                                       |
-| `/admin/add-pass-token`         | 生成添加卡券领取码                                                               |
-| `/admin/passes`                 | 搜索卡券、调整余额/权益、审核票券字段变更、导出全站卡券与流水 CSV                |
-| `/admin/disputes`               | 查看争议记录并推进状态                                                           |
-| `/admin/audit`                  | 查看领域事件审计记录，并按筛选条件导出审计 CSV                                   |
-| `/admin/platform`               | 配置全站公告和维护状态                                                           |
-| `/admin/theme`                  | 配置主题色自动切换计划                                                           |
-| `/admin/storage`                | 查看服务器存储空间状态与活动告警                                                 |
-| `/admin/legal`                  | 维护服务条款和隐私政策；提供方协议第一阶段不在后台入口展示                       |
+| `/admin/pass-templates`         | 审核发卡方提交的卡券模板                                                                                                                    |
+| `/admin/card-template-variants` | 维护平台提供的卡面模板变体                                                                                                                  |
+| `/admin/add-pass-token`         | 生成添加卡券领取码                                                                                                                          |
+| `/admin/passes`                 | 搜索卡券、调整余额/权益、审核票券字段变更、导出全站卡券与流水 CSV                                                                           |
+| `/admin/disputes`               | 查看争议记录并推进状态                                                                                                                      |
+| `/admin/audit`                  | 查看领域事件审计记录，并按筛选条件导出审计 CSV                                                                                              |
+| `/admin/platform`               | 配置全站公告和维护状态                                                                                                                      |
+| `/admin/theme`                  | 配置主题色自动切换计划                                                                                                                      |
+| `/admin/storage`                | 查看服务器存储空间状态与活动告警                                                                                                            |
+| `/admin/legal`                  | 维护服务条款和隐私政策；提供方协议第一阶段不在后台入口展示                                                                                  |
 
 `/admin` 是管理员后台首页，会读取 `GET /api/admin/dashboard/summary`，汇总用户审核、提供方审核、提供方资料变更、API 密钥审核、Webhook 配置审核、模板审核、票券字段变更、开放争议、存储告警、卡券状态、有效领取码、有效操作链接和最近审计记录。它只展示已有业务表的聚合结果，不产生新的业务写入。
 
@@ -159,17 +159,17 @@ POST /api/providers/auth/logout
 
 ### 3.3 当前已实现的发卡方页面
 
-| 页面                  | 用途                                                                              |
-| --------------------- | --------------------------------------------------------------------------------- |
-| `/provider/login`     | 发卡方负责人登录                                                                  |
-| `/provider/register`  | 发卡方入驻申请                                                                    |
-| `/provider/dashboard` | 查看当前发卡方和负责人账号状态，提交需要管理员审核的资料变更申请                  |
-| `/provider/templates` | 创建卡券模板并提交管理员审核                                                      |
-| `/provider/issue`     | 基于已审核模板生成单个或批量领取码/添加链接                                       |
-| `/provider/passes`    | 查看自己发出的卡券、调整金额/积分/次数、生成和撤销使用/额度补充操作链接、导出 CSV |
-| `/provider/disputes`  | 查看自己卡券相关的用户争议                                                        |
+| 页面                  | 用途                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `/provider/login`     | 发卡方负责人登录                                                                                                                |
+| `/provider/register`  | 发卡方入驻申请                                                                                                                  |
+| `/provider/dashboard` | 查看当前发卡方和负责人账号状态，提交需要管理员审核的资料变更申请                                                                |
+| `/provider/templates` | 创建卡券模板并提交管理员审核                                                                                                    |
+| `/provider/issue`     | 基于已审核模板生成单个或批量领取码/添加链接                                                                                     |
+| `/provider/passes`    | 查看自己发出的卡券、调整金额/积分/次数、生成和撤销使用/额度补充操作链接、导出 CSV                                               |
+| `/provider/disputes`  | 查看自己卡券相关的用户争议                                                                                                      |
 | `/provider/api-keys`  | 提交 API 密钥申请、审批通过后一次性查看明文密钥、轮换/停用密钥；外部系统按 scope 调用发放、领取码管理、操作链接、卡券和核销接口 |
-| `/provider/webhooks`  | 提交 Webhook 回调端点申请、审批通过后一次性查看签名密钥、查看投递记录和重试失败投递 |
+| `/provider/webhooks`  | 提交 Webhook 回调端点申请、审批通过后一次性查看签名密钥、查看投递记录和重试失败投递                                             |
 
 ### 3.4 模板创建与审核
 
@@ -340,7 +340,7 @@ POST /api/admin/providers/webhook-change-requests/:requestId/approve
 POST /api/admin/providers/webhook-change-requests/:requestId/reject
 ```
 
-Webhook 投递不会阻塞用户领取、核销或权益调整等主流程。后端会从 `OutboxEvent` 异步创建投递任务，默认每 30 秒扫描一次，单次 HTTP 超时默认 8 秒，最多尝试 5 次；这些值可以通过 `.env` 中的 `WEBHOOK_DISPATCH_INTERVAL_SECONDS`、`WEBHOOK_DELIVERY_TIMEOUT_SECONDS`、`WEBHOOK_MAX_ATTEMPTS` 调整。若 `WEBHOOK_DISPATCH_ENABLED=false`，API 进程不会投递 Webhook。
+Webhook 投递不会阻塞用户领取、核销或权益调整等主流程。后端会从 `OutboxEvent` 异步创建投递任务，默认每 30 秒扫描一次，单次 HTTP 超时默认 8 秒，最多尝试 5 次；这些值可以通过 `.env` 中的 `WEBHOOK_DISPATCH_INTERVAL_SECONDS`、`WEBHOOK_DELIVERY_TIMEOUT_SECONDS`、`WEBHOOK_MAX_ATTEMPTS` 调整。若 `WEBHOOK_DISPATCH_ENABLED=false`，Next.js API application context 不会投递 Webhook。
 
 每次投递使用 `POST` JSON，请求头包含：
 
@@ -469,4 +469,4 @@ POST /api/providers/webhooks/deliveries/:deliveryId/retry
 
 ### 4.3 改了后端登录或权限代码后是否需要重启
 
-需要。NestJS API 如果不是 watch 模式运行，后端代码变更后必须重启 API 进程。Next.js 生产构建或非热更新模式下，Web 进程也需要重新构建并重启。
+需要。后端业务模块现在由 Next.js API Route 内嵌加载；生产构建或非热更新模式下，改了后端登录、权限或业务代码后，需要重新构建并重启 Web 进程。

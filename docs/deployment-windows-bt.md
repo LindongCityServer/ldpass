@@ -9,7 +9,7 @@
 - pnpm：不要求全局安装；第一阶段通过 `npx --yes pnpm@10.14.0 ...` 临时运行仓库固定版本。
 - SQLite：默认使用仓库根目录 `data\ldpass.sqlite`，不需要单独安装数据库服务。
 - Nginx：使用宝塔面板自带或面板管理的 Nginx 反代。
-- 进程守护：第一阶段优先评估宝塔进程守护；如果稳定性不足，再评估 NSSM 或 PM2 for Windows。
+- 进程守护：只需要守护 Next.js Web 进程。宝塔进程守护、NSSM、系统服务或平台自带 Next.js 托管均可，PM2 不是硬性要求。
 
 ## 2. 目录建议
 
@@ -28,9 +28,6 @@ D:\wwwroot\ldpass\
 从 `.env.example` 复制一份生产环境配置，重点检查：
 
 - `DATABASE_URL`：SQLite 文件地址，默认 `file:./data/ldpass.sqlite`。
-- `WEB_ORIGIN`：Web 站点完整地址。
-- `API_ORIGIN`：API 站点完整地址。
-- `API_PORT`：API 本地监听端口。
 - `AUTH_COOKIE_DOMAIN`：同二级域名共享登录态时使用，例如 `.example.com`。
 - `SESSION_SECRET`：长随机字符串。
 - `PROVIDER_API_KEY_SECRET`：发卡方开放 API 密钥哈希使用的长随机字符串。
@@ -72,9 +69,6 @@ New-Item -ItemType Directory -Force .\data
 
 ```env
 DATABASE_URL="file:./data/ldpass.sqlite"
-WEB_ORIGIN="http://localhost:3200"
-API_ORIGIN="http://localhost:3201"
-API_PORT=3201
 SESSION_SECRET="请替换为至少 32 字符的随机字符串"
 PROVIDER_API_KEY_SECRET="请替换为另一段至少 32 字符的随机字符串"
 OPEN_API_RATE_LIMIT_WINDOW_SECONDS=60
@@ -116,19 +110,17 @@ Remove-Item Env:\SEED_ADMIN_PIN
 
 ## 6. 进程
 
-建议拆成两个常驻进程：
+建议只保留一个常驻进程：
 
 - Web：`pnpm --filter @ldpass/web start`
-- API：`pnpm --filter @ldpass/api start`
 
 如果服务器只提供 npm，可以在宝塔进程守护里使用：
 
 ```powershell
 npx --yes pnpm@10.14.0 --filter @ldpass/web start
-npx --yes pnpm@10.14.0 --filter @ldpass/api start
 ```
 
-当前 Webhook 调度器和操作链接过期清理器都运行在 API 进程中。Webhook 调度器基于数据库 `OutboxEvent` 和 `ProviderWebhookDelivery` 表异步投递；操作链接过期清理器按间隔把过期的 `Active` 链接标记为 `Expired` 并发布审计事件。二者都不会阻塞 Web 进程。后续如果加入更重的 BDSLM 长轮询、异步导出 CSV、批量提醒或多实例部署，可以新增 worker 进程承接这些后台任务，不要把长轮询任务塞进 Web 进程。
+`/api/*` 现在由 Next Route Handler 承接，内部会启动后端 application context。Webhook 调度器和操作链接过期清理器随这个 context 以单例方式运行；生产环境可以把 `/api/health` 作为启动后的预热和健康检查入口。后续如果加入更重的 BDSLM 长轮询、异步导出 CSV、批量提醒或多实例部署，可以新增 worker 进程承接这些后台任务，不要把长轮询任务塞进请求路径。
 
 ## 7. Nginx 反向代理
 
@@ -137,14 +129,14 @@ npx --yes pnpm@10.14.0 --filter @ldpass/api start
 - Web：`https://pass.example.com`
 - API：`https://pass.example.com/api`
 
-Nginx 反代规则需要把 `/api/` 转发到 API 本地端口，其余请求转发到 Next.js Web 本地端口。需要保留：
+Nginx 反代规则只需要把整站转发到 Next.js Web 本地端口，`/api/` 不再需要单独转发到 3201 之类的 API 端口。需要保留：
 
 - `Host`
 - `X-Forwarded-For`
 - `X-Forwarded-Proto`
 - `X-Real-IP`
 
-如果 API 和 Web 分不同三级域名，需要额外检查 Cookie Domain、CORS、SameSite 和 HTTPS 设置。
+如果未来重新拆出独立 API 域名，需要额外检查 Cookie Domain、CORS、SameSite 和 HTTPS 设置；当前全 Next.js 架构默认同源。
 
 ## 8. 数据库
 
@@ -166,7 +158,7 @@ Nginx 反代规则需要把 `/api/` 转发到 API 本地端口，其余请求转
 离线钱包的验证方式：
 
 1. 使用普通用户登录并打开首页，确认顶部出现离线卡券同步时间。
-2. 停止 API 进程或临时断网。
+2. 停止 Next.js Web 进程或临时断网。
 3. 刷新首页，应仍能看到最近同步过的基础卡券信息。
 4. 此时详情流水、核销确认、排序、删除等写操作应显示离线提示，不允许显示成功。
 
@@ -174,9 +166,9 @@ Nginx 反代规则需要把 `/api/` 转发到 API 本地端口，其余请求转
 
 回滚顺序建议：
 
-1. 停止 Web 和 API 进程。
+1. 停止 Web 进程。
 2. 切回上一版发布目录。
-3. 重启 Web 和 API。
+3. 重启 Web。
 4. 检查 `/api/health`。
 5. 如果数据库迁移不可逆，不要直接回滚代码，需要先准备数据修复脚本。
 
@@ -201,11 +193,11 @@ Test-Path .\data
 
 ### 11.2 注册页服务器验证按钮像没反应
 
-服务器验证注册同时依赖 Web、API、SQLite 文件和 BDSLM 聊天接口。排查顺序：
+服务器验证注册同时依赖 Next.js 应用、SQLite 文件和 BDSLM 聊天接口。排查顺序：
 
-1. 打开 `/api/health`，确认 API 进程在运行。
-2. 检查 `data\ldpass.sqlite` 是否存在，确认 API 进程有读写权限。
-3. 检查 API 进程使用的 `.env` 中 `DATABASE_URL` 是否正确。
+1. 打开 `/api/health`，确认 Next.js API Route 能返回 200。
+2. 检查 `data\ldpass.sqlite` 是否存在，确认 Web 进程有读写权限。
+3. 检查 Web 进程使用的 `.env` 中 `DATABASE_URL` 是否正确。
 4. 检查 `BDSLM_BASE_URL` 是否能访问。
 5. 如果 BDSLM 偶发慢响应，可以调大 `BDSLM_REQUEST_TIMEOUT_MS`，但不要设置得过长，否则用户会感觉按钮卡住。
 

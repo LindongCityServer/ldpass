@@ -18,6 +18,8 @@ const auditedEventTypes: DomainEventType[] = [
   'DeviceLoginApprovalRejected',
   'ServerAccountRebound',
   'DeviceBound',
+  'LoginDeviceRecorded',
+  'LoginDeviceSignedOut',
   'PinVerificationSucceeded',
   'UserRegistered',
   'UserLoggedIn',

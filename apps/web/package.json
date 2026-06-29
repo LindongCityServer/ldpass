@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "pnpm build:api && next build",
+    "build:api": "pnpm --filter @ldpass/api build",
     "check": "pnpm typecheck",
-    "dev": "next dev -p 3200",
+    "dev": "pnpm build:api && next dev -p 3200",
     "lint": "pnpm typecheck",
     "start": "next start -p 3200",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "pnpm build:api && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@ldpass/api": "workspace:*",
     "@ldpass/contracts": "workspace:*",
     "@ldpass/ui": "workspace:*",
     "next": "^15.3.4",

@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./dist/main.js",
+  "main": "./dist/next-handler.js",
+  "types": "./dist/next-handler.d.ts",
+  "exports": {
+    "./next-handler": {
+      "types": "./dist/next-handler.d.ts",
+      "default": "./dist/next-handler.js"
+    }
+  },
   "scripts": {
     "build": "tsc -b tsconfig.json",
     "check": "pnpm typecheck",
-    "dev": "pnpm build && node dist/main.js",
     "lint": "pnpm typecheck",
-    "start": "node dist/main.js",
     "typecheck": "tsc -b tsconfig.json"
   },
   "dependencies": {
@@ -18,10 +23,8 @@
     "@ldpass/event-bus": "workspace:*",
     "@nestjs/common": "^11.1.3",
     "@nestjs/core": "^11.1.3",
-    "@nestjs/platform-express": "^11.1.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
-    "dotenv": "^16.6.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },

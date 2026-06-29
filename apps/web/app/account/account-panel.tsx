@@ -107,7 +107,13 @@ type AccountDialog =
   | 'review'
   | 'delete';
 
-function UserAvatar({ avatarUrl, fallbackUrl }: { avatarUrl: string | null; fallbackUrl: string | null }) {
+function UserAvatar({
+  avatarUrl,
+  fallbackUrl,
+}: {
+  avatarUrl: string | null;
+  fallbackUrl: string | null;
+}) {
   const [currentUrl, setCurrentUrl] = useState(avatarUrl);
 
   if (!currentUrl) {
@@ -128,7 +134,8 @@ function UserAvatar({ avatarUrl, fallbackUrl }: { avatarUrl: string | null; fall
 
 export function AccountPanel() {
   const [session, setSession] = useState<SessionResponse['user']>(null);
-  const [providerAccount, setProviderAccount] = useState<ProviderSessionResponse['providerAccount']>(null);
+  const [providerAccount, setProviderAccount] =
+    useState<ProviderSessionResponse['providerAccount']>(null);
   const [devices, setDevices] = useState<AccountDevice[]>([]);
   const [deviceApprovals, setDeviceApprovals] = useState<DeviceLoginApproval[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -144,7 +151,9 @@ export function AccountPanel() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
   const [resolvingApprovalId, setResolvingApprovalId] = useState<string | null>(null);
-  const [serverRebindChallenge, setServerRebindChallenge] = useState<ServerAccountChallenge | null>(null);
+  const [serverRebindChallenge, setServerRebindChallenge] = useState<ServerAccountChallenge | null>(
+    null,
+  );
   const [activeDialog, setActiveDialog] = useState<AccountDialog | null>(null);
 
   useEffect(() => {
@@ -354,7 +363,11 @@ export function AccountPanel() {
     const form = new FormData(event.currentTarget);
     const expirationReminderDays = Number(form.get('expirationReminderDays'));
 
-    if (!Number.isInteger(expirationReminderDays) || expirationReminderDays < 1 || expirationReminderDays > 90) {
+    if (
+      !Number.isInteger(expirationReminderDays) ||
+      expirationReminderDays < 1 ||
+      expirationReminderDays > 90
+    ) {
       setMessage('过期提醒时间需要设置为 1 到 90 天之间的整数。');
       return;
     }
@@ -377,7 +390,11 @@ export function AccountPanel() {
   };
 
   const revokeDevice = async (device: AccountDevice) => {
-    if (!window.confirm(`撤销「${device.label ?? formatDeviceSystem(device.system)}」吗？该设备上的登录会话会失效。`)) {
+    if (
+      !window.confirm(
+        `下线「${device.label ?? formatDeviceSystem(device.system)}」吗？该设备上的登录会话会失效。`,
+      )
+    ) {
       return;
     }
 
@@ -398,9 +415,9 @@ export function AccountPanel() {
             : item,
         ),
       );
-      setMessage('设备已撤销，该设备上的登录会话会失效。');
+      setMessage('设备已下线，该设备上的登录会话会失效。');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '撤销设备失败。');
+      setMessage(error instanceof Error ? error.message : '下线设备失败。');
     } finally {
       setRevokingDeviceId(null);
     }
@@ -421,9 +438,12 @@ export function AccountPanel() {
     setMessage(null);
 
     try {
-      const result = await postJson<ServerAccountRebindStartResponse>('/api/auth/account/server-account/rebind/start', {
-        serverId,
-      });
+      const result = await postJson<ServerAccountRebindStartResponse>(
+        '/api/auth/account/server-account/rebind/start',
+        {
+          serverId,
+        },
+      );
       setSession(result.user);
       setServerRebindChallenge(result.challenge);
       setMessage(
@@ -442,7 +462,9 @@ export function AccountPanel() {
     }
 
     setIsCheckingServerRebind(true);
-    setMessage(`正在检查 ${serverRebindChallenge.serverId} 是否发送了验证码 ${serverRebindChallenge.code}。`);
+    setMessage(
+      `正在检查 ${serverRebindChallenge.serverId} 是否发送了验证码 ${serverRebindChallenge.code}。`,
+    );
 
     try {
       const result = await postJson<ServerAccountRebindCheckResponse>(
@@ -473,7 +495,9 @@ export function AccountPanel() {
         return;
       }
 
-      setMessage(`还没有检测到验证码。请确认 ${serverRebindChallenge.serverId} 已发送 ${serverRebindChallenge.code}。`);
+      setMessage(
+        `还没有检测到验证码。请确认 ${serverRebindChallenge.serverId} 已发送 ${serverRebindChallenge.code}。`,
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '检查服务器账号换绑失败。');
     } finally {
@@ -481,14 +505,21 @@ export function AccountPanel() {
     }
   };
 
-  const resolveDeviceApproval = async (approval: DeviceLoginApproval, action: 'approve' | 'reject') => {
+  const resolveDeviceApproval = async (
+    approval: DeviceLoginApproval,
+    action: 'approve' | 'reject',
+  ) => {
     setResolvingApprovalId(approval.id);
     setMessage(null);
 
     try {
       await postJson(`/api/auth/account/device-login-approvals/${approval.id}/${action}`);
-      setDeviceApprovals((currentApprovals) => currentApprovals.filter((item) => item.id !== approval.id));
-      setMessage(action === 'approve' ? '已批准新设备登录，请回到新设备继续检查。' : '已拒绝新设备登录。');
+      setDeviceApprovals((currentApprovals) =>
+        currentApprovals.filter((item) => item.id !== approval.id),
+      );
+      setMessage(
+        action === 'approve' ? '已批准新设备登录，请回到新设备继续检查。' : '已拒绝新设备登录。',
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '处理新设备确认失败。');
     } finally {
@@ -499,14 +530,15 @@ export function AccountPanel() {
   const canUseAccountSettings = session?.status === 'Active';
   const serverAccountLabel = session
     ? session.serverAccountVerified
-      ? session.serverAccountName ?? '已验证'
+      ? (session.serverAccountName ?? '已验证')
       : session.serverAccountName
         ? `${session.serverAccountName} · 未验证`
         : '未验证'
     : '未登录';
   const activeDeviceCount = devices.filter((device) => !device.revokedAt).length;
   const activeDialogTitle = activeDialog ? getAccountDialogTitle(activeDialog) : '';
-  const isAdminAccount = session?.status === 'Active' && (session.role === 'admin' || session.role === 'super_admin');
+  const isAdminAccount =
+    session?.status === 'Active' && (session.role === 'admin' || session.role === 'super_admin');
   const backofficeEntrances = [
     ...(isAdminAccount
       ? [
@@ -589,17 +621,22 @@ export function AccountPanel() {
                 <dd>提前 {session.expirationReminderDays} 天</dd>
               </div>
               <div>
-                <dt>绑定设备</dt>
+                <dt>登录设备</dt>
                 <dd>{isDevicesLoading ? '读取中' : `${activeDeviceCount} 台`}</dd>
               </div>
             </dl>
             {session.reviewRejectedReason ? (
-              <p className="detail-status detail-status-error">拒绝原因：{session.reviewRejectedReason}</p>
+              <p className="detail-status detail-status-error">
+                拒绝原因：{session.reviewRejectedReason}
+              </p>
             ) : null}
           </section>
 
           {backofficeEntrances.length ? (
-            <section className="account-settings-grid account-backoffice-grid" aria-label="后台入口">
+            <section
+              className="account-settings-grid account-backoffice-grid"
+              aria-label="后台入口"
+            >
               {backofficeEntrances.map((entry) => (
                 <a className="account-setting-item" href={entry.href} key={entry.href}>
                   <span className="material-symbols-rounded" aria-hidden="true">
@@ -619,7 +656,11 @@ export function AccountPanel() {
 
           {canUseAccountSettings ? (
             <section className="account-settings-grid" aria-label="账户设置">
-              <button className="account-setting-item" type="button" onClick={() => setActiveDialog('preferences')}>
+              <button
+                className="account-setting-item"
+                type="button"
+                onClick={() => setActiveDialog('preferences')}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   notifications
                 </span>
@@ -631,7 +672,11 @@ export function AccountPanel() {
                   chevron_right
                 </span>
               </button>
-              <button className="account-setting-item" type="button" onClick={() => setActiveDialog('pin')}>
+              <button
+                className="account-setting-item"
+                type="button"
+                onClick={() => setActiveDialog('pin')}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   pin
                 </span>
@@ -643,7 +688,11 @@ export function AccountPanel() {
                   chevron_right
                 </span>
               </button>
-              <button className="account-setting-item" type="button" onClick={() => setActiveDialog('password')}>
+              <button
+                className="account-setting-item"
+                type="button"
+                onClick={() => setActiveDialog('password')}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   password
                 </span>
@@ -655,7 +704,11 @@ export function AccountPanel() {
                   chevron_right
                 </span>
               </button>
-              <button className="account-setting-item" type="button" onClick={() => setActiveDialog('server')}>
+              <button
+                className="account-setting-item"
+                type="button"
+                onClick={() => setActiveDialog('server')}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   verified_user
                 </span>
@@ -667,31 +720,45 @@ export function AccountPanel() {
                   chevron_right
                 </span>
               </button>
-              <button className="account-setting-item" type="button" onClick={() => setActiveDialog('deviceApprovals')}>
+              <button
+                className="account-setting-item"
+                type="button"
+                onClick={() => setActiveDialog('deviceApprovals')}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   mobile_lock
                 </span>
                 <div>
                   <strong>新设备确认</strong>
-                  <small>{isDeviceApprovalsLoading ? '读取中' : `${deviceApprovals.length} 个待处理`}</small>
+                  <small>
+                    {isDeviceApprovalsLoading ? '读取中' : `${deviceApprovals.length} 个待处理`}
+                  </small>
                 </div>
                 <span className="material-symbols-rounded" aria-hidden="true">
                   chevron_right
                 </span>
               </button>
-              <button className="account-setting-item" type="button" onClick={() => setActiveDialog('devices')}>
+              <button
+                className="account-setting-item"
+                type="button"
+                onClick={() => setActiveDialog('devices')}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   devices
                 </span>
                 <div>
-                  <strong>已绑定设备</strong>
+                  <strong>登录设备</strong>
                   <small>{isDevicesLoading ? '读取中' : `${devices.length} 条记录`}</small>
                 </div>
                 <span className="material-symbols-rounded" aria-hidden="true">
                   chevron_right
                 </span>
               </button>
-              <button className="account-setting-item account-setting-danger" type="button" onClick={() => setActiveDialog('delete')}>
+              <button
+                className="account-setting-item account-setting-danger"
+                type="button"
+                onClick={() => setActiveDialog('delete')}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   delete
                 </span>
@@ -709,18 +776,28 @@ export function AccountPanel() {
               <div>
                 <h2 id="inactive-account-title">账户暂未激活</h2>
                 <p>{formatInactiveAccountMessage(session.status)}</p>
-                {session.reviewRejectedReason ? <p>管理员反馈：{session.reviewRejectedReason}</p> : null}
+                {session.reviewRejectedReason ? (
+                  <p>管理员反馈：{session.reviewRejectedReason}</p>
+                ) : null}
               </div>
               <div className="form-actions compact-actions">
                 {session.status === 'Rejected' || session.status === 'PendingReview' ? (
-                  <button className="primary-action" type="button" onClick={() => setActiveDialog('review')}>
+                  <button
+                    className="primary-action"
+                    type="button"
+                    onClick={() => setActiveDialog('review')}
+                  >
                     补充审核信息
                   </button>
                 ) : null}
                 <a className="secondary-action" href="/register">
                   返回注册流程
                 </a>
-                <button className="secondary-action" type="button" onClick={() => setActiveDialog('delete')}>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => setActiveDialog('delete')}
+                >
                   注销账户
                 </button>
               </div>
@@ -747,7 +824,12 @@ export function AccountPanel() {
       ) : null}
 
       {activeDialog && session ? (
-        <div className="detail-module-slot account-dialog is-dialog" role="dialog" aria-modal="true" aria-label={activeDialogTitle}>
+        <div
+          className="detail-module-slot account-dialog is-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeDialogTitle}
+        >
           <button
             className="detail-module-backdrop"
             type="button"
@@ -796,11 +878,23 @@ export function AccountPanel() {
               <form className="stacked-form" onSubmit={setPin} noValidate>
                 <label>
                   <span>当前密码</span>
-                  <input type="password" name="pinPassword" autoComplete="current-password" required />
+                  <input
+                    type="password"
+                    name="pinPassword"
+                    autoComplete="current-password"
+                    required
+                  />
                 </label>
                 <label>
                   <span>PIN</span>
-                  <input type="password" name="pin" inputMode="numeric" pattern="[0-9]{4,12}" autoComplete="off" required />
+                  <input
+                    type="password"
+                    name="pin"
+                    inputMode="numeric"
+                    pattern="[0-9]{4,12}"
+                    autoComplete="off"
+                    required
+                  />
                 </label>
                 <div className="form-actions">
                   <button className="primary-action" type="submit" disabled={isSettingPin}>
@@ -814,15 +908,32 @@ export function AccountPanel() {
               <form className="stacked-form" onSubmit={changePassword} noValidate>
                 <label>
                   <span>当前密码</span>
-                  <input type="password" name="currentPassword" autoComplete="current-password" required />
+                  <input
+                    type="password"
+                    name="currentPassword"
+                    autoComplete="current-password"
+                    required
+                  />
                 </label>
                 <label>
                   <span>新密码</span>
-                  <input type="password" name="nextPassword" autoComplete="new-password" minLength={8} required />
+                  <input
+                    type="password"
+                    name="nextPassword"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
                 </label>
                 <label>
                   <span>确认新密码</span>
-                  <input type="password" name="confirmPassword" autoComplete="new-password" minLength={8} required />
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
                 </label>
                 <div className="form-actions">
                   <button className="primary-action" type="submit" disabled={isChangingPassword}>
@@ -836,21 +947,38 @@ export function AccountPanel() {
               <form className="stacked-form" onSubmit={startServerRebind} noValidate>
                 <label>
                   <span>新的服务器 ID</span>
-                  <input type="text" name="serverId" maxLength={64} defaultValue={session.serverAccountName ?? ''} required />
+                  <input
+                    type="text"
+                    name="serverId"
+                    maxLength={64}
+                    defaultValue={session.serverAccountName ?? ''}
+                    required
+                  />
                 </label>
                 {serverRebindChallenge ? (
                   <div className="flow-notice" role="status" aria-live="polite">
                     <strong>{serverRebindChallenge.code}</strong>
-                    <span>请在服务器聊天中用 {serverRebindChallenge.serverId} 发送上面的验证码。</span>
+                    <span>
+                      请在服务器聊天中用 {serverRebindChallenge.serverId} 发送上面的验证码。
+                    </span>
                     <div className="form-actions">
-                      <button className="secondary-action" type="button" disabled={isCheckingServerRebind} onClick={() => void checkServerRebind()}>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        disabled={isCheckingServerRebind}
+                        onClick={() => void checkServerRebind()}
+                      >
                         {isCheckingServerRebind ? '检查中' : '我已发送，检查'}
                       </button>
                     </div>
                   </div>
                 ) : null}
                 <div className="form-actions">
-                  <button className="primary-action" type="submit" disabled={isStartingServerRebind}>
+                  <button
+                    className="primary-action"
+                    type="submit"
+                    disabled={isStartingServerRebind}
+                  >
                     {isStartingServerRebind ? '发送中' : '开始换绑'}
                   </button>
                 </div>
@@ -859,25 +987,46 @@ export function AccountPanel() {
 
             {activeDialog === 'deviceApprovals' ? (
               <section className="stacked-form" aria-label="新设备登录确认">
-                {isDeviceApprovalsLoading ? <p className="empty-note">正在读取新设备请求。</p> : null}
-                {!isDeviceApprovalsLoading && deviceApprovals.length === 0 ? <p className="empty-note">暂无待确认的新设备登录。</p> : null}
+                {isDeviceApprovalsLoading ? (
+                  <p className="empty-note">正在读取新设备请求。</p>
+                ) : null}
+                {!isDeviceApprovalsLoading && deviceApprovals.length === 0 ? (
+                  <p className="empty-note">暂无待确认的新设备登录。</p>
+                ) : null}
                 <div className="account-device-list">
                   {deviceApprovals.map((approval) => (
                     <article className="account-device-item" key={approval.id}>
                       <div>
-                        <strong>{approval.deviceLabel ?? formatDeviceSystem(approval.deviceSystem)}</strong>
+                        <strong>
+                          {approval.deviceLabel ?? formatDeviceSystem(approval.deviceSystem)}
+                        </strong>
                         <span>
-                          {formatDeviceSystem(approval.deviceSystem)} · IP {approval.ipAddress ?? '未知'} · 属地：
+                          {formatDeviceSystem(approval.deviceSystem)} · IP{' '}
+                          {approval.ipAddress ?? '未知'} · 属地：
                           {formatIpRegion(approval.ipRegion)}
                         </span>
-                        <span>发起时间：{new Date(approval.createdAt).toLocaleString('zh-CN')}</span>
-                        <span>有效期至：{new Date(approval.expiresAt).toLocaleString('zh-CN')}</span>
+                        <span>
+                          发起时间：{new Date(approval.createdAt).toLocaleString('zh-CN')}
+                        </span>
+                        <span>
+                          有效期至：{new Date(approval.expiresAt).toLocaleString('zh-CN')}
+                        </span>
                       </div>
                       <div className="form-actions compact-actions">
-                        <button className="secondary-action" type="button" disabled={resolvingApprovalId === approval.id} onClick={() => void resolveDeviceApproval(approval, 'reject')}>
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          disabled={resolvingApprovalId === approval.id}
+                          onClick={() => void resolveDeviceApproval(approval, 'reject')}
+                        >
                           拒绝
                         </button>
-                        <button className="primary-action" type="button" disabled={resolvingApprovalId === approval.id} onClick={() => void resolveDeviceApproval(approval, 'approve')}>
+                        <button
+                          className="primary-action"
+                          type="button"
+                          disabled={resolvingApprovalId === approval.id}
+                          onClick={() => void resolveDeviceApproval(approval, 'approve')}
+                        >
                           批准
                         </button>
                       </div>
@@ -888,16 +1037,20 @@ export function AccountPanel() {
             ) : null}
 
             {activeDialog === 'devices' ? (
-              <section className="stacked-form" aria-label="已绑定设备">
+              <section className="stacked-form" aria-label="登录设备">
                 {isDevicesLoading ? <p className="empty-note">正在读取设备列表。</p> : null}
                 <div className="account-device-list">
                   {devices.map((device) => (
                     <article className="account-device-item" key={device.id}>
                       <div>
                         <strong>{device.label ?? formatDeviceSystem(device.system)}</strong>
-                        <span>{formatDeviceSystem(device.system)} · {device.revokedAt ? '已撤销' : `${device.activeSessionCount} 个活动会话`}</span>
                         <span>
-                          最近登录：IP {device.lastLoginIp ?? '未知'} · 属地：{formatIpRegion(device.lastLoginIpRegion)}
+                          {formatDeviceSystem(device.system)} ·{' '}
+                          {device.revokedAt ? '已下线' : `${device.activeSessionCount} 个活动会话`}
+                        </span>
+                        <span>
+                          最近登录：IP {device.lastLoginIp ?? '未知'} · 属地：
+                          {formatIpRegion(device.lastLoginIpRegion)}
                         </span>
                         <span>最近更新：{new Date(device.updatedAt).toLocaleString('zh-CN')}</span>
                       </div>
@@ -907,7 +1060,11 @@ export function AccountPanel() {
                         disabled={Boolean(device.revokedAt) || revokingDeviceId === device.id}
                         onClick={() => void revokeDevice(device)}
                       >
-                        {revokingDeviceId === device.id ? '撤销中' : device.revokedAt ? '已撤销' : '撤销'}
+                        {revokingDeviceId === device.id
+                          ? '下线中'
+                          : device.revokedAt
+                            ? '已下线'
+                            : '下线'}
                       </button>
                     </article>
                   ))}
@@ -919,7 +1076,13 @@ export function AccountPanel() {
               <form className="stacked-form" onSubmit={resubmitReviewInfo} noValidate>
                 <label>
                   <span>审核信息</span>
-                  <textarea name="reviewInfo" rows={5} maxLength={2000} defaultValue={session.reviewInfo ?? ''} required />
+                  <textarea
+                    name="reviewInfo"
+                    rows={5}
+                    maxLength={2000}
+                    defaultValue={session.reviewInfo ?? ''}
+                    required
+                  />
                 </label>
                 <div className="form-actions">
                   <button className="primary-action" type="submit" disabled={isResubmittingReview}>
@@ -960,7 +1123,7 @@ function getAccountDialogTitle(dialog: AccountDialog): string {
     pin: 'PIN',
     server: '服务器账号',
     deviceApprovals: '新设备确认',
-    devices: '已绑定设备',
+    devices: '登录设备',
     review: '审核信息',
     delete: '注销账户',
   };
@@ -1003,7 +1166,9 @@ function formatUserRole(role: NonNullable<SessionResponse['user']>['role']): str
   return labels[role];
 }
 
-function formatProviderAccountStatus(account: NonNullable<ProviderSessionResponse['providerAccount']>): string {
+function formatProviderAccountStatus(
+  account: NonNullable<ProviderSessionResponse['providerAccount']>,
+): string {
   const accountStatus = formatShortStatus(account.status);
   const providerStatus = formatShortStatus(account.providerStatus);
 
@@ -1032,7 +1197,8 @@ function formatInactiveAccountMessage(status: string): string {
     CodeRotated: '服务器验证码已更新，请使用最新验证码完成验证。',
     Verified: '服务器账号已验证，账户正在完成激活，请稍后刷新。',
     Approved: '账户已通过审核，正在完成激活，请稍后刷新。',
-    Suspended: '账户已被管理员封禁，暂不能使用卡包、设备设置和敏感操作。你仍可以退出登录或注销账户。',
+    Suspended:
+      '账户已被管理员封禁，暂不能使用卡包、设备设置和敏感操作。你仍可以退出登录或注销账户。',
     Deleted: '账户已被删除，暂不能继续使用。你可以退出登录或联系管理员确认处理结果。',
     Draft: '账户注册信息尚未提交完成。',
     Failed: '账户注册流程失败，请重新提交注册申请或联系管理员。',

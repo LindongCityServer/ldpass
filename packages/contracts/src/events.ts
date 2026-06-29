@@ -162,6 +162,31 @@ export interface DeviceBound extends BaseEvent {
   };
 }
 
+export interface LoginDeviceRecorded extends BaseEvent {
+  type: 'LoginDeviceRecorded';
+  payload: {
+    userId: string;
+    deviceId: string;
+    deviceSystem: DeviceSystem;
+    deviceLabel?: string;
+    lastLoginIp?: string;
+    lastLoginIpRegion?: IpRegion;
+    lastLoginAt: string;
+    isNew: boolean;
+    replacedDeviceId?: string;
+  };
+}
+
+export interface LoginDeviceSignedOut extends BaseEvent {
+  type: 'LoginDeviceSignedOut';
+  payload: {
+    userId: string;
+    deviceId: string;
+    reason: 'device_limit' | 'user_revoked' | 'admin_revoked';
+    replacedByDeviceId?: string;
+  };
+}
+
 export interface PinVerificationSucceeded extends BaseEvent {
   type: 'PinVerificationSucceeded';
   payload: {
@@ -1201,6 +1226,8 @@ export type DomainEvent =
   | DeviceLoginApprovalRejected
   | ServerAccountRebound
   | DeviceBound
+  | LoginDeviceRecorded
+  | LoginDeviceSignedOut
   | PinVerificationSucceeded
   | UserRegistered
   | UserLoggedIn

@@ -64,7 +64,10 @@ async function readJsonResponse<TResponse>(response: Response): Promise<TRespons
 
   const errorMessage = readErrorMessage(payload);
   if (response.status >= 500 && (!errorMessage || errorMessage === 'Internal server error')) {
-    throw new ApiClientError('服务器内部错误，请检查 API 进程和数据库连接。', response.status);
+    throw new ApiClientError(
+      '服务器内部错误，请检查 Next.js API Route 和数据库连接。',
+      response.status,
+    );
   }
 
   throw new ApiClientError(errorMessage ?? `请求失败：${response.status}`, response.status);

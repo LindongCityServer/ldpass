@@ -6,7 +6,7 @@ export class HealthController {
   check() {
     return {
       ok: true,
-      service: 'ldpass-api',
+      service: 'ldpass-next-api',
     };
   }
 }

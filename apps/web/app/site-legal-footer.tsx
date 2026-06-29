@@ -2,6 +2,8 @@ export function SiteLegalFooter() {
   return (
     <footer className="site-legal-footer">
       <span>本站部分代码使用人工智能技术生成，上述地名、组织名均为虚构</span>
+      <a href="/legal/terms">用户协议</a>
+      <a href="/legal/privacy">隐私政策</a>
       <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
         辽ICP备2021004959号-1
       </a>

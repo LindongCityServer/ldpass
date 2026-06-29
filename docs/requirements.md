@@ -200,8 +200,8 @@
 - 当前服务器聊天可通过 BDSLM WebChat 接口轮询获取，详见“8.4 服务器聊天验证接入”。
 - 第一阶段登录方式优先使用用户名，邮箱作为备选登录方式。
 - 用户实名与手机号验证不是第一阶段必需能力。
-- 需要支持设备绑定，用于登录安全、敏感操作确认和异常设备提醒。
-- 设备绑定上限按操作系统区分；一个用户在每种操作系统下最多绑定 2 台设备。
+- 需要支持登录设备管理，用于登录安全、敏感操作确认和异常设备提醒。
+- 登录设备上限按操作系统区分；一个用户在每种操作系统下最多保留 2 台活动登录设备，超出时自动下线同系统最早登录的设备。
 - 新设备登录需要通过服务器账户验证，或由已登录设备确认。
 - 服务器账户验证成功后允许换绑服务器 ID。
 - 服务器 ID 换绑后，该用户其余设备需要全部退出登录。
@@ -577,111 +577,112 @@ export interface BdslmPlayerMarker {
 
 ### 9.1 事件列表
 
-| 事件名                                  | 触发时机                               | 主要消费者                   |
-| --------------------------------------- | -------------------------------------- | ---------------------------- |
-| `UserRegistrationSubmitted`             | 用户提交注册申请                       | 管理员审核、审计、风控       |
-| `UserRegistrationApproved`              | 管理员审核通过注册申请                 | 通知、账户启用、审计         |
-| `UserRegistrationRejected`              | 管理员拒绝注册申请                     | 通知、审计                   |
-| `ServerVerificationCodeIssued`          | 服务器账户验证码生成                   | 审计、验证码展示             |
-| `ServerVerificationCodeRotated`         | 用户在服务器聊天输入其他内容或触发刷新 | 审计、验证码更新             |
-| `ServerAccountVerified`                 | 服务器账户验证成功                     | 账户启用、审计               |
-| `ServerAccountRebound`                  | 用户通过服务器账户验证换绑服务器 ID    | 审计、会话与设备治理         |
-| `DeviceLoginVerified`                   | 新设备登录通过服务器账户验证           | 审计、设备绑定               |
-| `DeviceLoginApprovalRequested`          | 新设备登录等待已登录设备确认           | 审计、账户安全提醒           |
-| `DeviceLoginApprovalApproved`           | 已登录设备批准新设备登录               | 审计、设备绑定               |
-| `DeviceLoginApprovalRejected`           | 已登录设备拒绝新设备登录               | 审计、风控                   |
-| `DeviceBound`                           | 用户绑定设备成功                       | 审计、风控                   |
-| `PinVerificationSucceeded`              | PIN 二次验证成功                       | 审计、敏感操作               |
-| `UserRegistered`                        | 用户账户正式可用                       | 审计、欢迎通知               |
-| `UserLoggedIn`                          | 用户登录成功                           | 审计、风控                   |
-| `UserAccountDeleted`                    | 用户主动注销账户或管理员删除账户       | 审计、会话清理               |
-| `UserSuspended`                         | 管理员封禁用户账户                     | 审计、会话清理、风控         |
-| `UserUnsuspended`                       | 管理员解除用户封禁                     | 审计、账户恢复               |
-| `UserDeletedByAdmin`                    | 管理员删除用户账户                     | 审计、会话清理、历史引用保留 |
-| `UserPreferencesUpdated`                | 用户修改账户偏好，例如过期提醒时间     | 审计、提醒调度               |
-| `CredentialChanged`                     | 用户自助修改密码/PIN 或管理员重置密码  | 审计、账户安全               |
-| `ProviderSubmitted`                     | 提供方提交或重新提交入驻申请           | 管理员审核、审计             |
-| `ProviderCreatedByAdmin`                | 管理员手动创建提供方                   | 审计、权限开通               |
-| `ProviderAccountCreated`                | 提供方入驻时创建负责人账号             | 审计、账号启用               |
-| `ProviderApproved`                      | 提供方审核通过                         | 通知、权限开通               |
-| `ProviderRejected`                      | 提供方审核拒绝                         | 通知、审计                   |
-| `ProviderSuspended`                     | 管理员停用提供方                       | 权限收回、审计               |
-| `ProviderUnsuspended`                   | 管理员恢复已停用提供方                 | 权限恢复、审计               |
-| `ProviderArchived`                      | 管理员归档提供方                       | 权限收回、凭据停用、审计     |
-| `ProviderLoggedIn`                      | 发卡方负责人登录成功                   | 审计、风控                   |
-| `ProviderProfileChangeSubmitted`        | 发卡方提交资料变更申请                 | 管理员审核、审计             |
-| `ProviderProfileChangeApproved`         | 管理员通过资料变更申请                 | 资料更新、审计               |
-| `ProviderProfileChangeRejected`         | 管理员拒绝资料变更申请                 | 审计、反馈                   |
-| `ProviderApiKeyCreateSubmitted`         | 发卡方提交 API 密钥创建申请            | 管理员审核、审计             |
-| `ProviderApiKeyCreateApproved`          | 管理员通过 API 密钥创建申请            | 创建密钥、审计               |
-| `ProviderApiKeyCreateRejected`          | 管理员拒绝 API 密钥创建申请            | 审计、反馈                   |
-| `ProviderApiKeyCreated`                 | 发卡方创建开放 API 密钥                | 审计、开放接入治理           |
-| `ProviderApiKeySecretClaimed`           | 发卡方一次性查看已通过申请的明文密钥   | 审计、密钥交付               |
-| `ProviderApiKeyRotated`                 | 发卡方轮换开放 API 密钥                | 审计、密钥泄漏响应           |
-| `ProviderApiKeyRevoked`                 | 发卡方停用开放 API 密钥                | 审计、权限收回               |
-| `ProviderWebhookEndpointCreateSubmitted` | 发卡方提交 Webhook 端点创建申请       | 管理员审核、审计             |
-| `ProviderWebhookEndpointCreateApproved` | 管理员通过 Webhook 端点创建申请        | 创建端点、审计               |
-| `ProviderWebhookEndpointCreateRejected` | 管理员拒绝 Webhook 端点创建申请        | 审计、反馈                   |
-| `ProviderWebhookChangeSubmitted`        | 发卡方提交 Webhook 配置变更申请        | 管理员审核、审计             |
-| `ProviderWebhookChangeApproved`         | 管理员通过 Webhook 配置变更申请        | 应用配置、审计               |
-| `ProviderWebhookChangeRejected`         | 管理员拒绝 Webhook 配置变更申请        | 审计、反馈                   |
-| `ProviderWebhookEndpointCreated`        | Webhook 回调端点正式创建               | 审计、开放接入治理           |
-| `ProviderWebhookSecretClaimed`          | 发卡方一次性查看已通过端点的签名密钥   | 审计、密钥交付               |
-| `ProviderWebhookEndpointUpdated`        | 管理员审批后应用 Webhook 回调端点修改  | 审计、开放接入治理           |
-| `ProviderWebhookSecretRotated`          | 管理员审批后轮换 Webhook 签名密钥      | 审计、密钥泄漏响应           |
-| `ProviderWebhookEndpointDeleted`        | 管理员审批后软删除 Webhook 回调端点    | 审计、权限收回               |
-| `ProviderWebhookDeliveryRetryRequested` | 发卡方手动重新排队 Webhook 投递        | 审计、开放接入治理           |
-| `ClientApplicationCreated`              | 管理员登记外部接入应用                 | 审计、开放接入治理           |
-| `ClientApplicationUpdated`              | 管理员修改外部接入应用白名单或启用状态 | 审计、开放接入治理           |
-| `PassTemplateCreated`                   | 卡券模板创建成功                       | 审计、审核队列               |
-| `PassTemplateUpdateSubmitted`           | 发卡方提交卡券模板新版本               | 审计、审核队列               |
-| `PassTemplateApproved`                  | 卡券模板审核通过                       | 通知、发放开关               |
-| `PassTemplateRejected`                  | 卡券模板或卡券信息审核拒绝             | 通知、审计                   |
-| `PassIssued`                            | 卡券发放成功                           | 通知、外部同步               |
-| `PassAddedToWallet`                     | 用户添加卡券成功                       | 审计、推荐排序               |
-| `AddPassTokenRevoked`                   | 领取码被撤销                           | 审计、外部同步               |
-| `AddPassTokenReissued`                  | 领取码作废并重发                       | 审计、外部同步               |
-| `WalletActionLinkCreated`               | 操作链接已生成                         | 审计、外部同步               |
-| `WalletActionLinkConsumed`              | 操作链接已被用户确认使用               | 审计、外部同步               |
-| `WalletActionLinkExpired`               | 操作链接已过期                         | 审计、外部同步               |
-| `WalletActionLinkRevoked`               | 操作链接被撤销                         | 审计、外部同步               |
-| `PassTransferRequested`                 | 用户发起卡券转赠                       | 审计、外部同步               |
-| `PassTransferAccepted`                  | 接收方接受卡券转赠                     | 审计、外部同步               |
-| `PassTransferRejected`                  | 接收方拒绝卡券转赠                     | 审计、外部同步               |
-| `PassTransferCancelled`                 | 发起方取消卡券转赠                     | 审计、外部同步               |
-| `PassOrderUpdated`                      | 用户调整钱包卡券顺序                   | 审计、排序同步               |
-| `PassBalanceChanged`                    | 卡券余额/权益变化                      | 记录、通知、风控             |
-| `PassTicketUpdateSubmitted`             | 发卡方提交票券字段变更申请             | 管理员审核、审计、外部同步   |
-| `PassTicketUpdateApproved`              | 管理员通过票券字段变更申请             | 审计、外部同步               |
-| `PassTicketUpdateRejected`              | 管理员拒绝票券字段变更申请             | 审计、外部同步               |
-| `PassTicketStatusUpdated`               | 票券字段审核通过并已写入卡券           | 用户展示、审计、外部同步     |
-| `PassExpirationReminderCreated`         | 系统为临期积分/次数卡券生成站内提醒    | 审计、提醒展示               |
-| `UserNotificationRead`                  | 用户将站内提醒标记为已读               | 审计、提醒状态               |
-| `AdminBalanceAdjustmentRequested`       | 管理员发起余额/权益调整                | 审批、审计                   |
-| `AdminBalanceAdjustmentApproved`        | 管理员调整审批通过                     | 执行调整、审计               |
-| `DisputeStatusChanged`                  | 争议状态变化                           | 审计、通知                   |
-| `ServerLocationVerified`                | 服务器位置范围核验成功                 | 核销、审计                   |
-| `PassUseRequested`                      | 用户或提供方发起使用请求               | 风控、核验                   |
-| `PassUseSucceeded`                      | 使用/核销成功                          | 记录、通知、外部同步         |
-| `PassUseReversed`                       | 已完成使用/核销被冲正                  | 审计、外部同步、争议处理     |
-| `PassUseFailed`                         | 使用/核销失败                          | 记录、告警、用户提示         |
-| `PassUseCancelled`                      | 提供方取消待确认核销                   | 审计、外部同步               |
-| `PassTopUpRequested`                    | 用户发起卡内额度补充请求               | 风控、核验                   |
-| `PassTopUpSucceeded`                    | 来源卡消耗并成功补充目标卡             | 记录、通知、外部同步         |
-| `PassTopUpFailed`                       | 卡内额度补充失败                       | 记录、用户提示               |
-| `PassTopUpExpired`                      | 等待验证的额度补充请求过期             | 审计、用户提示               |
-| `PassTopUpCancelled`                    | 用户取消等待验证的额度补充请求         | 审计、用户提示               |
-| `PassTopUpReversed`                     | 已完成额度补充被冲正                   | 审计、外部同步、争议处理     |
-| `AutoDeductionAuthorized`               | 用户授权自动扣减                       | 审计、提醒                   |
-| `AutoDeductionCancelled`                | 用户取消自动扣减                       | 审计、外部同步               |
-| `PassFrozen`                            | 卡券被冻结                             | 通知、风控                   |
-| `PassUnfrozen`                          | 卡券被解冻                             | 审计、恢复使用               |
-| `PassDeleted`                           | 用户删除或归档卡券                     | 审计、排序清理               |
-| `PlatformStatusUpdated`                 | 管理员更新全站公告或维护状态           | 审计、前端平台横幅刷新       |
-| `PlatformThemeScheduleUpdated`          | 管理员更新主题色自动切换计划           | 审计、前端配置刷新           |
-| `LegalDocumentUpdated`                  | 管理员更新服务条款或隐私政策           | 审计、公开协议页刷新         |
-| `StorageAlertRaised`                    | 系统检测到剩余存储空间低于阈值         | 管理员提醒、审计             |
-| `StorageAlertResolved`                  | 系统检测到活动存储告警已恢复           | 管理员提醒、审计             |
+| 事件名                                   | 触发时机                               | 主要消费者                   |
+| ---------------------------------------- | -------------------------------------- | ---------------------------- |
+| `UserRegistrationSubmitted`              | 用户提交注册申请                       | 管理员审核、审计、风控       |
+| `UserRegistrationApproved`               | 管理员审核通过注册申请                 | 通知、账户启用、审计         |
+| `UserRegistrationRejected`               | 管理员拒绝注册申请                     | 通知、审计                   |
+| `ServerVerificationCodeIssued`           | 服务器账户验证码生成                   | 审计、验证码展示             |
+| `ServerVerificationCodeRotated`          | 用户在服务器聊天输入其他内容或触发刷新 | 审计、验证码更新             |
+| `ServerAccountVerified`                  | 服务器账户验证成功                     | 账户启用、审计               |
+| `ServerAccountRebound`                   | 用户通过服务器账户验证换绑服务器 ID    | 审计、会话与设备治理         |
+| `DeviceLoginVerified`                    | 新设备登录通过服务器账户验证           | 审计、新设备登录确认         |
+| `DeviceLoginApprovalRequested`           | 新设备登录等待已登录设备确认           | 审计、账户安全提醒           |
+| `DeviceLoginApprovalApproved`            | 已登录设备批准新设备登录               | 审计、新设备登录确认         |
+| `DeviceLoginApprovalRejected`            | 已登录设备拒绝新设备登录               | 审计、风控                   |
+| `LoginDeviceRecorded`                    | 用户登录设备记录已更新                 | 审计、风控                   |
+| `LoginDeviceSignedOut`                   | 登录设备被用户或系统下线               | 审计、会话治理               |
+| `PinVerificationSucceeded`               | PIN 二次验证成功                       | 审计、敏感操作               |
+| `UserRegistered`                         | 用户账户正式可用                       | 审计、欢迎通知               |
+| `UserLoggedIn`                           | 用户登录成功                           | 审计、风控                   |
+| `UserAccountDeleted`                     | 用户主动注销账户或管理员删除账户       | 审计、会话清理               |
+| `UserSuspended`                          | 管理员封禁用户账户                     | 审计、会话清理、风控         |
+| `UserUnsuspended`                        | 管理员解除用户封禁                     | 审计、账户恢复               |
+| `UserDeletedByAdmin`                     | 管理员删除用户账户                     | 审计、会话清理、历史引用保留 |
+| `UserPreferencesUpdated`                 | 用户修改账户偏好，例如过期提醒时间     | 审计、提醒调度               |
+| `CredentialChanged`                      | 用户自助修改密码/PIN 或管理员重置密码  | 审计、账户安全               |
+| `ProviderSubmitted`                      | 提供方提交或重新提交入驻申请           | 管理员审核、审计             |
+| `ProviderCreatedByAdmin`                 | 管理员手动创建提供方                   | 审计、权限开通               |
+| `ProviderAccountCreated`                 | 提供方入驻时创建负责人账号             | 审计、账号启用               |
+| `ProviderApproved`                       | 提供方审核通过                         | 通知、权限开通               |
+| `ProviderRejected`                       | 提供方审核拒绝                         | 通知、审计                   |
+| `ProviderSuspended`                      | 管理员停用提供方                       | 权限收回、审计               |
+| `ProviderUnsuspended`                    | 管理员恢复已停用提供方                 | 权限恢复、审计               |
+| `ProviderArchived`                       | 管理员归档提供方                       | 权限收回、凭据停用、审计     |
+| `ProviderLoggedIn`                       | 发卡方负责人登录成功                   | 审计、风控                   |
+| `ProviderProfileChangeSubmitted`         | 发卡方提交资料变更申请                 | 管理员审核、审计             |
+| `ProviderProfileChangeApproved`          | 管理员通过资料变更申请                 | 资料更新、审计               |
+| `ProviderProfileChangeRejected`          | 管理员拒绝资料变更申请                 | 审计、反馈                   |
+| `ProviderApiKeyCreateSubmitted`          | 发卡方提交 API 密钥创建申请            | 管理员审核、审计             |
+| `ProviderApiKeyCreateApproved`           | 管理员通过 API 密钥创建申请            | 创建密钥、审计               |
+| `ProviderApiKeyCreateRejected`           | 管理员拒绝 API 密钥创建申请            | 审计、反馈                   |
+| `ProviderApiKeyCreated`                  | 发卡方创建开放 API 密钥                | 审计、开放接入治理           |
+| `ProviderApiKeySecretClaimed`            | 发卡方一次性查看已通过申请的明文密钥   | 审计、密钥交付               |
+| `ProviderApiKeyRotated`                  | 发卡方轮换开放 API 密钥                | 审计、密钥泄漏响应           |
+| `ProviderApiKeyRevoked`                  | 发卡方停用开放 API 密钥                | 审计、权限收回               |
+| `ProviderWebhookEndpointCreateSubmitted` | 发卡方提交 Webhook 端点创建申请        | 管理员审核、审计             |
+| `ProviderWebhookEndpointCreateApproved`  | 管理员通过 Webhook 端点创建申请        | 创建端点、审计               |
+| `ProviderWebhookEndpointCreateRejected`  | 管理员拒绝 Webhook 端点创建申请        | 审计、反馈                   |
+| `ProviderWebhookChangeSubmitted`         | 发卡方提交 Webhook 配置变更申请        | 管理员审核、审计             |
+| `ProviderWebhookChangeApproved`          | 管理员通过 Webhook 配置变更申请        | 应用配置、审计               |
+| `ProviderWebhookChangeRejected`          | 管理员拒绝 Webhook 配置变更申请        | 审计、反馈                   |
+| `ProviderWebhookEndpointCreated`         | Webhook 回调端点正式创建               | 审计、开放接入治理           |
+| `ProviderWebhookSecretClaimed`           | 发卡方一次性查看已通过端点的签名密钥   | 审计、密钥交付               |
+| `ProviderWebhookEndpointUpdated`         | 管理员审批后应用 Webhook 回调端点修改  | 审计、开放接入治理           |
+| `ProviderWebhookSecretRotated`           | 管理员审批后轮换 Webhook 签名密钥      | 审计、密钥泄漏响应           |
+| `ProviderWebhookEndpointDeleted`         | 管理员审批后软删除 Webhook 回调端点    | 审计、权限收回               |
+| `ProviderWebhookDeliveryRetryRequested`  | 发卡方手动重新排队 Webhook 投递        | 审计、开放接入治理           |
+| `ClientApplicationCreated`               | 管理员登记外部接入应用                 | 审计、开放接入治理           |
+| `ClientApplicationUpdated`               | 管理员修改外部接入应用白名单或启用状态 | 审计、开放接入治理           |
+| `PassTemplateCreated`                    | 卡券模板创建成功                       | 审计、审核队列               |
+| `PassTemplateUpdateSubmitted`            | 发卡方提交卡券模板新版本               | 审计、审核队列               |
+| `PassTemplateApproved`                   | 卡券模板审核通过                       | 通知、发放开关               |
+| `PassTemplateRejected`                   | 卡券模板或卡券信息审核拒绝             | 通知、审计                   |
+| `PassIssued`                             | 卡券发放成功                           | 通知、外部同步               |
+| `PassAddedToWallet`                      | 用户添加卡券成功                       | 审计、推荐排序               |
+| `AddPassTokenRevoked`                    | 领取码被撤销                           | 审计、外部同步               |
+| `AddPassTokenReissued`                   | 领取码作废并重发                       | 审计、外部同步               |
+| `WalletActionLinkCreated`                | 操作链接已生成                         | 审计、外部同步               |
+| `WalletActionLinkConsumed`               | 操作链接已被用户确认使用               | 审计、外部同步               |
+| `WalletActionLinkExpired`                | 操作链接已过期                         | 审计、外部同步               |
+| `WalletActionLinkRevoked`                | 操作链接被撤销                         | 审计、外部同步               |
+| `PassTransferRequested`                  | 用户发起卡券转赠                       | 审计、外部同步               |
+| `PassTransferAccepted`                   | 接收方接受卡券转赠                     | 审计、外部同步               |
+| `PassTransferRejected`                   | 接收方拒绝卡券转赠                     | 审计、外部同步               |
+| `PassTransferCancelled`                  | 发起方取消卡券转赠                     | 审计、外部同步               |
+| `PassOrderUpdated`                       | 用户调整钱包卡券顺序                   | 审计、排序同步               |
+| `PassBalanceChanged`                     | 卡券余额/权益变化                      | 记录、通知、风控             |
+| `PassTicketUpdateSubmitted`              | 发卡方提交票券字段变更申请             | 管理员审核、审计、外部同步   |
+| `PassTicketUpdateApproved`               | 管理员通过票券字段变更申请             | 审计、外部同步               |
+| `PassTicketUpdateRejected`               | 管理员拒绝票券字段变更申请             | 审计、外部同步               |
+| `PassTicketStatusUpdated`                | 票券字段审核通过并已写入卡券           | 用户展示、审计、外部同步     |
+| `PassExpirationReminderCreated`          | 系统为临期积分/次数卡券生成站内提醒    | 审计、提醒展示               |
+| `UserNotificationRead`                   | 用户将站内提醒标记为已读               | 审计、提醒状态               |
+| `AdminBalanceAdjustmentRequested`        | 管理员发起余额/权益调整                | 审批、审计                   |
+| `AdminBalanceAdjustmentApproved`         | 管理员调整审批通过                     | 执行调整、审计               |
+| `DisputeStatusChanged`                   | 争议状态变化                           | 审计、通知                   |
+| `ServerLocationVerified`                 | 服务器位置范围核验成功                 | 核销、审计                   |
+| `PassUseRequested`                       | 用户或提供方发起使用请求               | 风控、核验                   |
+| `PassUseSucceeded`                       | 使用/核销成功                          | 记录、通知、外部同步         |
+| `PassUseReversed`                        | 已完成使用/核销被冲正                  | 审计、外部同步、争议处理     |
+| `PassUseFailed`                          | 使用/核销失败                          | 记录、告警、用户提示         |
+| `PassUseCancelled`                       | 提供方取消待确认核销                   | 审计、外部同步               |
+| `PassTopUpRequested`                     | 用户发起卡内额度补充请求               | 风控、核验                   |
+| `PassTopUpSucceeded`                     | 来源卡消耗并成功补充目标卡             | 记录、通知、外部同步         |
+| `PassTopUpFailed`                        | 卡内额度补充失败                       | 记录、用户提示               |
+| `PassTopUpExpired`                       | 等待验证的额度补充请求过期             | 审计、用户提示               |
+| `PassTopUpCancelled`                     | 用户取消等待验证的额度补充请求         | 审计、用户提示               |
+| `PassTopUpReversed`                      | 已完成额度补充被冲正                   | 审计、外部同步、争议处理     |
+| `AutoDeductionAuthorized`                | 用户授权自动扣减                       | 审计、提醒                   |
+| `AutoDeductionCancelled`                 | 用户取消自动扣减                       | 审计、外部同步               |
+| `PassFrozen`                             | 卡券被冻结                             | 通知、风控                   |
+| `PassUnfrozen`                           | 卡券被解冻                             | 审计、恢复使用               |
+| `PassDeleted`                            | 用户删除或归档卡券                     | 审计、排序清理               |
+| `PlatformStatusUpdated`                  | 管理员更新全站公告或维护状态           | 审计、前端平台横幅刷新       |
+| `PlatformThemeScheduleUpdated`           | 管理员更新主题色自动切换计划           | 审计、前端配置刷新           |
+| `LegalDocumentUpdated`                   | 管理员更新服务条款或隐私政策           | 审计、公开协议页刷新         |
+| `StorageAlertRaised`                     | 系统检测到剩余存储空间低于阈值         | 管理员提醒、审计             |
+| `StorageAlertResolved`                   | 系统检测到活动存储告警已恢复           | 管理员提醒、审计             |
 
 ### 9.2 TypeScript Event Schema 草案
 
@@ -836,13 +837,28 @@ export interface DeviceLoginApprovalRejected extends BaseEvent {
   };
 }
 
-export interface DeviceBound extends BaseEvent {
-  type: 'DeviceBound';
+export interface LoginDeviceRecorded extends BaseEvent {
+  type: 'LoginDeviceRecorded';
   payload: {
     userId: string;
     deviceId: string;
+    deviceSystem: DeviceSystem;
     deviceLabel?: string;
-    trustedUntil?: string;
+    lastLoginIp?: string;
+    lastLoginIpRegion?: IpRegion;
+    lastLoginAt: string;
+    isNew: boolean;
+    replacedDeviceId?: string;
+  };
+}
+
+export interface LoginDeviceSignedOut extends BaseEvent {
+  type: 'LoginDeviceSignedOut';
+  payload: {
+    userId: string;
+    deviceId: string;
+    reason: 'device_limit' | 'user_revoked' | 'admin_revoked';
+    replacedByDeviceId?: string;
   };
 }
 
@@ -1674,7 +1690,7 @@ Created -> WaitingVerification -> Verified -> Processing -> Succeeded
 - 服务器账户验证需要限制生成验证码频率、失败次数和同一服务器 ID 的绑定次数。
 - PIN 不允许明文保存，必须使用适合密码/PIN 的哈希方案。
 - PIN 验证需要限制尝试次数、失败冷却和异常提醒。
-- 设备绑定需要可查看、可撤销，并记录首次绑定时间、最近使用时间和大致设备信息。
+- 登录设备需要可查看、可下线，并记录首次出现时间、最后登录时间、最后登录 IP、当时 IP 属地和大致设备信息。
 - 设备指纹只能作为辅助风控信号，不能作为唯一登录凭据。
 - 管理员操作必须审计。
 - 余额/权益调整、核销、管理员审批、卡券模板发布必须保留不可变审计记录。
@@ -1708,7 +1724,7 @@ Created -> WaitingVerification -> Verified -> Processing -> Succeeded
 - 页面文案避免让用户误以为临东通是支付机构或银行。
 - 所有“余额”需要在服务条款中说明其业务含义与适用范围。
 - 第一阶段需要提供服务条款和隐私政策框架；提供方协议先去掉，后续当发卡方责任、资质审核和违规处置规则稳定后再补。
-- 隐私政策需要说明注册 IP、IP 属地、设备绑定信息、服务器账户验证、服务器聊天验证、玩家位置范围核验等数据用途。
+- 隐私政策需要说明注册 IP、IP 属地、登录设备信息、服务器账户验证、服务器聊天验证、玩家位置范围核验等数据用途。
 - 服务条款需要说明临东通不接入真实支付通道，“余额/额度/积分/次数”属于平台内展示权益，不代表银行账户或清算资金。
 
 ### 11.5 多设备性能要求
@@ -1825,7 +1841,7 @@ Created -> WaitingVerification -> Verified -> Processing -> Succeeded
 建议组成：
 
 - 前端：Next.js App Router。
-- 后端：NestJS 模块化单体。
+- 后端：Next.js Route Handlers 内嵌后端业务模块，沿用 Nest application context、事件总线和 Prisma。
 - 数据库：SQLite 默认方案；后续规模扩大后可迁移 PostgreSQL。
 - ORM：Prisma。
 - 认证：优先评估 Better Auth；如果最终决定前后端强绑定在 Next.js 内，可评估 Auth.js。
@@ -1835,16 +1851,16 @@ Created -> WaitingVerification -> Verified -> Processing -> Succeeded
 - 部署：云服务器部署，目标系统为 Windows Server，目前通过宝塔面板管理各网站项目。
 - 进程形态：所有服务以宝塔面板 + Windows 原生进程方式部署，第一阶段不使用 Docker / Docker Compose。
 - 数据库：SQLite 文件先部署在同一台云服务器项目目录内。
-- 应用形态：从第一阶段开始保留独立 `apps/api`，避免后期再拆 API。
+- 应用形态：从第一阶段开始采用单 Next.js 主应用；`apps/api` 保留为后端业务模块边界，不作为独立 HTTP 服务启动。
 - 交付要求：需要提供详尽部署文档，包括环境变量、数据库迁移、反向代理、HTTPS、后台任务、PWA 配置和回滚方式。
 
 推荐理由：
 
 - 你熟悉 Node.js，TypeScript 生态学习成本最低。
 - Next.js 适合做用户端卡包这种需要首屏体验、路由拆包、图片/字体优化的 Web App。
-- NestJS 的模块、Provider、事件、队列、OpenAPI、鉴权、限流等能力更适合承载长期后端复杂度。
-- 登录验证需要复用给其他项目时，独立后端 Identity 模块比只写在前端框架内更稳。
-- 独立 `api` 应用有利于后续接入其他同二级域名项目、服务端任务和 BDSLM Adapter。
+- 后端模块继续保留 Provider、事件、鉴权、限流等边界，避免业务逻辑散落在页面组件或 Route Handler 中。
+- 登录验证需要复用给其他项目时，Identity 模块仍保持独立业务边界，只是由 Next.js API Route 统一承接 HTTP 入口。
+- `apps/api` 模块边界有利于后续接入其他同二级域名项目、服务端任务和 BDSLM Adapter；如果后台任务变重，再拆 worker 进程。
 - SQLite 不需要单独数据库服务，适合当前低并发、低存储空间的单机部署；卡券、流水、事件、审计模型仍保持 Prisma 关系建模，后续可迁移 PostgreSQL。
 - Prisma 可以把数据库模型、迁移和 TypeScript 类型串起来，减少手写 SQL 的低级错误。
 
@@ -1853,7 +1869,7 @@ Created -> WaitingVerification -> Verified -> Processing -> Succeeded
 ```text
 apps/
   web/              # Next.js 用户端、提供方后台、管理员后台
-  api/              # NestJS API 与后台任务入口
+  api/              # 后端业务模块，由 Next.js API Route 内嵌调用
   worker/           # 可选：后台任务、BDSLM 轮询、异步导出
 packages/
   contracts/        # 事件 Schema、DTO、错误码、权限常量
@@ -1867,7 +1883,7 @@ packages/
 
 - Windows Server 系统依赖、Node.js LTS、pnpm、SQLite 文件权限。
 - 宝塔面板下站点、进程守护、反向代理、日志路径的配置方式。
-- `apps/web`、`apps/api`、后台任务进程的启动方式。
+- `apps/web` 单进程启动方式，以及后续可选 worker 进程的拆分条件。
 - Windows 原生进程守护与开机自启配置。
 - 宝塔面板下的 Nginx 反向代理配置。
 - HTTPS 证书申请与续期。
@@ -1880,34 +1896,32 @@ packages/
 - Android WebView 114、Safari 17 兼容注意事项。
 - 常见故障排查和回滚步骤。
 
-### 15.2 备选方案 A：Next.js 全栈单体
+### 15.2 当前方案：Next.js 全栈单体
 
 组成：
 
 - Next.js App Router
-- Route Handlers / Server Functions
+- Route Handlers
+- 内嵌后端业务模块
 - SQLite + Prisma
-- Auth.js 或 Better Auth
 
 优点：
 
-- 启动最快，项目结构少。
-- 对小团队和早期原型非常友好。
-- 用户端页面和接口可以放在同一个项目里。
+- 部署路径更短，页面和接口同源，不再需要单独 API 端口、CORS 和 PM2/NSSM 双进程配置。
+- 用户端、提供方后台、管理员后台和 `/api/*` 都在同一个 Next.js 主应用内。
+- 后端业务仍通过 `apps/api` 模块、事件总线和 Prisma 保持边界，不让页面直接改业务表。
 
 风险：
 
-- 登录验证要给其他项目复用时，边界容易变模糊。
-- 提供方后台、管理员后台、外部接入、异步任务变多后，业务逻辑可能散落在路由层。
-- 如果不强制模块边界，很容易出现页面直接改业务表、跨模块互相调用的问题。
+- Route Handler 不能直接承载业务逻辑，否则会重新变成页面和接口耦合。
+- Webhook、过期扫描、BDSLM 轮询等任务变重后，需要拆出 worker，避免长任务挤占请求路径。
+- 多实例部署时，内存事件总线和定时任务需要重新评估，必要时引入队列或数据库锁。
 
 适用条件：
 
-- 第一阶段只想快速做可点击原型和小规模 MVP。
-- 暂时不追求清晰的 API 服务边界。
-- 接受后续可能拆出 NestJS 或独立 API。
-
-当前项目不优先采用该方案，因为登录验证需要复用给同二级域名下的其他项目，并且你倾向从一开始就做独立 API。
+- 第一阶段优先降低部署复杂度。
+- 仍然坚持后端模块边界和事件驱动，不允许页面或 Route Handler 直接互相调用业务 Service。
+- 接受后续按负载拆出 worker，而不是一开始强制维护独立 API 进程。
 
 ### 15.3 备选方案 B：Vue / Nuxt + Node API
 
@@ -1947,7 +1961,7 @@ packages/
 
 - 用户名 + 密码登录。
 - 邮箱作为备选登录标识和找回入口。
-- 设备绑定。
+- 登录设备管理。
 - 敏感操作二次验证：服务器账户验证或 PIN。
 - 登录后回跳：`redirect_uri` + `state`。
 - 会话校验接口：其他项目可以检查当前用户是否已登录。
@@ -2026,8 +2040,8 @@ OAuth 2.0/2.1 更偏“授权委托”：一个应用拿到用户授权后，可
 - 登录方式优先选择用户名，邮箱作为备选登录标识。
 - 项目部署在三级域名上，当前接入项目共享同一个二级域名。
 - 第一阶段采用自定义登录回跳 + 会话校验，预留未来 OIDC 扩展。
-- 需要设备绑定。
-- 设备绑定上限按操作系统区分，每种操作系统最多绑定 2 台设备。
+- 需要登录设备管理。
+- 登录设备上限按操作系统区分，每种操作系统最多保留 2 台活动登录设备，超出时自动下线同系统最早登录的设备。
 - 新设备登录可以通过服务器账户验证或已登录设备验证。
 - 服务器账户验证成功后允许换绑，换绑后其余设备全部退出登录。
 - PIN 重置以服务器账户验证为主，允许管理员介入。
@@ -2140,7 +2154,7 @@ UI 与品牌：
 2. 存储空间不足提醒的阈值，例如剩余 5 GB、10 GB 或低于 15%。
 3. 卡面模板变体增删接口的权限范围、审批流程和默认初始变体。
 4. 管理员争议反转、管理员介入重置密码、异常账户处置的具体操作页面。
-5. Windows 原生进程守护工具选型，例如宝塔进程守护、NSSM、PM2 for Windows 或系统计划任务。
+5. Web 进程守护或平台托管方式选型，例如宝塔进程守护、NSSM、Windows 服务、系统计划任务或云平台 Next.js 托管。
 6. 管理员删除用户采用软删除还是硬删除；建议第一阶段软删除。
 7. 服务器聊天验证码前缀已采用 `LDPASS-`，用户需要在服务器聊天内发送完整验证码。
 8. 卡内额度补充是否第一阶段只允许同一用户持有的两张卡之间发生；建议先限制同一用户。
