@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 
 interface ClientApplication {
   id: string;
@@ -97,7 +98,10 @@ export function AdminClientApplicationsPanel() {
     }
   };
 
-  const updateApplication = async (event: FormEvent<HTMLFormElement>, application: ClientApplication) => {
+  const updateApplication = async (
+    event: FormEvent<HTMLFormElement>,
+    application: ClientApplication,
+  ) => {
     event.preventDefault();
     setUpdatingId(application.id);
     setMessage(null);
@@ -111,7 +115,10 @@ export function AdminClientApplicationsPanel() {
     };
 
     try {
-      const result = await postJson<ClientApplicationResponse>(`/api/admin/client-applications/${application.id}`, payload);
+      const result = await postJson<ClientApplicationResponse>(
+        `/api/admin/client-applications/${application.id}`,
+        payload,
+      );
       setApplications((currentApplications) =>
         currentApplications.map((item) => (item.id === application.id ? result.application : item)),
       );
@@ -125,179 +132,277 @@ export function AdminClientApplicationsPanel() {
   };
 
   return (
-    <section className="admin-panel" aria-labelledby="client-applications-title">
-      <div className="admin-panel-heading">
-        <div>
-          <p>平台管理</p>
-          <h1 id="client-applications-title">客户端应用</h1>
-        </div>
+    <>
+      <BackofficeTopbarPageActions>
         <div className="admin-list-actions">
-          <button className="primary-action" type="button" onClick={() => setIsCreateDialogOpen(true)}>
+          <button
+            className="primary-action"
+            type="button"
+            onClick={() => setIsCreateDialogOpen(true)}
+            title="登记新应用"
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               add_link
             </span>
             <span>登记新应用</span>
           </button>
-          <button className="secondary-action" type="button" onClick={() => void loadApplications()}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => void loadApplications()}
+            title="刷新"
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               refresh
             </span>
             <span>刷新</span>
           </button>
-          <button className="secondary-action" type="button" onClick={() => exportApplicationsCsv(filteredApplications, setMessage)}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => exportApplicationsCsv(filteredApplications, setMessage)}
+            title="导出 CSV"
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               file_save
             </span>
             <span>导出 CSV</span>
           </button>
         </div>
-      </div>
-
-      {message ? (
-        <div className="flow-notice" role="status" aria-live="polite">
-          <span>{message}</span>
+      </BackofficeTopbarPageActions>
+      <section className="admin-panel" aria-labelledby="client-applications-title">
+        <div className="admin-panel-heading">
+          <div>
+            <p>平台管理</p>
+            <h1 id="client-applications-title">客户端应用</h1>
+          </div>
         </div>
-      ) : null}
 
-      <form className="audit-filter-grid" onSubmit={(event) => event.preventDefault()}>
-        <label>
-          <span>搜索应用</span>
-          <input
-            type="search"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="名称、client_id、回跳地址、来源"
-          />
-        </label>
-        <div className="audit-filter-actions">
-          <button className="secondary-action" type="button" onClick={() => void loadApplications()}>
-            刷新
-          </button>
-          <button className="secondary-action" type="button" onClick={() => setKeyword('')}>
-            重置
-          </button>
-        </div>
-      </form>
+        {message ? (
+          <div className="flow-notice" role="status" aria-live="polite">
+            <span>{message}</span>
+          </div>
+        ) : null}
 
-      {isLoading ? <p className="empty-note">正在读取客户端应用。</p> : null}
-      {!isLoading && filteredApplications.length === 0 ? <p className="empty-note">暂无匹配客户端应用。</p> : null}
+        <form className="audit-filter-grid" onSubmit={(event) => event.preventDefault()}>
+          <label>
+            <span>搜索应用</span>
+            <input
+              type="search"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="名称、client_id、回跳地址、来源"
+            />
+          </label>
+          <div className="audit-filter-actions">
+            <button
+              className="secondary-action"
+              type="button"
+              onClick={() => void loadApplications()}
+            >
+              刷新
+            </button>
+            <button className="secondary-action" type="button" onClick={() => setKeyword('')}>
+              重置
+            </button>
+          </div>
+        </form>
 
-      <div className="admin-list">
-        {filteredApplications.map((application) => (
-          <article className="admin-list-item" key={application.id}>
-            <div>
-              <h2>{application.name}</h2>
-              <p>
-                client_id：{application.clientId} · 状态：{application.enabled ? '已启用' : '已停用'} · 最近更新：
-                {new Date(application.updatedAt).toLocaleString('zh-CN')}
-              </p>
-              <p>回跳地址：{application.allowedRedirects.length} 个 · 允许来源：{application.allowedOrigins.length} 个</p>
-            </div>
-            <div className="admin-list-actions">
-              <a className="secondary-action" href={buildLoginExample(application)}>
-                登录页
-              </a>
-              <button className="secondary-action" type="button" onClick={() => setEditingApplication(application)}>
-                详情/编辑
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+        {isLoading ? <p className="empty-note">正在读取客户端应用。</p> : null}
+        {!isLoading && filteredApplications.length === 0 ? (
+          <p className="empty-note">暂无匹配客户端应用。</p>
+        ) : null}
 
-      {isCreateDialogOpen ? (
-        <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)} />
-          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="登记新应用">
-            <div className="admin-dialog-heading">
-              <h2>登记新应用</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)}>
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  close
-                </span>
-              </button>
-            </div>
-            <form className="admin-dialog-form" onSubmit={createApplication} noValidate>
-              <label>
-                <span>应用名称</span>
-                <input type="text" name="name" maxLength={80} required />
-              </label>
-              <label>
-                <span>client_id</span>
-                <input type="text" name="clientId" maxLength={80} required />
-              </label>
-              <label>
-                <span>允许回跳地址（每行一个完整 URL）</span>
-                <textarea name="allowedRedirects" rows={3} required />
-              </label>
-              <label>
-                <span>允许来源（每行一个 Origin 或完整 URL）</span>
-                <textarea name="allowedOrigins" rows={3} required />
-              </label>
-              <label className="inline-toggle">
-                <input type="checkbox" name="enabled" defaultChecked />
-                <span>启用</span>
-              </label>
-              <div className="admin-dialog-actions">
-                <button className="secondary-action" type="button" onClick={() => setIsCreateDialogOpen(false)}>
-                  取消
-                </button>
-                <button className="primary-action" type="submit" disabled={isCreating}>
-                  {isCreating ? '创建中' : '创建'}
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
-      ) : null}
-
-      {editingApplication ? (
-        <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setEditingApplication(null)} />
-          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="客户端应用详情">
-            <div className="admin-dialog-heading">
-              <h2>{editingApplication.name}</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setEditingApplication(null)}>
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  close
-                </span>
-              </button>
-            </div>
-            <form className="admin-dialog-form" onSubmit={(event) => void updateApplication(event, editingApplication)}>
+        <div className="admin-list">
+          {filteredApplications.map((application) => (
+            <article className="admin-list-item" key={application.id}>
               <div>
-                <p>client_id：{editingApplication.clientId}</p>
-                <p>登录入口：{buildLoginExample(editingApplication)}</p>
-                <p>会话校验：{buildSessionCheckEndpoint(editingApplication)}</p>
+                <h2>{application.name}</h2>
+                <p>
+                  client_id：{application.clientId} · 状态：
+                  {application.enabled ? '已启用' : '已停用'} · 最近更新：
+                  {new Date(application.updatedAt).toLocaleString('zh-CN')}
+                </p>
+                <p>
+                  回跳地址：{application.allowedRedirects.length} 个 · 允许来源：
+                  {application.allowedOrigins.length} 个
+                </p>
               </div>
-              <label>
-                <span>应用名称</span>
-                <input type="text" name="name" defaultValue={editingApplication.name} maxLength={80} required />
-              </label>
-              <label>
-                <span>允许回跳地址</span>
-                <textarea name="allowedRedirects" rows={3} defaultValue={joinLines(editingApplication.allowedRedirects)} required />
-              </label>
-              <label>
-                <span>允许来源</span>
-                <textarea name="allowedOrigins" rows={3} defaultValue={joinLines(editingApplication.allowedOrigins)} required />
-              </label>
-              <label className="inline-toggle">
-                <input type="checkbox" name="enabled" defaultChecked={editingApplication.enabled} />
-                <span>启用</span>
-              </label>
-              <div className="admin-dialog-actions">
-                <button className="secondary-action" type="button" onClick={() => setEditingApplication(null)}>
-                  取消
-                </button>
-                <button className="primary-action" type="submit" disabled={updatingId === editingApplication.id}>
-                  {updatingId === editingApplication.id ? '保存中' : '保存'}
+              <div className="admin-list-actions">
+                <a className="secondary-action" href={buildLoginExample(application)}>
+                  登录页
+                </a>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => setEditingApplication(application)}
+                >
+                  详情/编辑
                 </button>
               </div>
-            </form>
-          </section>
+            </article>
+          ))}
         </div>
-      ) : null}
-    </section>
+
+        {isCreateDialogOpen ? (
+          <div className="admin-dialog-layer">
+            <button
+              className="admin-dialog-scrim"
+              type="button"
+              aria-label="关闭弹窗"
+              onClick={() => setIsCreateDialogOpen(false)}
+            />
+            <section
+              className="admin-dialog-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-label="登记新应用"
+            >
+              <div className="admin-dialog-heading">
+                <h2>登记新应用</h2>
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="关闭弹窗"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+              </div>
+              <form className="admin-dialog-form" onSubmit={createApplication} noValidate>
+                <label>
+                  <span>应用名称</span>
+                  <input type="text" name="name" maxLength={80} required />
+                </label>
+                <label>
+                  <span>client_id</span>
+                  <input type="text" name="clientId" maxLength={80} required />
+                </label>
+                <label>
+                  <span>允许回跳地址（每行一个完整 URL）</span>
+                  <textarea name="allowedRedirects" rows={3} required />
+                </label>
+                <label>
+                  <span>允许来源（每行一个 Origin 或完整 URL）</span>
+                  <textarea name="allowedOrigins" rows={3} required />
+                </label>
+                <label className="inline-toggle">
+                  <input type="checkbox" name="enabled" defaultChecked />
+                  <span>启用</span>
+                </label>
+                <div className="admin-dialog-actions">
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                  >
+                    取消
+                  </button>
+                  <button className="primary-action" type="submit" disabled={isCreating}>
+                    {isCreating ? '创建中' : '创建'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
+        {editingApplication ? (
+          <div className="admin-dialog-layer">
+            <button
+              className="admin-dialog-scrim"
+              type="button"
+              aria-label="关闭弹窗"
+              onClick={() => setEditingApplication(null)}
+            />
+            <section
+              className="admin-dialog-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-label="客户端应用详情"
+            >
+              <div className="admin-dialog-heading">
+                <h2>{editingApplication.name}</h2>
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="关闭弹窗"
+                  onClick={() => setEditingApplication(null)}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+              </div>
+              <form
+                className="admin-dialog-form"
+                onSubmit={(event) => void updateApplication(event, editingApplication)}
+              >
+                <div>
+                  <p>client_id：{editingApplication.clientId}</p>
+                  <p>登录入口：{buildLoginExample(editingApplication)}</p>
+                  <p>会话校验：{buildSessionCheckEndpoint(editingApplication)}</p>
+                </div>
+                <label>
+                  <span>应用名称</span>
+                  <input
+                    type="text"
+                    name="name"
+                    defaultValue={editingApplication.name}
+                    maxLength={80}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>允许回跳地址</span>
+                  <textarea
+                    name="allowedRedirects"
+                    rows={3}
+                    defaultValue={joinLines(editingApplication.allowedRedirects)}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>允许来源</span>
+                  <textarea
+                    name="allowedOrigins"
+                    rows={3}
+                    defaultValue={joinLines(editingApplication.allowedOrigins)}
+                    required
+                  />
+                </label>
+                <label className="inline-toggle">
+                  <input
+                    type="checkbox"
+                    name="enabled"
+                    defaultChecked={editingApplication.enabled}
+                  />
+                  <span>启用</span>
+                </label>
+                <div className="admin-dialog-actions">
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => setEditingApplication(null)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="primary-action"
+                    type="submit"
+                    disabled={updatingId === editingApplication.id}
+                  >
+                    {updatingId === editingApplication.id ? '保存中' : '保存'}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
+      </section>
+    </>
   );
 }
 
@@ -321,7 +426,10 @@ function buildSessionCheckEndpoint(application: ClientApplication): string {
   return `/api/auth/client-session?client_id=${encodeURIComponent(application.clientId)}`;
 }
 
-function exportApplicationsCsv(applications: ClientApplication[], onMessage: (message: string) => void): void {
+function exportApplicationsCsv(
+  applications: ClientApplication[],
+  onMessage: (message: string) => void,
+): void {
   const rows = applications.map((application) => ({
     id: application.id,
     clientId: application.clientId,
@@ -342,7 +450,10 @@ function toCsv(rows: Array<Record<string, string>>): string {
   }
 
   const headers = Object.keys(rows[0] ?? {});
-  return [headers.join(','), ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(','))].join('\r\n');
+  return [
+    headers.join(','),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(',')),
+  ].join('\r\n');
 }
 
 function escapeCsvCell(value: string): string {

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { PlatformStatusBanner } from './platform-status-banner';
 import { ServiceWorkerRegistration } from './service-worker-registration';
 import { SiteLegalFooter } from './site-legal-footer';
+import { StaticAssetReloadGuard } from './static-asset-reload-guard';
 import { ThemeScript } from './theme-script';
 import './globals.css';
 
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
       </head>
       <body>
+        <StaticAssetReloadGuard />
         <ServiceWorkerRegistration />
         <PlatformStatusBanner />
         {children}

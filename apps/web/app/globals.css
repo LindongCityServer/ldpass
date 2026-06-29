@@ -205,7 +205,11 @@ textarea {
   font-family: 'Material Symbols Rounded';
   font-size: 24px;
   font-style: normal;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
   font-weight: 400;
   line-height: 1;
 }
@@ -215,7 +219,11 @@ textarea {
 .backoffice-mobile-nav a.is-active .material-symbols-rounded,
 .detail-action-grid button.is-active .material-symbols-rounded,
 .icon-button.is-active .material-symbols-rounded {
-  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 500,
+    'GRAD' 0,
+    'opsz' 24;
 }
 
 .site-legal-footer {
@@ -223,7 +231,8 @@ textarea {
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px 14px;
-  padding: 14px max(16px, env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  padding: 14px max(16px, env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
@@ -2761,8 +2770,84 @@ textarea {
 
 .backoffice-topbar-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
   gap: 8px;
+}
+
+.backoffice-page-actions,
+.backoffice-page-actions .admin-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  gap: 8px;
+  overflow: visible;
+}
+
+.backoffice-page-actions {
+  max-width: min(100%, 42rem);
+}
+
+.backoffice-page-actions-floating {
+  display: none;
+}
+
+.backoffice-page-actions .secondary-action,
+.backoffice-page-actions .danger-action {
+  position: relative;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.backoffice-page-actions .primary-action {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: white;
+}
+
+.backoffice-page-actions .secondary-action {
+  background: transparent;
+}
+
+.backoffice-page-actions .secondary-action:hover {
+  background: var(--surface-muted);
+}
+
+.backoffice-page-actions .primary-action:hover {
+  background: var(--brand-dark);
+}
+
+.backoffice-page-actions .material-symbols-rounded {
+  font-size: 21px;
+}
+
+.backoffice-page-actions .secondary-action > span:not(.material-symbols-rounded),
+.backoffice-page-actions .danger-action > span:not(.material-symbols-rounded) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .backoffice-body {
@@ -2921,9 +3006,9 @@ textarea {
   pointer-events: auto;
 }
 
-.backoffice-content > .admin-panel > .admin-panel-heading a.secondary-action[href^="/admin/"],
-.backoffice-content > .admin-panel > .admin-panel-heading > a.secondary-action[href^="/admin/"],
-.backoffice-content .detail-section-heading a.secondary-action[href^="/admin/"] {
+.backoffice-content > .admin-panel > .admin-panel-heading a.secondary-action[href^='/admin/'],
+.backoffice-content > .admin-panel > .admin-panel-heading > a.secondary-action[href^='/admin/'],
+.backoffice-content .detail-section-heading a.secondary-action[href^='/admin/'] {
   display: none;
 }
 
@@ -3812,7 +3897,6 @@ input[type='radio'] {
   }
 
   .backoffice-topbar.is-subpage .backoffice-brand,
-  .backoffice-topbar.is-subpage .backoffice-home-action,
   .backoffice-topbar.is-subpage .backoffice-title span {
     display: none;
   }
@@ -4100,6 +4184,55 @@ input[type='radio'] {
     display: none;
   }
 
+  .backoffice-page-actions-topbar {
+    display: none;
+  }
+
+  .backoffice-page-actions-floating {
+    display: flex;
+    position: fixed;
+    inset-inline-end: max(16px, env(safe-area-inset-right));
+    inset-block-end: max(16px, env(safe-area-inset-bottom));
+    z-index: 80;
+    max-width: min(320px, calc(100vw - 32px));
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: var(--chrome-surface);
+    box-shadow: var(--shadow);
+  }
+
+  .backoffice-page-actions .primary-action,
+  .backoffice-page-actions .secondary-action,
+  .backoffice-page-actions .danger-action {
+    position: relative;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+    display: inline-grid;
+    place-items: center;
+    gap: 0;
+    padding: 0;
+  }
+
+  .backoffice-page-actions .primary-action > span:not(.material-symbols-rounded),
+  .backoffice-page-actions .secondary-action > span:not(.material-symbols-rounded),
+  .backoffice-page-actions .danger-action > span:not(.material-symbols-rounded) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  .backoffice-content {
+    padding-block-end: max(112px, calc(96px + env(safe-area-inset-bottom)));
+  }
+
   .backoffice-mobile-nav {
     inset-block-start: 57px;
   }
@@ -4271,5 +4404,19 @@ input[type='radio'] {
 
   .location-rule-fields {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .backoffice-page-actions-floating {
+    inset-inline-end: max(12px, env(safe-area-inset-right));
+    inset-block-end: max(12px, env(safe-area-inset-bottom));
+    max-width: min(280px, calc(100vw - 24px));
+  }
+
+  .backoffice-page-actions,
+  .backoffice-page-actions .admin-list-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }

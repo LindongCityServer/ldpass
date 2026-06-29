@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getJson } from '../api-client';
+import { BackofficeTopbarPageActions } from '../backoffice-shell';
 
 interface AdminDashboardSummary {
   users: {
@@ -127,112 +128,129 @@ export function AdminDashboardPanel() {
   const pendingActionItems = actionItems.filter((item) => item.count > 0);
 
   return (
-    <section className="admin-panel admin-dashboard-panel" aria-labelledby="admin-dashboard-title">
-      <div className="admin-panel-heading">
-        <div>
-          <p>平台管理</p>
-          <h1 id="admin-dashboard-title">后台概览</h1>
-        </div>
+    <>
+      <BackofficeTopbarPageActions>
         <div className="admin-list-actions">
-          <button className="secondary-action" type="button" onClick={() => void loadSummary()}>
-            刷新
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => void loadSummary()}
+            title="刷新"
+          >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              refresh
+            </span>
+            <span>刷新</span>
           </button>
         </div>
-      </div>
-
-      {message ? (
-        <div className="flow-notice" role="status" aria-live="polite">
-          <span>{message}</span>
+      </BackofficeTopbarPageActions>
+      <section
+        className="admin-panel admin-dashboard-panel"
+        aria-labelledby="admin-dashboard-title"
+      >
+        <div className="admin-panel-heading">
+          <div>
+            <p>平台管理</p>
+            <h1 id="admin-dashboard-title">后台概览</h1>
+          </div>
         </div>
-      ) : null}
 
-      {isLoading ? <p className="empty-note">正在读取后台概览。</p> : null}
+        {message ? (
+          <div className="flow-notice" role="status" aria-live="polite">
+            <span>{message}</span>
+          </div>
+        ) : null}
 
-      {summary ? (
-        <>
-          <section className="admin-list-section" aria-labelledby="admin-dashboard-metrics-title">
-            <div className="detail-section-heading">
-              <h2 id="admin-dashboard-metrics-title">关键数字</h2>
-            </div>
-            <dl className="storage-stat-grid admin-dashboard-metric-grid">
-              <div>
-                <dt>可用用户</dt>
-                <dd>{summary.users.active}</dd>
-              </div>
-              <div>
-                <dt>封禁用户</dt>
-                <dd>{summary.users.suspended}</dd>
-              </div>
-              <div>
-                <dt>可用提供方</dt>
-                <dd>{summary.providers.active}</dd>
-              </div>
-              <div>
-                <dt>停用提供方</dt>
-                <dd>{summary.providers.suspended}</dd>
-              </div>
-              <div>
-                <dt>卡券总数</dt>
-                <dd>{summary.passes.total}</dd>
-              </div>
-              <div>
-                <dt>待领取卡券</dt>
-                <dd>{summary.passes.issued}</dd>
-              </div>
-              <div>
-                <dt>已添加/可用卡券</dt>
-                <dd>{summary.passes.added + summary.passes.active}</dd>
-              </div>
-              <div>
-                <dt>冻结卡券</dt>
-                <dd>{summary.passes.frozen}</dd>
-              </div>
-              <div>
-                <dt>有效领取码</dt>
-                <dd>{summary.operations.activeAddPassTokens}</dd>
-              </div>
-              <div>
-                <dt>有效操作链接</dt>
-                <dd>{summary.operations.activeActionLinks}</dd>
-              </div>
-            </dl>
-          </section>
+        {isLoading ? <p className="empty-note">正在读取后台概览。</p> : null}
 
-          <section className="admin-list-section" aria-labelledby="admin-dashboard-actions-title">
-            <div className="detail-section-heading">
-              <h2 id="admin-dashboard-actions-title">待办</h2>
-              <span>更新时间：{formatDateTime(summary.generatedAt)}</span>
-            </div>
-            {pendingActionItems.length === 0 ? (
-              <p className="empty-note">当前没有需要立即处理的待办。</p>
-            ) : (
-              <>
-                <div className="flow-notice" role="status">
-                  <span>有 {pendingActionItems.reduce((total, item) => total + item.count, 0)} 项待办需要处理。</span>
+        {summary ? (
+          <>
+            <section className="admin-list-section" aria-labelledby="admin-dashboard-metrics-title">
+              <div className="detail-section-heading">
+                <h2 id="admin-dashboard-metrics-title">关键数字</h2>
+              </div>
+              <dl className="storage-stat-grid admin-dashboard-metric-grid">
+                <div>
+                  <dt>可用用户</dt>
+                  <dd>{summary.users.active}</dd>
                 </div>
-                <div className="admin-list">
-                  {pendingActionItems.map((item) => (
-                    <article className="admin-list-item" key={item.label}>
-                      <div>
-                        <h2>{item.label}</h2>
-                        <p>{item.detail}</p>
-                      </div>
-                      <div className="admin-list-actions">
-                        <strong>{item.count}</strong>
-                        <a className="primary-action" href={item.href}>
-                          处理
-                        </a>
-                      </div>
-                    </article>
-                  ))}
+                <div>
+                  <dt>封禁用户</dt>
+                  <dd>{summary.users.suspended}</dd>
                 </div>
-              </>
-            )}
-          </section>
+                <div>
+                  <dt>可用提供方</dt>
+                  <dd>{summary.providers.active}</dd>
+                </div>
+                <div>
+                  <dt>停用提供方</dt>
+                  <dd>{summary.providers.suspended}</dd>
+                </div>
+                <div>
+                  <dt>卡券总数</dt>
+                  <dd>{summary.passes.total}</dd>
+                </div>
+                <div>
+                  <dt>待领取卡券</dt>
+                  <dd>{summary.passes.issued}</dd>
+                </div>
+                <div>
+                  <dt>已添加/可用卡券</dt>
+                  <dd>{summary.passes.added + summary.passes.active}</dd>
+                </div>
+                <div>
+                  <dt>冻结卡券</dt>
+                  <dd>{summary.passes.frozen}</dd>
+                </div>
+                <div>
+                  <dt>有效领取码</dt>
+                  <dd>{summary.operations.activeAddPassTokens}</dd>
+                </div>
+                <div>
+                  <dt>有效操作链接</dt>
+                  <dd>{summary.operations.activeActionLinks}</dd>
+                </div>
+              </dl>
+            </section>
 
-        </>
-      ) : null}
-    </section>
+            <section className="admin-list-section" aria-labelledby="admin-dashboard-actions-title">
+              <div className="detail-section-heading">
+                <h2 id="admin-dashboard-actions-title">待办</h2>
+                <span>更新时间：{formatDateTime(summary.generatedAt)}</span>
+              </div>
+              {pendingActionItems.length === 0 ? (
+                <p className="empty-note">当前没有需要立即处理的待办。</p>
+              ) : (
+                <>
+                  <div className="flow-notice" role="status">
+                    <span>
+                      有 {pendingActionItems.reduce((total, item) => total + item.count, 0)}{' '}
+                      项待办需要处理。
+                    </span>
+                  </div>
+                  <div className="admin-list">
+                    {pendingActionItems.map((item) => (
+                      <article className="admin-list-item" key={item.label}>
+                        <div>
+                          <h2>{item.label}</h2>
+                          <p>{item.detail}</p>
+                        </div>
+                        <div className="admin-list-actions">
+                          <strong>{item.count}</strong>
+                          <a className="primary-action" href={item.href}>
+                            处理
+                          </a>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
+          </>
+        ) : null}
+      </section>
+    </>
   );
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { brandAssets } from '@ldpass/ui';
 import { postJson } from './api-client';
@@ -50,9 +50,14 @@ interface BackofficeShellProps {
   kind: 'admin' | 'provider';
 }
 
+const BackofficeTopbarActionsContext = createContext<
+  React.Dispatch<React.SetStateAction<React.ReactNode>>
+>(() => undefined);
+
 export function BackofficeShell({ children, kind }: BackofficeShellProps) {
   const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
+  const [pageActions, setPageActions] = useState<React.ReactNode>(null);
   const isAdmin = kind === 'admin';
   const navItems = isAdmin ? adminNavItems : providerNavItems;
   const navGroups = isAdmin ? adminNavGroups : providerNavGroups;
@@ -91,14 +96,21 @@ export function BackofficeShell({ children, kind }: BackofficeShellProps) {
           <strong>{currentLabel}</strong>
         </div>
         <div className="backoffice-topbar-actions">
-          <a className="secondary-action backoffice-home-action" href={homeHref}>
-            <span className="material-symbols-rounded" aria-hidden="true">
-              home
-            </span>
-            <span>后台首页</span>
-          </a>
+          {pageActions ? (
+            <div
+              className="backoffice-page-actions backoffice-page-actions-topbar"
+              role="toolbar"
+              aria-label="页面操作"
+            >
+              {pageActions}
+            </div>
+          ) : null}
           {!isAdmin ? (
-            <button className="secondary-action" type="button" onClick={() => void logoutProvider()}>
+            <button
+              className="secondary-action"
+              type="button"
+              onClick={() => void logoutProvider()}
+            >
               <span className="material-symbols-rounded" aria-hidden="true">
                 logout
               </span>
@@ -108,6 +120,16 @@ export function BackofficeShell({ children, kind }: BackofficeShellProps) {
           <ThemeSettings />
         </div>
       </header>
+
+      {pageActions ? (
+        <div
+          className="backoffice-page-actions backoffice-page-actions-floating"
+          role="toolbar"
+          aria-label="页面操作"
+        >
+          {pageActions}
+        </div>
+      ) : null}
 
       <div className={`backoffice-body${isHomePage ? ' is-home' : ''}`}>
         <nav className="backoffice-nav" aria-label={title}>
@@ -155,13 +177,32 @@ export function BackofficeShell({ children, kind }: BackofficeShellProps) {
             ))}
           </nav>
         ) : null}
-        <div className="backoffice-content">{children}</div>
+        <BackofficeTopbarActionsContext.Provider value={setPageActions}>
+          <div className="backoffice-content">{children}</div>
+        </BackofficeTopbarActionsContext.Provider>
       </div>
     </main>
   );
 }
 
-function readCurrentLabel(pathname: string, navItems: typeof adminNavItems | typeof providerNavItems): string | null {
+export function BackofficeTopbarPageActions({ children }: Readonly<{ children: React.ReactNode }>) {
+  const setPageActions = useContext(BackofficeTopbarActionsContext);
+
+  useEffect(() => {
+    setPageActions(children);
+
+    return () => {
+      setPageActions(null);
+    };
+  }, [children, setPageActions]);
+
+  return null;
+}
+
+function readCurrentLabel(
+  pathname: string,
+  navItems: typeof adminNavItems | typeof providerNavItems,
+): string | null {
   const matchedItem = navItems
     .filter((item) => isActiveNavItem(pathname, item.href))
     .sort((first, second) => second.href.length - first.href.length)[0];

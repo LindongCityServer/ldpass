@@ -100,14 +100,6 @@ export function AdminLegalDocumentsPanel() {
           <p>平台管理</p>
           <h1 id="admin-legal-title">协议</h1>
         </div>
-        <div className="admin-list-actions">
-          <a className="secondary-action" href="/admin/audit">
-            审计记录
-          </a>
-          <a className="secondary-action" href="/admin/users">
-            用户审核
-          </a>
-        </div>
       </div>
 
       <div className="segmented-control legal-document-tabs" role="tablist" aria-label="协议文档">

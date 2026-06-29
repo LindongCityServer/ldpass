@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 
 interface PendingTemplate {
   versionId: string;
@@ -64,7 +65,10 @@ export function AdminPassTemplatesPanel() {
   const [activeTemplate, setActiveTemplate] = useState<PendingTemplate | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const allTemplates = useMemo(() => [...templates, ...approvedTemplates], [templates, approvedTemplates]);
+  const allTemplates = useMemo(
+    () => [...templates, ...approvedTemplates],
+    [templates, approvedTemplates],
+  );
   const templateGroups = useMemo(() => groupTemplates(allTemplates), [allTemplates]);
   const filteredTemplateGroups = useMemo(
     () =>
@@ -79,7 +83,11 @@ export function AdminPassTemplatesPanel() {
             group.category,
             group.benefitType,
             group.templateStatus,
-            ...group.versions.flatMap((template) => [template.title, template.status, String(template.version)]),
+            ...group.versions.flatMap((template) => [
+              template.title,
+              template.status,
+              String(template.version),
+            ]),
           ]
             .join(' ')
             .toLowerCase()
@@ -167,142 +175,187 @@ export function AdminPassTemplatesPanel() {
   };
 
   return (
-    <section className="admin-panel" aria-labelledby="admin-pass-templates-title">
-      <div className="admin-panel-heading">
-        <div>
-          <p>平台管理</p>
-          <h1 id="admin-pass-templates-title">卡面模板</h1>
-        </div>
+    <>
+      <BackofficeTopbarPageActions>
         <div className="admin-list-actions">
-          <button className="secondary-action" type="button" onClick={() => void loadTemplates()}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => void loadTemplates()}
+            title="刷新"
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               refresh
             </span>
             <span>刷新</span>
           </button>
-          <button className="secondary-action" type="button" onClick={exportTemplatesCsv}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={exportTemplatesCsv}
+            title="导出 CSV"
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               file_save
             </span>
             <span>导出 CSV</span>
           </button>
-          <a className="secondary-action" href="/admin/providers">
-            发卡方
-          </a>
-          <a className="secondary-action" href="/admin/card-template-variants">
-            模板变体
-          </a>
-          <a className="secondary-action" href="/admin/users">
-            用户审核
-          </a>
         </div>
-      </div>
-
-      {message ? (
-        <div className="flow-notice" role="status" aria-live="polite">
-          <span>{message}</span>
+      </BackofficeTopbarPageActions>
+      <section className="admin-panel" aria-labelledby="admin-pass-templates-title">
+        <div className="admin-panel-heading">
+          <div>
+            <p>平台管理</p>
+            <h1 id="admin-pass-templates-title">卡面模板</h1>
+          </div>
         </div>
-      ) : null}
 
-      <form className="audit-filter-grid" onSubmit={submitFilters}>
-        <label>
-          <span>搜索模板</span>
-          <input
-            type="search"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="名称、发卡方、标识、状态"
-          />
-        </label>
-        <label>
-          <span>分类</span>
-          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-            <option value="all">全部分类</option>
-            {Object.entries(categoryLabels).map(([value, label]) => (
-              <option value={value} key={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="audit-filter-actions">
-          <button className="secondary-action" type="button" onClick={() => void loadTemplates()}>
-            刷新
-          </button>
-          <button
-            className="secondary-action"
-            type="button"
-            onClick={() => {
-              setKeyword('');
-              setCategoryFilter('all');
-            }}
-          >
-            重置
-          </button>
-        </div>
-      </form>
+        {message ? (
+          <div className="flow-notice" role="status" aria-live="polite">
+            <span>{message}</span>
+          </div>
+        ) : null}
 
-      {isLoading ? <p className="empty-note">正在读取模板列表。</p> : null}
-      {!isLoading && filteredTemplateGroups.length === 0 ? <p className="empty-note">暂无匹配模板。</p> : null}
+        <form className="audit-filter-grid" onSubmit={submitFilters}>
+          <label>
+            <span>搜索模板</span>
+            <input
+              type="search"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="名称、发卡方、标识、状态"
+            />
+          </label>
+          <label>
+            <span>分类</span>
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+            >
+              <option value="all">全部分类</option>
+              {Object.entries(categoryLabels).map(([value, label]) => (
+                <option value={value} key={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="audit-filter-actions">
+            <button className="secondary-action" type="button" onClick={() => void loadTemplates()}>
+              刷新
+            </button>
+            <button
+              className="secondary-action"
+              type="button"
+              onClick={() => {
+                setKeyword('');
+                setCategoryFilter('all');
+              }}
+            >
+              重置
+            </button>
+          </div>
+        </form>
 
-      <div className="admin-list">
-        {filteredTemplateGroups.map((group) => {
-          const previewTemplate = group.versions[0];
+        {isLoading ? <p className="empty-note">正在读取模板列表。</p> : null}
+        {!isLoading && filteredTemplateGroups.length === 0 ? (
+          <p className="empty-note">暂无匹配模板。</p>
+        ) : null}
 
-          return (
-          <article className="admin-list-item admin-list-item-review" key={group.templateId}>
-            <div>
-              <h2>{group.displayName}</h2>
-              <p className="admin-meta-line">
-                <span>{group.provider.name}（{group.provider.slug}）</span>
-                <CategoryTag category={group.category} />
-                <span>{benefitLabels[group.benefitType] ?? group.benefitType}</span>
-                <span>{group.versions.length} 个版本</span>
-              </p>
-              {previewTemplate ? <TemplateReviewPreview template={previewTemplate} /> : null}
-              <div className="template-version-list" aria-label={`${group.displayName} 的版本`}>
-                {group.versions.map((template) => (
-                  <div className="template-version-row" key={template.versionId}>
-                    <div>
-                      <strong>v{template.version}</strong>
-                      <span>{template.title}</span>
-                      <small>{formatTemplateStatus(template.status)} · {formatDate(template.createdAt)}</small>
-                    </div>
-                    <div className="admin-list-actions">
-                      <button className="secondary-action" type="button" onClick={() => setActiveTemplate(template)}>
-                        详情
-                      </button>
-                      <button className="secondary-action" type="button" onClick={() => void rejectTemplate(template.versionId)}>
-                        {template.status === 'Approved' ? '打回' : '驳回'}
-                      </button>
-                      {template.status === 'PendingReview' ? (
-                        <button className="primary-action" type="button" onClick={() => void approveTemplate(template.versionId)}>
-                          <span className="material-symbols-rounded" aria-hidden="true">
-                            check
-                          </span>
-                          <span>批准</span>
-                        </button>
-                      ) : null}
-                    </div>
+        <div className="admin-list">
+          {filteredTemplateGroups.map((group) => {
+            const previewTemplate = group.versions[0];
+
+            return (
+              <article className="admin-list-item admin-list-item-review" key={group.templateId}>
+                <div>
+                  <h2>{group.displayName}</h2>
+                  <p className="admin-meta-line">
+                    <span>
+                      {group.provider.name}（{group.provider.slug}）
+                    </span>
+                    <CategoryTag category={group.category} />
+                    <span>{benefitLabels[group.benefitType] ?? group.benefitType}</span>
+                    <span>{group.versions.length} 个版本</span>
+                  </p>
+                  {previewTemplate ? <TemplateReviewPreview template={previewTemplate} /> : null}
+                  <div className="template-version-list" aria-label={`${group.displayName} 的版本`}>
+                    {group.versions.map((template) => (
+                      <div className="template-version-row" key={template.versionId}>
+                        <div>
+                          <strong>v{template.version}</strong>
+                          <span>{template.title}</span>
+                          <small>
+                            {formatTemplateStatus(template.status)} ·{' '}
+                            {formatDate(template.createdAt)}
+                          </small>
+                        </div>
+                        <div className="admin-list-actions">
+                          <button
+                            className="secondary-action"
+                            type="button"
+                            onClick={() => setActiveTemplate(template)}
+                          >
+                            详情
+                          </button>
+                          <button
+                            className="secondary-action"
+                            type="button"
+                            onClick={() => void rejectTemplate(template.versionId)}
+                          >
+                            {template.status === 'Approved' ? '打回' : '驳回'}
+                          </button>
+                          {template.status === 'PendingReview' ? (
+                            <button
+                              className="primary-action"
+                              type="button"
+                              onClick={() => void approveTemplate(template.versionId)}
+                            >
+                              <span className="material-symbols-rounded" aria-hidden="true">
+                                check
+                              </span>
+                              <span>批准</span>
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          </article>
-          );
-        })}
-      </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
 
-      {activeTemplate ? <TemplateDetailDialog template={activeTemplate} onClose={() => setActiveTemplate(null)} /> : null}
-    </section>
+        {activeTemplate ? (
+          <TemplateDetailDialog template={activeTemplate} onClose={() => setActiveTemplate(null)} />
+        ) : null}
+      </section>
+    </>
   );
 }
 
-function TemplateDetailDialog({ template, onClose }: { template: PendingTemplate; onClose: () => void }) {
+function TemplateDetailDialog({
+  template,
+  onClose,
+}: {
+  template: PendingTemplate;
+  onClose: () => void;
+}) {
   return (
     <div className="admin-dialog-layer">
-      <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={onClose} />
-      <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="卡面模板详情">
+      <button
+        className="admin-dialog-scrim"
+        type="button"
+        aria-label="关闭弹窗"
+        onClick={onClose}
+      />
+      <section
+        className="admin-dialog-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="卡面模板详情"
+      >
         <div className="admin-dialog-heading">
           <h2>{template.template.displayName}</h2>
           <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={onClose}>
@@ -399,7 +452,9 @@ function TemplateSemanticSummary({ template }: { template: PendingTemplate }) {
   return (
     <div className="template-semantic-summary" aria-label="模板规则摘要">
       <p className="audit-summary">规则：{summarizeTemplateRules(template.rules).join('；')}</p>
-      <p className="audit-summary">位置规则：{summarizeLocationRules(template.locationRules).join('；')}</p>
+      <p className="audit-summary">
+        位置规则：{summarizeLocationRules(template.locationRules).join('；')}
+      </p>
       <p className="audit-summary">样式：{summarizeCardStyle(template.cardStyle).join('；')}</p>
     </div>
   );
@@ -421,7 +476,10 @@ function TemplateReviewPreview({ template }: { template: PendingTemplate }) {
   };
 
   return (
-    <section className={`template-card-preview template-card-preview-${template.template.category}`} aria-label="卡面预览">
+    <section
+      className={`template-card-preview template-card-preview-${template.template.category}`}
+      aria-label="卡面预览"
+    >
       <div className="template-preview-pass" style={style}>
         <small>**** 5678</small>
       </div>
@@ -449,16 +507,26 @@ function summarizeTemplateRules(value: unknown): string[] {
     readBoolean(rules.allowFrozenBalance, true) ? '支持冻结余额' : '不支持冻结余额',
     readBoolean(rules.allowTopUpIn, false) ? '可被额度补充' : '不可被额度补充',
     readBoolean(rules.allowTopUpOut, false) ? '可作为补充来源' : '不可作为补充来源',
-    readBoolean(rules.requireServerVerifiedUser, false) ? '领取需服务器账号验证' : '领取不要求服务器账号验证',
-    readBoolean(rules.requireLocationVerification, false) ? '核验需要位置校验' : '核验不需要位置校验',
-    redemptionProviderCount > 0 ? `限定 ${redemptionProviderCount} 个核销提供方` : '不限制核销提供方',
+    readBoolean(rules.requireServerVerifiedUser, false)
+      ? '领取需服务器账号验证'
+      : '领取不要求服务器账号验证',
+    readBoolean(rules.requireLocationVerification, false)
+      ? '核验需要位置校验'
+      : '核验不需要位置校验',
+    redemptionProviderCount > 0
+      ? `限定 ${redemptionProviderCount} 个核销提供方`
+      : '不限制核销提供方',
     Number.isFinite(reminderDays) ? `默认提前 ${reminderDays} 天提醒过期` : '使用系统默认过期提醒',
   ];
 }
 
 function summarizeLocationRules(value: unknown): string[] {
   const container = asRecord(value);
-  const rawRules = Array.isArray(value) ? value : container && Array.isArray(container.rules) ? container.rules : [];
+  const rawRules = Array.isArray(value)
+    ? value
+    : container && Array.isArray(container.rules)
+      ? container.rules
+      : [];
 
   if (rawRules.length === 0) {
     return ['未启用位置规则'];
@@ -500,7 +568,9 @@ function summarizeCardStyle(value: unknown): string[] {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function readString(value: unknown): string {
@@ -516,7 +586,9 @@ function readNumber(value: unknown): number {
 }
 
 function readStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
 }
 
 function formatRuleNumber(value: unknown): string {
@@ -551,7 +623,10 @@ function toCsv(rows: Array<Record<string, string>>): string {
   }
 
   const headers = Object.keys(rows[0] ?? {});
-  return [headers.join(','), ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(','))].join('\r\n');
+  return [
+    headers.join(','),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(',')),
+  ].join('\r\n');
 }
 
 function escapeCsvCell(value: string): string {

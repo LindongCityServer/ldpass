@@ -3,7 +3,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { getJson, postJson } from '../../api-client';
 import type { AccentTone } from '../../theme-provider';
-import { cachePlatformThemeConfig, normalizePlatformThemeConfig, type PlatformThemeScheduleResponse } from '../../theme-config';
+import {
+  cachePlatformThemeConfig,
+  normalizePlatformThemeConfig,
+  type PlatformThemeScheduleResponse,
+} from '../../theme-config';
 
 interface EditableThemeEntry {
   effectiveAt: string;
@@ -32,12 +36,14 @@ export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } 
 
     try {
       const result = await getJson<PlatformThemeScheduleResponse>('/api/admin/theme/schedule');
-      setEntries(result.entries.map((entry) => ({
-        effectiveAt: formatUtc8DateTimeInput(new Date(entry.effectiveAt)),
-        tone: entry.tone,
-        enabled: entry.enabled,
-        note: entry.note ?? '',
-      })));
+      setEntries(
+        result.entries.map((entry) => ({
+          effectiveAt: formatUtc8DateTimeInput(new Date(entry.effectiveAt)),
+          tone: entry.tone,
+          enabled: entry.enabled,
+          note: entry.note ?? '',
+        })),
+      );
       cachePlatformThemeConfig(normalizePlatformThemeConfig(result));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '读取主题计划失败。');
@@ -51,13 +57,22 @@ export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } 
   }, []);
 
   const updateEntry = (index: number, patch: Partial<EditableThemeEntry>) => {
-    setEntries((currentEntries) => currentEntries.map((entry, entryIndex) => (entryIndex === index ? { ...entry, ...patch } : entry)));
+    setEntries((currentEntries) =>
+      currentEntries.map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, ...patch } : entry,
+      ),
+    );
   };
 
   const addEntry = () => {
     setEntries((currentEntries) => [
       ...currentEntries,
-      { effectiveAt: formatUtc8DateTimeInput(new Date(Date.now() + 60 * 60 * 1000)), tone: 'red', enabled: true, note: '' },
+      {
+        effectiveAt: formatUtc8DateTimeInput(new Date(Date.now() + 60 * 60 * 1000)),
+        tone: 'red',
+        enabled: true,
+        note: '',
+      },
     ]);
   };
 
@@ -79,12 +94,14 @@ export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } 
           note: entry.note.trim() || undefined,
         })),
       });
-      setEntries(result.entries.map((entry) => ({
-        effectiveAt: formatUtc8DateTimeInput(new Date(entry.effectiveAt)),
-        tone: entry.tone,
-        enabled: entry.enabled,
-        note: entry.note ?? '',
-      })));
+      setEntries(
+        result.entries.map((entry) => ({
+          effectiveAt: formatUtc8DateTimeInput(new Date(entry.effectiveAt)),
+          tone: entry.tone,
+          enabled: entry.enabled,
+          note: entry.note ?? '',
+        })),
+      );
       cachePlatformThemeConfig(normalizePlatformThemeConfig(result));
       setMessage('主题自动切换计划已保存。');
     } catch (error) {
@@ -95,16 +112,16 @@ export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } 
   };
 
   return (
-    <section className={embedded ? 'theme-schedule-embedded' : 'admin-panel'} aria-labelledby="theme-schedule-title">
+    <section
+      className={embedded ? 'theme-schedule-embedded' : 'admin-panel'}
+      aria-labelledby="theme-schedule-title"
+    >
       {!embedded ? (
         <div className="admin-panel-heading">
           <div>
             <p>平台管理</p>
             <h1 id="theme-schedule-title">主题计划</h1>
           </div>
-          <a className="secondary-action" href="/admin/users">
-            用户审核
-          </a>
         </div>
       ) : (
         <div className="detail-section-heading">
@@ -136,7 +153,12 @@ export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } 
               </label>
               <label>
                 <span>主题色</span>
-                <select value={entry.tone} onChange={(event) => updateEntry(index, { tone: event.target.value as AccentTone })}>
+                <select
+                  value={entry.tone}
+                  onChange={(event) =>
+                    updateEntry(index, { tone: event.target.value as AccentTone })
+                  }
+                >
                   {toneOptions.map((tone) => (
                     <option value={tone.value} key={tone.value}>
                       {tone.label}
@@ -161,7 +183,12 @@ export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } 
                   maxLength={120}
                 />
               </label>
-              <button className="secondary-action" type="button" onClick={() => removeEntry(index)} disabled={entries.length <= 1}>
+              <button
+                className="secondary-action"
+                type="button"
+                onClick={() => removeEntry(index)}
+                disabled={entries.length <= 1}
+              >
                 删除
               </button>
             </article>
@@ -169,7 +196,12 @@ export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } 
         </div>
 
         <div className="form-actions">
-          <button className="secondary-action" type="button" onClick={addEntry} disabled={entries.length >= 24}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={addEntry}
+            disabled={entries.length >= 24}
+          >
             添加时间段
           </button>
           <button className="primary-action" type="submit" disabled={isSubmitting}>

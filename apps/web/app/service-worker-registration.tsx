@@ -10,7 +10,8 @@ export function ServiceWorkerRegistration() {
 
     const register = async () => {
       try {
-        await navigator.serviceWorker.register('/sw.js');
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        await registration.update();
       } catch {
         // 不阻断主流程；离线能力不可用时，页面仍按普通 Web 应用运行。
       }

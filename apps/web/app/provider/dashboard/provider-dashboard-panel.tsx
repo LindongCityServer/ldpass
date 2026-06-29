@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 
 interface ProviderSessionResponse {
   providerAccount: {
@@ -64,9 +65,12 @@ interface ProviderProfileChangeResponse {
 }
 
 export function ProviderDashboardPanel() {
-  const [providerAccount, setProviderAccount] = useState<ProviderSessionResponse['providerAccount']>(null);
+  const [providerAccount, setProviderAccount] =
+    useState<ProviderSessionResponse['providerAccount']>(null);
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
-  const [profileChangeRequests, setProfileChangeRequests] = useState<ProviderProfileChangeRequest[]>([]);
+  const [profileChangeRequests, setProfileChangeRequests] = useState<
+    ProviderProfileChangeRequest[]
+  >([]);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingProfileChange, setIsSubmittingProfileChange] = useState(false);
@@ -107,7 +111,9 @@ export function ProviderDashboardPanel() {
 
   const loadProfileChangeRequests = async () => {
     try {
-      const result = await getJson<ProviderProfileChangeResponse>('/api/providers/profile-change-requests');
+      const result = await getJson<ProviderProfileChangeResponse>(
+        '/api/providers/profile-change-requests',
+      );
       setProviderProfile(result.provider);
       setProfileChangeRequests(result.requests);
     } catch (error) {
@@ -157,28 +163,31 @@ export function ProviderDashboardPanel() {
           businessInfo: providerAccount.providerBusinessInfo,
         }
       : null);
-  const pendingProfileChange = profileChangeRequests.find((request) => request.status === 'PendingReview');
+  const pendingProfileChange = profileChangeRequests.find(
+    (request) => request.status === 'PendingReview',
+  );
 
   return (
-    <section className="admin-panel provider-dashboard-panel" aria-labelledby="provider-dashboard-title">
+    <section
+      className="admin-panel provider-dashboard-panel"
+      aria-labelledby="provider-dashboard-title"
+    >
+      <BackofficeTopbarPageActions>
+        {!isLoading && !providerAccount ? (
+          <div className="admin-list-actions">
+            <a className="primary-action" href="/provider/login" title="登录">
+              <span className="material-symbols-rounded" aria-hidden="true">
+                login
+              </span>
+              <span>登录</span>
+            </a>
+          </div>
+        ) : null}
+      </BackofficeTopbarPageActions>
       <div className="admin-panel-heading">
         <div>
           <p>发卡方后台</p>
           <h1 id="provider-dashboard-title">工作台</h1>
-        </div>
-        <div className="admin-list-actions">
-          <a className="secondary-action" href="/provider/register">
-            入驻申请
-          </a>
-          {providerAccount ? (
-            <button className="secondary-action" type="button" onClick={() => void logout()}>
-              退出登录
-            </button>
-          ) : (
-            <a className="primary-action" href="/provider/login">
-              登录
-            </a>
-          )}
         </div>
       </div>
 
@@ -194,18 +203,30 @@ export function ProviderDashboardPanel() {
         <>
           <div className="account-summary provider-home-card">
             {effectiveProfile?.logoUrl ? (
-              <img className="avatar" src={effectiveProfile.logoUrl} alt="" width={48} height={48} />
+              <img
+                className="avatar"
+                src={effectiveProfile.logoUrl}
+                alt=""
+                width={48}
+                height={48}
+              />
             ) : (
               <span className="provider-home-avatar" aria-hidden="true" />
             )}
             <div className="provider-home-main">
               <h2>
                 {providerAccount.providerName}
-                <span className="admin-status-pill">{formatProviderStatus(providerAccount.providerStatus)}</span>
+                <span className="admin-status-pill">
+                  {formatProviderStatus(providerAccount.providerStatus)}
+                </span>
               </h2>
               <p>{providerAccount.providerSlug}</p>
               <div className="admin-list-actions">
-                <button className="secondary-action" type="button" onClick={() => setIsProfileDetailOpen(true)}>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => setIsProfileDetailOpen(true)}
+                >
                   详情
                 </button>
                 <button
@@ -269,7 +290,9 @@ export function ProviderDashboardPanel() {
             <article className="admin-list-item">
               <div>
                 <h2>开放 API</h2>
-                <p>创建 API 密钥并配置 Webhook 回调，让外部系统发放卡券、同步状态并接收异步事件。</p>
+                <p>
+                  创建 API 密钥并配置 Webhook 回调，让外部系统发放卡券、同步状态并接收异步事件。
+                </p>
               </div>
               <div className="admin-list-actions">
                 <a className="secondary-action" href="/provider/api-keys">
@@ -284,11 +307,26 @@ export function ProviderDashboardPanel() {
 
           {isProfileDetailOpen ? (
             <div className="admin-dialog-layer">
-              <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsProfileDetailOpen(false)} />
-              <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="发卡方详情">
+              <button
+                className="admin-dialog-scrim"
+                type="button"
+                aria-label="关闭弹窗"
+                onClick={() => setIsProfileDetailOpen(false)}
+              />
+              <section
+                className="admin-dialog-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-label="发卡方详情"
+              >
                 <div className="admin-dialog-heading">
                   <h2>发卡方详情</h2>
-                  <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsProfileDetailOpen(false)}>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label="关闭弹窗"
+                    onClick={() => setIsProfileDetailOpen(false)}
+                  >
                     <span className="material-symbols-rounded" aria-hidden="true">
                       close
                     </span>
@@ -309,11 +347,16 @@ export function ProviderDashboardPanel() {
                   </div>
                   <div>
                     <dt>负责人</dt>
-                    <dd>{providerAccount.displayName} · {providerAccount.email}</dd>
+                    <dd>
+                      {providerAccount.displayName} · {providerAccount.email}
+                    </dd>
                   </div>
                   <div>
                     <dt>联系人</dt>
-                    <dd>{effectiveProfile?.contactName ?? '未填写'} · {effectiveProfile?.contactEmail ?? '未填写'}</dd>
+                    <dd>
+                      {effectiveProfile?.contactName ?? '未填写'} ·{' '}
+                      {effectiveProfile?.contactEmail ?? '未填写'}
+                    </dd>
                   </div>
                   <div>
                     <dt>介绍链接</dt>
@@ -330,11 +373,26 @@ export function ProviderDashboardPanel() {
 
           {isProfileChangeDialogOpen && effectiveProfile ? (
             <div className="admin-dialog-layer">
-              <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsProfileChangeDialogOpen(false)} />
-              <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="资料变更申请">
+              <button
+                className="admin-dialog-scrim"
+                type="button"
+                aria-label="关闭弹窗"
+                onClick={() => setIsProfileChangeDialogOpen(false)}
+              />
+              <section
+                className="admin-dialog-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-label="资料变更申请"
+              >
                 <div className="admin-dialog-heading">
                   <h2>资料变更</h2>
-                  <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsProfileChangeDialogOpen(false)}>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label="关闭弹窗"
+                    onClick={() => setIsProfileChangeDialogOpen(false)}
+                  >
                     <span className="material-symbols-rounded" aria-hidden="true">
                       close
                     </span>
@@ -348,23 +406,52 @@ export function ProviderDashboardPanel() {
                 >
                   <label>
                     <span>提供方名称</span>
-                    <input name="name" defaultValue={effectiveProfile.name} required minLength={2} maxLength={80} />
+                    <input
+                      name="name"
+                      defaultValue={effectiveProfile.name}
+                      required
+                      minLength={2}
+                      maxLength={80}
+                    />
                   </label>
                   <label>
                     <span>头像图床链接</span>
-                    <input name="logoUrl" type="url" defaultValue={effectiveProfile.logoUrl ?? ''} placeholder="https://example.com/logo.png" maxLength={1000} />
+                    <input
+                      name="logoUrl"
+                      type="url"
+                      defaultValue={effectiveProfile.logoUrl ?? ''}
+                      placeholder="https://example.com/logo.png"
+                      maxLength={1000}
+                    />
                   </label>
                   <label>
                     <span>介绍链接</span>
-                    <input name="introductionUrl" type="url" defaultValue={effectiveProfile.introductionUrl ?? ''} placeholder="https://example.com/about" maxLength={1000} />
+                    <input
+                      name="introductionUrl"
+                      type="url"
+                      defaultValue={effectiveProfile.introductionUrl ?? ''}
+                      placeholder="https://example.com/about"
+                      maxLength={1000}
+                    />
                   </label>
                   <label>
                     <span>联系人</span>
-                    <input name="contactName" defaultValue={effectiveProfile.contactName ?? ''} required maxLength={80} />
+                    <input
+                      name="contactName"
+                      defaultValue={effectiveProfile.contactName ?? ''}
+                      required
+                      maxLength={80}
+                    />
                   </label>
                   <label>
                     <span>联系邮箱</span>
-                    <input name="contactEmail" type="email" defaultValue={effectiveProfile.contactEmail ?? ''} required maxLength={160} />
+                    <input
+                      name="contactEmail"
+                      type="email"
+                      defaultValue={effectiveProfile.contactEmail ?? ''}
+                      required
+                      maxLength={160}
+                    />
                   </label>
                   <label>
                     <span>变更原因</span>
@@ -372,13 +459,27 @@ export function ProviderDashboardPanel() {
                   </label>
                   <label>
                     <span>业务说明</span>
-                    <textarea name="businessInfo" defaultValue={effectiveProfile.businessInfo ?? ''} required minLength={10} maxLength={2000} />
+                    <textarea
+                      name="businessInfo"
+                      defaultValue={effectiveProfile.businessInfo ?? ''}
+                      required
+                      minLength={10}
+                      maxLength={2000}
+                    />
                   </label>
                   <div className="admin-dialog-actions">
-                    <button className="secondary-action" type="button" onClick={() => setIsProfileChangeDialogOpen(false)}>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      onClick={() => setIsProfileChangeDialogOpen(false)}
+                    >
                       取消
                     </button>
-                    <button className="primary-action" type="submit" disabled={isSubmittingProfileChange}>
+                    <button
+                      className="primary-action"
+                      type="submit"
+                      disabled={isSubmittingProfileChange}
+                    >
                       {isSubmittingProfileChange ? '提交中' : '提交审核'}
                     </button>
                   </div>

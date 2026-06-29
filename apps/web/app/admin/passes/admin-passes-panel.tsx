@@ -47,7 +47,17 @@ interface AdminTicketUpdateRequest {
   reason: string | null;
   reviewReason: string | null;
   createdAt: string;
-  pass: Pick<AdminPass, 'id' | 'displayName' | 'title' | 'category' | 'benefitType' | 'publicNumber' | 'maskedNumber' | 'user'>;
+  pass: Pick<
+    AdminPass,
+    | 'id'
+    | 'displayName'
+    | 'title'
+    | 'category'
+    | 'benefitType'
+    | 'publicNumber'
+    | 'maskedNumber'
+    | 'user'
+  >;
 }
 
 interface AdminPassesResponse {
@@ -352,7 +362,9 @@ export function AdminPassesPanel() {
       );
 
       setTicketUpdateRequests((currentRequests) =>
-        currentRequests.filter((currentRequest) => currentRequest.id !== result.ticketUpdateRequest.id),
+        currentRequests.filter(
+          (currentRequest) => currentRequest.id !== result.ticketUpdateRequest.id,
+        ),
       );
 
       if (result.pass) {
@@ -363,7 +375,13 @@ export function AdminPassesPanel() {
 
       setMessage(action === 'approve' ? '票券字段变更已通过并生效。' : '票券字段变更已拒绝。');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : action === 'approve' ? '通过票券字段变更失败。' : '拒绝票券字段变更失败。');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : action === 'approve'
+            ? '通过票券字段变更失败。'
+            : '拒绝票券字段变更失败。',
+      );
     } finally {
       setReviewingTicketUpdateId(null);
     }
@@ -428,14 +446,6 @@ export function AdminPassesPanel() {
           <p>平台管理</p>
           <h1 id="admin-passes-title">卡券列表</h1>
         </div>
-        <div className="admin-list-actions">
-          <a className="secondary-action" href="/admin/disputes">
-            争议处理
-          </a>
-          <a className="secondary-action" href="/admin/audit">
-            审计日志
-          </a>
-        </div>
       </div>
 
       {message ? (
@@ -445,13 +455,21 @@ export function AdminPassesPanel() {
       ) : null}
 
       <div className="segmented-control" role="tablist" aria-label="卡券管理视图">
-        <button className={activeView === 'passes' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('passes')}>
+        <button
+          className={activeView === 'passes' ? 'is-selected' : undefined}
+          type="button"
+          onClick={() => setActiveView('passes')}
+        >
           <span className="material-symbols-rounded" aria-hidden="true">
             cards
           </span>
           <span>卡券列表</span>
         </button>
-        <button className={activeView === 'tickets' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('tickets')}>
+        <button
+          className={activeView === 'tickets' ? 'is-selected' : undefined}
+          type="button"
+          onClick={() => setActiveView('tickets')}
+        >
           <span className="material-symbols-rounded" aria-hidden="true">
             confirmation_number
           </span>
@@ -470,7 +488,11 @@ export function AdminPassesPanel() {
             />
           </label>
           <div className="audit-filter-actions">
-            <button className="secondary-action" type="button" onClick={() => void loadPasses(keyword)}>
+            <button
+              className="secondary-action"
+              type="button"
+              onClick={() => void loadPasses(keyword)}
+            >
               刷新
             </button>
             <button
@@ -500,298 +522,325 @@ export function AdminPassesPanel() {
       ) : null}
 
       {activeView === 'tickets' ? (
-      <section className="admin-list-section" aria-labelledby="ticket-update-requests-title">
-        <div className="detail-section-heading">
-          <h2 id="ticket-update-requests-title">待审核票券变更</h2>
-          <span>{ticketUpdateRequests.length}</span>
-        </div>
-        <div className="admin-list-actions">
-          <button
-            className="secondary-action"
-            type="button"
-            disabled={isLoadingTicketUpdates}
-            onClick={() => void loadTicketUpdateRequests()}
-          >
-            {isLoadingTicketUpdates ? '刷新中' : '刷新票券变更'}
-          </button>
-        </div>
-        {isLoadingTicketUpdates ? <p className="empty-note">正在读取票券变更审核列表。</p> : null}
-        {!isLoadingTicketUpdates && ticketUpdateRequests.length === 0 ? (
-          <p className="empty-note">暂无待审核票券变更。</p>
-        ) : null}
-        <div className="admin-list">
-          {ticketUpdateRequests.map((request) => (
-            <article className="admin-list-item" key={request.id}>
-              <div>
-                <h2>{request.pass.displayName}</h2>
-                <p>
-                  {request.providerName} · {request.pass.title} ·{' '}
-                  {request.pass.maskedNumber ?? request.pass.publicNumber ?? request.pass.id}
-                </p>
-                <p>当前：{formatTicketSummary(request.currentTicketInfo)}</p>
-                <p>拟改：{formatTicketSummary(request.proposedTicketInfo)}</p>
-                <p>
-                  状态：{formatTicketStatus(request.proposedTicketInfo)} · 提交：
-                  {formatDate(request.createdAt)}
-                </p>
-                {request.reason ? <p>发卡方说明：{request.reason}</p> : null}
-              </div>
-              <div className="admin-list-actions">
-                <button
-                  className="secondary-action"
-                  type="button"
-                  disabled={reviewingTicketUpdateId === request.id}
-                  onClick={() => void reviewTicketUpdateRequest(request, 'reject')}
-                >
-                  拒绝
-                </button>
-                <button
-                  className="primary-action"
-                  type="button"
-                  disabled={reviewingTicketUpdateId === request.id}
-                  onClick={() => void reviewTicketUpdateRequest(request, 'approve')}
-                >
-                  <span className="material-symbols-rounded" aria-hidden="true">
-                    check
-                  </span>
-                  <span>{reviewingTicketUpdateId === request.id ? '处理中' : '通过'}</span>
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+        <section className="admin-list-section" aria-labelledby="ticket-update-requests-title">
+          <div className="detail-section-heading">
+            <h2 id="ticket-update-requests-title">待审核票券变更</h2>
+            <span>{ticketUpdateRequests.length}</span>
+          </div>
+          <div className="admin-list-actions">
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={isLoadingTicketUpdates}
+              onClick={() => void loadTicketUpdateRequests()}
+            >
+              {isLoadingTicketUpdates ? '刷新中' : '刷新票券变更'}
+            </button>
+          </div>
+          {isLoadingTicketUpdates ? <p className="empty-note">正在读取票券变更审核列表。</p> : null}
+          {!isLoadingTicketUpdates && ticketUpdateRequests.length === 0 ? (
+            <p className="empty-note">暂无待审核票券变更。</p>
+          ) : null}
+          <div className="admin-list">
+            {ticketUpdateRequests.map((request) => (
+              <article className="admin-list-item" key={request.id}>
+                <div>
+                  <h2>{request.pass.displayName}</h2>
+                  <p>
+                    {request.providerName} · {request.pass.title} ·{' '}
+                    {request.pass.maskedNumber ?? request.pass.publicNumber ?? request.pass.id}
+                  </p>
+                  <p>当前：{formatTicketSummary(request.currentTicketInfo)}</p>
+                  <p>拟改：{formatTicketSummary(request.proposedTicketInfo)}</p>
+                  <p>
+                    状态：{formatTicketStatus(request.proposedTicketInfo)} · 提交：
+                    {formatDate(request.createdAt)}
+                  </p>
+                  {request.reason ? <p>发卡方说明：{request.reason}</p> : null}
+                </div>
+                <div className="admin-list-actions">
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    disabled={reviewingTicketUpdateId === request.id}
+                    onClick={() => void reviewTicketUpdateRequest(request, 'reject')}
+                  >
+                    拒绝
+                  </button>
+                  <button
+                    className="primary-action"
+                    type="button"
+                    disabled={reviewingTicketUpdateId === request.id}
+                    onClick={() => void reviewTicketUpdateRequest(request, 'approve')}
+                  >
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      check
+                    </span>
+                    <span>{reviewingTicketUpdateId === request.id ? '处理中' : '通过'}</span>
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       {activeView === 'passes' ? (
-      <>
-      {selectedPass && activePassDialog ? (
-        <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setActivePassDialog(null)} />
-          <section className="admin-dialog-panel admin-pass-dialog-panel" role="dialog" aria-modal="true" aria-label="卡券详情">
-            <div className="admin-dialog-heading">
-              <h2>{readPassDialogTitle(activePassDialog, selectedPass)}</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setActivePassDialog(null)}>
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  close
-                </span>
-              </button>
-            </div>
-            {activePassDialog === 'detail' ? (
-              <PassDetail pass={selectedPass} />
-            ) : null}
-            {activePassDialog === 'adjust' ? (
-              <form className="admin-adjustment-panel" onSubmit={submitAdjustment}>
-            <div>
-              <p>正在调整</p>
-              <h2>{selectedPass.displayName}</h2>
-              <span>
-                {selectedPass.providerName} ·{' '}
-                {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
-              </span>
-            </div>
-            <strong>
-              {formatBenefitValue(selectedPass.balanceValue, selectedPass.benefitType)}
-            </strong>
-            <label>
-              <span>增减量</span>
-              <input
-                value={changeValue}
-                onChange={(event) => setChangeValue(event.target.value)}
-                placeholder="+30 或 -5"
-                required
-              />
-            </label>
-            <label>
-              <span>原因</span>
-              <input
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="补发活动权益"
-                required
-              />
-            </label>
-            <label>
-              <span>备注</span>
-              <input
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="可选"
-              />
-            </label>
-            <label>
-              <span>管理员 PIN</span>
-              <input
-                type="password"
-                value={adminPin}
-                onChange={(event) => setAdminPin(event.target.value)}
-                inputMode="numeric"
-                pattern="[0-9]{4,12}"
-                autoComplete="one-time-code"
-                required
-              />
-            </label>
-            <button className="primary-action" type="submit" disabled={isSubmitting}>
-              <span className="material-symbols-rounded" aria-hidden="true">
-                tune
-              </span>
-              <span>{isSubmitting ? '提交中' : '提交调整'}</span>
-            </button>
-          </form>
-            ) : null}
-            {activePassDialog === 'freeze' ? (
-          <div className="admin-adjustment-panel">
-            <div>
-              <p>状态操作</p>
-              <h2>{formatPassStatus(selectedPass.status)}</h2>
-              <span>冻结后发卡方不能对该卡券发起消耗请求。</span>
-            </div>
-            <label>
-              <span>原因</span>
-              <input
-                value={freezeReason}
-                onChange={(event) => setFreezeReason(event.target.value)}
-                placeholder="异常争议处理中"
-              />
-            </label>
-            <label>
-              <span>管理员 PIN</span>
-              <input
-                type="password"
-                value={freezePin}
-                onChange={(event) => setFreezePin(event.target.value)}
-                inputMode="numeric"
-                pattern="[0-9]{4,12}"
-                autoComplete="one-time-code"
-              />
-            </label>
-            {selectedPass.status === 'Frozen' ? (
+        <>
+          {selectedPass && activePassDialog ? (
+            <div className="admin-dialog-layer">
               <button
-                className="primary-action"
+                className="admin-dialog-scrim"
                 type="button"
-                disabled={isChangingFreezeStatus}
-                onClick={() => void changeFreezeStatus('unfreeze')}
+                aria-label="关闭弹窗"
+                onClick={() => setActivePassDialog(null)}
+              />
+              <section
+                className="admin-dialog-panel admin-pass-dialog-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-label="卡券详情"
               >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  lock_open
-                </span>
-                <span>{isChangingFreezeStatus ? '处理中' : '解冻卡券'}</span>
-              </button>
-            ) : (
-              <button
-                className="danger-action"
-                type="button"
-                disabled={isChangingFreezeStatus || selectedPass.status === 'Archived'}
-                onClick={() => void changeFreezeStatus('freeze')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  lock
-                </span>
-                <span>{isChangingFreezeStatus ? '处理中' : '冻结卡券'}</span>
-              </button>
-            )}
-          </div>
-            ) : null}
-            {activePassDialog === 'topUpReversal' ? (
-              <form className="admin-adjustment-panel top-up-reversal-panel" onSubmit={submitTopUpReversal}>
-                <div>
-                  <p>额度补充冲正</p>
-                  <h2>{selectedPass.displayName}</h2>
-                  <span>输入补充 ID，系统会按原始补充记录冲正对应卡券。</span>
+                <div className="admin-dialog-heading">
+                  <h2>{readPassDialogTitle(activePassDialog, selectedPass)}</h2>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label="关闭弹窗"
+                    onClick={() => setActivePassDialog(null)}
+                  >
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      close
+                    </span>
+                  </button>
                 </div>
-                <label>
-                  <span>补充 ID</span>
-                  <input
-                    value={topUpIdToReverse}
-                    onChange={(event) => setTopUpIdToReverse(event.target.value)}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    required
-                  />
-                </label>
-                <label>
-                  <span>原因</span>
-                  <input
-                    value={topUpReverseReason}
-                    onChange={(event) => setTopUpReverseReason(event.target.value)}
-                    placeholder="误补充或争议处理"
-                    required
-                  />
-                </label>
-                <label>
-                  <span>管理员 PIN</span>
-                  <input
-                    type="password"
-                    value={topUpReversePin}
-                    onChange={(event) => setTopUpReversePin(event.target.value)}
-                    inputMode="numeric"
-                    pattern="[0-9]{4,12}"
-                    autoComplete="one-time-code"
-                    required
-                  />
-                </label>
-                <button className="danger-action" type="submit" disabled={isReversingTopUp}>
-                  <span className="material-symbols-rounded" aria-hidden="true">
-                    undo
-                  </span>
-                  <span>{isReversingTopUp ? '处理中' : '冲正补充'}</span>
-                </button>
-              </form>
-            ) : null}
-          </section>
-        </div>
-      ) : null}
-
-      {isLoading ? <p className="empty-note">正在读取卡券列表。</p> : null}
-      {!isLoading && passes.length === 0 ? <p className="empty-note">暂无可调整的卡券。</p> : null}
-
-      <div className="admin-list">
-        {passes.map((pass) => (
-          <article
-            className={`admin-list-item${selectedPass?.id === pass.id ? ' is-selected' : ''}`}
-            key={pass.id}
-          >
-            <div>
-              <h2>{pass.displayName}</h2>
-              <p>
-                {pass.providerName} · {pass.title} · <CategoryText category={pass.category} /> · {formatPassStatus(pass.status)}
-              </p>
-              <p>
-                持有人：{pass.user ? `${pass.user.username} / ${pass.user.email}` : '尚未领取'} ·
-                编号：
-                {pass.maskedNumber ?? pass.publicNumber ?? '未设置'}
-              </p>
-              <p>
-                当前值：{formatBenefitValue(pass.balanceValue, pass.benefitType)} · 冻结值：
-                {formatBenefitValue(pass.frozenValue, pass.benefitType)}
-              </p>
+                {activePassDialog === 'detail' ? <PassDetail pass={selectedPass} /> : null}
+                {activePassDialog === 'adjust' ? (
+                  <form className="admin-adjustment-panel" onSubmit={submitAdjustment}>
+                    <div>
+                      <p>正在调整</p>
+                      <h2>{selectedPass.displayName}</h2>
+                      <span>
+                        {selectedPass.providerName} ·{' '}
+                        {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
+                      </span>
+                    </div>
+                    <strong>
+                      {formatBenefitValue(selectedPass.balanceValue, selectedPass.benefitType)}
+                    </strong>
+                    <label>
+                      <span>增减量</span>
+                      <input
+                        value={changeValue}
+                        onChange={(event) => setChangeValue(event.target.value)}
+                        placeholder="+30 或 -5"
+                        required
+                      />
+                    </label>
+                    <label>
+                      <span>原因</span>
+                      <input
+                        value={reason}
+                        onChange={(event) => setReason(event.target.value)}
+                        placeholder="补发活动权益"
+                        required
+                      />
+                    </label>
+                    <label>
+                      <span>备注</span>
+                      <input
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        placeholder="可选"
+                      />
+                    </label>
+                    <label>
+                      <span>管理员 PIN</span>
+                      <input
+                        type="password"
+                        value={adminPin}
+                        onChange={(event) => setAdminPin(event.target.value)}
+                        inputMode="numeric"
+                        pattern="[0-9]{4,12}"
+                        autoComplete="one-time-code"
+                        required
+                      />
+                    </label>
+                    <button className="primary-action" type="submit" disabled={isSubmitting}>
+                      <span className="material-symbols-rounded" aria-hidden="true">
+                        tune
+                      </span>
+                      <span>{isSubmitting ? '提交中' : '提交调整'}</span>
+                    </button>
+                  </form>
+                ) : null}
+                {activePassDialog === 'freeze' ? (
+                  <div className="admin-adjustment-panel">
+                    <div>
+                      <p>状态操作</p>
+                      <h2>{formatPassStatus(selectedPass.status)}</h2>
+                      <span>冻结后发卡方不能对该卡券发起消耗请求。</span>
+                    </div>
+                    <label>
+                      <span>原因</span>
+                      <input
+                        value={freezeReason}
+                        onChange={(event) => setFreezeReason(event.target.value)}
+                        placeholder="异常争议处理中"
+                      />
+                    </label>
+                    <label>
+                      <span>管理员 PIN</span>
+                      <input
+                        type="password"
+                        value={freezePin}
+                        onChange={(event) => setFreezePin(event.target.value)}
+                        inputMode="numeric"
+                        pattern="[0-9]{4,12}"
+                        autoComplete="one-time-code"
+                      />
+                    </label>
+                    {selectedPass.status === 'Frozen' ? (
+                      <button
+                        className="primary-action"
+                        type="button"
+                        disabled={isChangingFreezeStatus}
+                        onClick={() => void changeFreezeStatus('unfreeze')}
+                      >
+                        <span className="material-symbols-rounded" aria-hidden="true">
+                          lock_open
+                        </span>
+                        <span>{isChangingFreezeStatus ? '处理中' : '解冻卡券'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        className="danger-action"
+                        type="button"
+                        disabled={isChangingFreezeStatus || selectedPass.status === 'Archived'}
+                        onClick={() => void changeFreezeStatus('freeze')}
+                      >
+                        <span className="material-symbols-rounded" aria-hidden="true">
+                          lock
+                        </span>
+                        <span>{isChangingFreezeStatus ? '处理中' : '冻结卡券'}</span>
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+                {activePassDialog === 'topUpReversal' ? (
+                  <form
+                    className="admin-adjustment-panel top-up-reversal-panel"
+                    onSubmit={submitTopUpReversal}
+                  >
+                    <div>
+                      <p>额度补充冲正</p>
+                      <h2>{selectedPass.displayName}</h2>
+                      <span>输入补充 ID，系统会按原始补充记录冲正对应卡券。</span>
+                    </div>
+                    <label>
+                      <span>补充 ID</span>
+                      <input
+                        value={topUpIdToReverse}
+                        onChange={(event) => setTopUpIdToReverse(event.target.value)}
+                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        required
+                      />
+                    </label>
+                    <label>
+                      <span>原因</span>
+                      <input
+                        value={topUpReverseReason}
+                        onChange={(event) => setTopUpReverseReason(event.target.value)}
+                        placeholder="误补充或争议处理"
+                        required
+                      />
+                    </label>
+                    <label>
+                      <span>管理员 PIN</span>
+                      <input
+                        type="password"
+                        value={topUpReversePin}
+                        onChange={(event) => setTopUpReversePin(event.target.value)}
+                        inputMode="numeric"
+                        pattern="[0-9]{4,12}"
+                        autoComplete="one-time-code"
+                        required
+                      />
+                    </label>
+                    <button className="danger-action" type="submit" disabled={isReversingTopUp}>
+                      <span className="material-symbols-rounded" aria-hidden="true">
+                        undo
+                      </span>
+                      <span>{isReversingTopUp ? '处理中' : '冲正补充'}</span>
+                    </button>
+                  </form>
+                ) : null}
+              </section>
             </div>
-            <div className="admin-list-actions">
-              <button
-                className="secondary-action"
-                type="button"
-                onClick={() => openPassDialog(pass, 'detail')}
+          ) : null}
+
+          {isLoading ? <p className="empty-note">正在读取卡券列表。</p> : null}
+          {!isLoading && passes.length === 0 ? (
+            <p className="empty-note">暂无可调整的卡券。</p>
+          ) : null}
+
+          <div className="admin-list">
+            {passes.map((pass) => (
+              <article
+                className={`admin-list-item${selectedPass?.id === pass.id ? ' is-selected' : ''}`}
+                key={pass.id}
               >
-                详情
-              </button>
-              <button className="secondary-action" type="button" onClick={() => openPassDialog(pass, 'adjust')}>
-                调整余额
-              </button>
-              <button
-                className="secondary-action"
-                type="button"
-                disabled={pass.status === 'Archived'}
-                onClick={() => openPassDialog(pass, 'freeze')}
-              >
-                {pass.status === 'Frozen' ? '解冻' : '冻结'}
-              </button>
-              <button className="secondary-action danger-action" type="button" onClick={() => openPassDialog(pass, 'topUpReversal')}>
-                冲正
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-      </>
+                <div>
+                  <h2>{pass.displayName}</h2>
+                  <p>
+                    {pass.providerName} · {pass.title} · <CategoryText category={pass.category} /> ·{' '}
+                    {formatPassStatus(pass.status)}
+                  </p>
+                  <p>
+                    持有人：{pass.user ? `${pass.user.username} / ${pass.user.email}` : '尚未领取'}{' '}
+                    · 编号：
+                    {pass.maskedNumber ?? pass.publicNumber ?? '未设置'}
+                  </p>
+                  <p>
+                    当前值：{formatBenefitValue(pass.balanceValue, pass.benefitType)} · 冻结值：
+                    {formatBenefitValue(pass.frozenValue, pass.benefitType)}
+                  </p>
+                </div>
+                <div className="admin-list-actions">
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => openPassDialog(pass, 'detail')}
+                  >
+                    详情
+                  </button>
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => openPassDialog(pass, 'adjust')}
+                  >
+                    调整余额
+                  </button>
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    disabled={pass.status === 'Archived'}
+                    onClick={() => openPassDialog(pass, 'freeze')}
+                  >
+                    {pass.status === 'Frozen' ? '解冻' : '冻结'}
+                  </button>
+                  <button
+                    className="secondary-action danger-action"
+                    type="button"
+                    onClick={() => openPassDialog(pass, 'topUpReversal')}
+                  >
+                    冲正
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
       ) : null}
     </section>
   );

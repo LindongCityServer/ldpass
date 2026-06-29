@@ -3,7 +3,14 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { getJson } from '../../api-client';
 
-type DisputeStatus = 'Submitted' | 'InReview' | 'NeedMoreInfo' | 'Approved' | 'Rejected' | 'Reversed' | 'Closed';
+type DisputeStatus =
+  | 'Submitted'
+  | 'InReview'
+  | 'NeedMoreInfo'
+  | 'Approved'
+  | 'Rejected'
+  | 'Reversed'
+  | 'Closed';
 
 interface ProviderDispute {
   id: string;
@@ -56,7 +63,9 @@ export function ProviderDisputesPanel() {
     }
 
     try {
-      const result = await getJson<ProviderDisputesResponse>(`/api/provider/disputes?${search.toString()}`);
+      const result = await getJson<ProviderDisputesResponse>(
+        `/api/provider/disputes?${search.toString()}`,
+      );
       setDisputes(result.disputes);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '读取争议记录失败。');
@@ -81,15 +90,17 @@ export function ProviderDisputesPanel() {
           <p>发卡方后台</p>
           <h1 id="provider-disputes-title">争议记录</h1>
         </div>
-        <a className="secondary-action" href="/provider/passes">
-          卡券权益
-        </a>
       </div>
 
       <form className="audit-filter-grid" onSubmit={submitFilters}>
         <label>
           <span>状态</span>
-          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+          <select
+            value={filters.status}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, status: event.target.value }))
+            }
+          >
             <option value="">全部状态</option>
             <option value="Submitted">已提交</option>
             <option value="InReview">处理中</option>
@@ -104,12 +115,18 @@ export function ProviderDisputesPanel() {
           <span>搜索</span>
           <input
             value={filters.keyword}
-            onChange={(event) => setFilters((current) => ({ ...current, keyword: event.target.value }))}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, keyword: event.target.value }))
+            }
             placeholder="用户、卡号、原因"
           />
         </label>
         <div className="audit-filter-actions">
-          <button className="secondary-action" type="button" onClick={() => void loadDisputes(filters)}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => void loadDisputes(filters)}
+          >
             刷新
           </button>
           <button className="primary-action" type="submit">
@@ -128,7 +145,9 @@ export function ProviderDisputesPanel() {
       ) : null}
 
       {isLoading ? <p className="empty-note">正在读取争议记录。</p> : null}
-      {!isLoading && disputes.length === 0 ? <p className="empty-note">暂无匹配的争议记录。</p> : null}
+      {!isLoading && disputes.length === 0 ? (
+        <p className="empty-note">暂无匹配的争议记录。</p>
+      ) : null}
 
       <div className="admin-list">
         {disputes.map((dispute) => (
@@ -136,10 +155,18 @@ export function ProviderDisputesPanel() {
             <div>
               <h2>{formatDisputeStatus(dispute.status)}</h2>
               <p>{readDisputePassLabel(dispute)}</p>
-              <p>{dispute.user ? `${dispute.user.username} · ${dispute.user.email}` : '用户已删除或不可用'}</p>
-              <p>对象：{formatSubjectType(dispute.subjectType)} · {dispute.subjectId}</p>
+              <p>
+                {dispute.user
+                  ? `${dispute.user.username} · ${dispute.user.email}`
+                  : '用户已删除或不可用'}
+              </p>
+              <p>
+                对象：{formatSubjectType(dispute.subjectType)} · {dispute.subjectId}
+              </p>
               <p className="audit-summary">{dispute.reason}</p>
-              {dispute.resolutionNote ? <p className="audit-summary">处理备注：{dispute.resolutionNote}</p> : null}
+              {dispute.resolutionNote ? (
+                <p className="audit-summary">处理备注：{dispute.resolutionNote}</p>
+              ) : null}
               <p>{formatDate(dispute.updatedAt)}</p>
             </div>
           </article>

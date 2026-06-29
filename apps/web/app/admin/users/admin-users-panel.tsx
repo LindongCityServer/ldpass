@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 
 interface AdminUser {
   id: string;
@@ -39,7 +40,14 @@ interface GovernanceInput {
 
 type GovernanceAction = 'suspend' | 'unsuspend' | 'delete';
 type ReviewAction = 'approve' | 'reject';
-type UserStatusFilter = 'all' | 'PendingReview' | 'Active' | 'Suspended' | 'Deleted' | 'Rejected' | 'WaitingServerVerification';
+type UserStatusFilter =
+  | 'all'
+  | 'PendingReview'
+  | 'Active'
+  | 'Suspended'
+  | 'Deleted'
+  | 'Rejected'
+  | 'WaitingServerVerification';
 
 type UserDialog =
   | { kind: 'detail'; user: AdminUser }
@@ -71,7 +79,10 @@ export function AdminUsersPanel() {
   const [governanceActionKey, setGovernanceActionKey] = useState<string | null>(null);
   const [isExportingUsers, setIsExportingUsers] = useState(false);
 
-  const allUsers = useMemo(() => mergeUsers(pendingUsers, directoryUsers), [pendingUsers, directoryUsers]);
+  const allUsers = useMemo(
+    () => mergeUsers(pendingUsers, directoryUsers),
+    [pendingUsers, directoryUsers],
+  );
   const filteredUsers = useMemo(
     () => allUsers.filter((user) => statusFilter === 'all' || user.status === statusFilter),
     [allUsers, statusFilter],
@@ -176,7 +187,13 @@ export function AdminUsersPanel() {
       setReviewReason('');
       await refreshUsers();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : action === 'approve' ? '审核通过失败。' : '驳回注册失败。');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : action === 'approve'
+            ? '审核通过失败。'
+            : '驳回注册失败。',
+      );
     }
   };
 
@@ -291,175 +308,223 @@ export function AdminUsersPanel() {
   };
 
   return (
-    <section className="admin-panel" aria-labelledby="admin-users-title">
-      <div className="admin-panel-heading">
-        <div>
-          <p>平台管理</p>
-          <h1 id="admin-users-title">用户</h1>
-        </div>
+    <>
+      <BackofficeTopbarPageActions>
         <div className="admin-list-actions">
-          <button className="secondary-action" type="button" onClick={() => void refreshUsers()}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => void refreshUsers()}
+            title="刷新"
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               refresh
             </span>
             <span>刷新</span>
           </button>
-          <button className="secondary-action" type="button" disabled={isExportingUsers} onClick={() => void exportUsersCsv()}>
+          <button
+            className="secondary-action"
+            type="button"
+            disabled={isExportingUsers}
+            onClick={() => void exportUsersCsv()}
+            title={isExportingUsers ? '导出中' : '导出 CSV'}
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               file_save
             </span>
             <span>{isExportingUsers ? '导出中' : '导出 CSV'}</span>
           </button>
         </div>
-      </div>
-
-      {message ? (
-        <div className="flow-notice" role="status" aria-live="polite">
-          <span>{message}</span>
+      </BackofficeTopbarPageActions>
+      <section className="admin-panel" aria-labelledby="admin-users-title">
+        <div className="admin-panel-heading">
+          <div>
+            <p>平台管理</p>
+            <h1 id="admin-users-title">用户</h1>
+          </div>
         </div>
-      ) : null}
 
-      <form className="audit-filter-grid" onSubmit={submitDirectorySearch}>
-        <label>
-          <span>搜索用户</span>
-          <input
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="用户名、邮箱、服务器 ID"
-          />
-        </label>
-        <label>
-          <span>分类</span>
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UserStatusFilter)}>
-            {userStatusFilters.map((item) => (
-              <option value={item.value} key={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="audit-filter-actions">
-          <button className="primary-action" type="submit">
-            <span className="material-symbols-rounded" aria-hidden="true">
-              manage_search
-            </span>
-            <span>搜索</span>
-          </button>
-        </div>
-      </form>
+        {message ? (
+          <div className="flow-notice" role="status" aria-live="polite">
+            <span>{message}</span>
+          </div>
+        ) : null}
 
-      <section className="admin-list-section" aria-labelledby="admin-users-directory-title">
-        <div className="detail-section-heading">
-          <h2 id="admin-users-directory-title">用户列表</h2>
-          <span>{filteredUsers.length}</span>
-        </div>
-        {isLoading || isDirectoryLoading ? <p className="empty-note">正在读取用户列表。</p> : null}
-        {!isLoading && !isDirectoryLoading && filteredUsers.length === 0 ? <p className="empty-note">没有找到匹配用户。</p> : null}
-        <div className="admin-list">
-          {filteredUsers.map((user) => (
-            <article
-              className={`admin-list-item admin-user-row${activeDialog?.user.id === user.id ? ' is-selected' : ''}`}
-              key={user.id}
+        <form className="audit-filter-grid" onSubmit={submitDirectorySearch}>
+          <label>
+            <span>搜索用户</span>
+            <input
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="用户名、邮箱、服务器 ID"
+            />
+          </label>
+          <label>
+            <span>分类</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as UserStatusFilter)}
             >
-              <div className="admin-user-main">
-                <span className="admin-user-avatar" aria-hidden="true">
-                  {readUserInitial(user)}
-                </span>
-                <div>
-                  <h2>
-                    {user.username}
-                    <span className="admin-status-pill">{formatUserStatus(user.status)}</span>
-                  </h2>
-                  <p>{user.email}</p>
-                  <p>
-                    ID：{formatShortId(user.id)} · 角色：{user.role}
-                    {user.serverAccountName ? ` · 服务器 ID：${user.serverAccountName}` : ''}
-                  </p>
-                </div>
-              </div>
-              <div className="admin-list-actions">
-                <button className="secondary-action" type="button" onClick={() => setActiveDialog({ kind: 'detail', user })}>
-                  详情
-                </button>
-                {user.status === 'PendingReview' ? (
-                  <>
-                    <button
-                      className="secondary-action"
-                      type="button"
-                      onClick={() => {
-                        setReviewReason('');
-                        setActiveDialog({ kind: 'review', user, action: 'reject' });
-                      }}
-                    >
-                      驳回
-                    </button>
-                    <button
-                      className="primary-action"
-                      type="button"
-                      onClick={() => {
-                        setReviewReason('');
-                        setActiveDialog({ kind: 'review', user, action: 'approve' });
-                      }}
-                    >
-                      <span className="material-symbols-rounded" aria-hidden="true">
-                        check
-                      </span>
-                      <span>通过</span>
-                    </button>
-                  </>
-                ) : null}
-                {user.role === 'user' && user.status !== 'Deleted' ? (
-                  <>
-                    <button className="secondary-action" type="button" onClick={() => openPasswordDialog(user)}>
-                      重置密码
-                    </button>
-                    {user.status === 'Suspended' ? (
-                      <button className="secondary-action" type="button" onClick={() => openGovernanceDialog(user, 'unsuspend')}>
-                        解除封禁
-                      </button>
-                    ) : (
-                      <button className="secondary-action" type="button" onClick={() => openGovernanceDialog(user, 'suspend')}>
-                        封禁
-                      </button>
-                    )}
-                    <button className="danger-action" type="button" onClick={() => openGovernanceDialog(user, 'delete')}>
-                      注销
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+              {userStatusFilters.map((item) => (
+                <option value={item.value} key={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="audit-filter-actions">
+            <button className="primary-action" type="submit">
+              <span className="material-symbols-rounded" aria-hidden="true">
+                manage_search
+              </span>
+              <span>搜索</span>
+            </button>
+          </div>
+        </form>
 
-      {activeDialog ? (
-        <AdminUserDialog
-          dialog={activeDialog}
-          governanceInput={governanceInputs[activeDialog.user.id] ?? { reason: '', secondFactor: '', newPassword: '' }}
-          governanceActionKey={governanceActionKey}
-          reviewReason={reviewReason}
-          onClose={() => setActiveDialog(null)}
-          onGovernanceInputChange={(patch) => updateGovernanceInput(activeDialog.user.id, patch)}
-          onReviewReasonChange={setReviewReason}
-          onReviewSubmit={() => {
-            if (activeDialog.kind === 'review') {
-              void submitReview(activeDialog.user, activeDialog.action);
+        <section className="admin-list-section" aria-labelledby="admin-users-directory-title">
+          <div className="detail-section-heading">
+            <h2 id="admin-users-directory-title">用户列表</h2>
+            <span>{filteredUsers.length}</span>
+          </div>
+          {isLoading || isDirectoryLoading ? (
+            <p className="empty-note">正在读取用户列表。</p>
+          ) : null}
+          {!isLoading && !isDirectoryLoading && filteredUsers.length === 0 ? (
+            <p className="empty-note">没有找到匹配用户。</p>
+          ) : null}
+          <div className="admin-list">
+            {filteredUsers.map((user) => (
+              <article
+                className={`admin-list-item admin-user-row${activeDialog?.user.id === user.id ? ' is-selected' : ''}`}
+                key={user.id}
+              >
+                <div className="admin-user-main">
+                  <span className="admin-user-avatar" aria-hidden="true">
+                    {readUserInitial(user)}
+                  </span>
+                  <div>
+                    <h2>
+                      {user.username}
+                      <span className="admin-status-pill">{formatUserStatus(user.status)}</span>
+                    </h2>
+                    <p>{user.email}</p>
+                    <p>
+                      ID：{formatShortId(user.id)} · 角色：{user.role}
+                      {user.serverAccountName ? ` · 服务器 ID：${user.serverAccountName}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="admin-list-actions">
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => setActiveDialog({ kind: 'detail', user })}
+                  >
+                    详情
+                  </button>
+                  {user.status === 'PendingReview' ? (
+                    <>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => {
+                          setReviewReason('');
+                          setActiveDialog({ kind: 'review', user, action: 'reject' });
+                        }}
+                      >
+                        驳回
+                      </button>
+                      <button
+                        className="primary-action"
+                        type="button"
+                        onClick={() => {
+                          setReviewReason('');
+                          setActiveDialog({ kind: 'review', user, action: 'approve' });
+                        }}
+                      >
+                        <span className="material-symbols-rounded" aria-hidden="true">
+                          check
+                        </span>
+                        <span>通过</span>
+                      </button>
+                    </>
+                  ) : null}
+                  {user.role === 'user' && user.status !== 'Deleted' ? (
+                    <>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => openPasswordDialog(user)}
+                      >
+                        重置密码
+                      </button>
+                      {user.status === 'Suspended' ? (
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          onClick={() => openGovernanceDialog(user, 'unsuspend')}
+                        >
+                          解除封禁
+                        </button>
+                      ) : (
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          onClick={() => openGovernanceDialog(user, 'suspend')}
+                        >
+                          封禁
+                        </button>
+                      )}
+                      <button
+                        className="danger-action"
+                        type="button"
+                        onClick={() => openGovernanceDialog(user, 'delete')}
+                      >
+                        注销
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {activeDialog ? (
+          <AdminUserDialog
+            dialog={activeDialog}
+            governanceInput={
+              governanceInputs[activeDialog.user.id] ?? {
+                reason: '',
+                secondFactor: '',
+                newPassword: '',
+              }
             }
-          }}
-          onPasswordSubmit={() => {
-            if (activeDialog.kind === 'reset-password') {
-              void resetUserPassword(activeDialog.user);
-            }
-          }}
-          onGovernanceSubmit={() => {
-            if (activeDialog.kind === 'governance') {
-              void changeUserGovernance(activeDialog.user, activeDialog.action);
-            }
-          }}
-        />
-      ) : null}
-    </section>
+            governanceActionKey={governanceActionKey}
+            reviewReason={reviewReason}
+            onClose={() => setActiveDialog(null)}
+            onGovernanceInputChange={(patch) => updateGovernanceInput(activeDialog.user.id, patch)}
+            onReviewReasonChange={setReviewReason}
+            onReviewSubmit={() => {
+              if (activeDialog.kind === 'review') {
+                void submitReview(activeDialog.user, activeDialog.action);
+              }
+            }}
+            onPasswordSubmit={() => {
+              if (activeDialog.kind === 'reset-password') {
+                void resetUserPassword(activeDialog.user);
+              }
+            }}
+            onGovernanceSubmit={() => {
+              if (activeDialog.kind === 'governance') {
+                void changeUserGovernance(activeDialog.user, activeDialog.action);
+              }
+            }}
+          />
+        ) : null}
+      </section>
+    </>
   );
 }
 
@@ -492,7 +557,12 @@ function AdminUserDialog({
 
   return (
     <div className="admin-dialog-layer">
-      <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={onClose} />
+      <button
+        className="admin-dialog-scrim"
+        type="button"
+        aria-label="关闭弹窗"
+        onClick={onClose}
+      />
       <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label={title}>
         <div className="admin-dialog-heading">
           <h2>{title}</h2>
@@ -517,14 +587,21 @@ function AdminUserDialog({
             {dialog.action === 'reject' ? (
               <label>
                 <span>驳回原因</span>
-                <textarea value={reviewReason} onChange={(event) => onReviewReasonChange(event.target.value)} rows={4} />
+                <textarea
+                  value={reviewReason}
+                  onChange={(event) => onReviewReasonChange(event.target.value)}
+                  rows={4}
+                />
               </label>
             ) : null}
             <div className="admin-dialog-actions">
               <button className="secondary-action" type="button" onClick={onClose}>
                 取消
               </button>
-              <button className={dialog.action === 'approve' ? 'primary-action' : 'danger-action'} type="submit">
+              <button
+                className={dialog.action === 'approve' ? 'primary-action' : 'danger-action'}
+                type="submit"
+              >
                 {dialog.action === 'approve' ? '通过' : '驳回'}
               </button>
             </div>
@@ -552,7 +629,10 @@ function AdminUserDialog({
             </label>
             <label>
               <span>原因</span>
-              <input value={governanceInput.reason} onChange={(event) => onGovernanceInputChange({ reason: event.target.value })} />
+              <input
+                value={governanceInput.reason}
+                onChange={(event) => onGovernanceInputChange({ reason: event.target.value })}
+              />
             </label>
             <label>
               <span>管理员 PIN</span>
@@ -568,7 +648,11 @@ function AdminUserDialog({
               <button className="secondary-action" type="button" onClick={onClose}>
                 取消
               </button>
-              <button className="primary-action" type="submit" disabled={governanceActionKey === `${dialog.user.id}:password`}>
+              <button
+                className="primary-action"
+                type="submit"
+                disabled={governanceActionKey === `${dialog.user.id}:password`}
+              >
                 {governanceActionKey === `${dialog.user.id}:password` ? '重置中' : '确认'}
               </button>
             </div>
@@ -585,7 +669,11 @@ function AdminUserDialog({
           >
             <label>
               <span>处置原因</span>
-              <textarea value={governanceInput.reason} onChange={(event) => onGovernanceInputChange({ reason: event.target.value })} rows={5} />
+              <textarea
+                value={governanceInput.reason}
+                onChange={(event) => onGovernanceInputChange({ reason: event.target.value })}
+                rows={5}
+              />
             </label>
             <label>
               <span>管理员 PIN</span>
@@ -606,7 +694,9 @@ function AdminUserDialog({
                 type="submit"
                 disabled={governanceActionKey === `${dialog.user.id}:${dialog.action}`}
               >
-                {governanceActionKey === `${dialog.user.id}:${dialog.action}` ? '处理中' : formatGovernanceAction(dialog.action)}
+                {governanceActionKey === `${dialog.user.id}:${dialog.action}`
+                  ? '处理中'
+                  : formatGovernanceAction(dialog.action)}
               </button>
             </div>
           </form>

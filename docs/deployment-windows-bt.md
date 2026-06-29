@@ -209,6 +209,8 @@ Test-Path .\data
 
 如果页面 HTML 能返回 200，但浏览器控制台或请求面板里出现 `/_next/static/chunks/app-pages-internals.js`、`./543.js` 等 Next.js chunk 404，通常是开发服务运行时又执行了 `next build` 或 `pnpm build`，导致 `.next` 目录里的开发产物和生产产物混在一起。
 
+生产环境如果只有旧 hash 的 chunk 404，例如浏览器还在请求上一版的 `/_next/static/chunks/app/admin/page-*.js`，而直接访问当前 `/admin` 或 `/provider/*` 页面看到的新 chunk 都是 200，通常是旧页面、旧 Service Worker 缓存或仍打开的旧标签页和新部署静态资源不一致。当前前端已做两层兜底：Service Worker 不再缓存 `/admin/*`、`/provider/*` 和 `/_next/static/*`，并且页面检测到 Next 静态资源加载失败时会自动刷新一次。
+
 本地开发时按以下顺序恢复：
 
 ```powershell

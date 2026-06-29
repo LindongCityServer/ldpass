@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 
 interface ProviderTemplate {
   id: string;
@@ -62,7 +63,10 @@ const benefitLabels: Record<string, string> = {
   times: '次数',
 };
 
-const fallbackTemplateVariants: Record<'account' | 'identity_key' | 'ticket', Array<{ key: string; name: string }>> = {
+const fallbackTemplateVariants: Record<
+  'account' | 'identity_key' | 'ticket',
+  Array<{ key: string; name: string }>
+> = {
   account: [
     { key: 'standard', name: '标准横版' },
     { key: 'compact', name: '紧凑信息' },
@@ -87,10 +91,12 @@ export function ProviderTemplatesPanel() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [detailTemplate, setDetailTemplate] = useState<ProviderTemplate | null>(null);
   const [isSubmittingVersion, setIsSubmittingVersion] = useState(false);
-  const [templateCategory, setTemplateCategory] = useState<'account' | 'identity_key' | 'ticket'>('account');
-  const [newTemplateLocationRules, setNewTemplateLocationRules] = useState<LocationRuleDraft[]>(() => [
-    createLocationRuleDraft('circle'),
-  ]);
+  const [templateCategory, setTemplateCategory] = useState<'account' | 'identity_key' | 'ticket'>(
+    'account',
+  );
+  const [newTemplateLocationRules, setNewTemplateLocationRules] = useState<LocationRuleDraft[]>(
+    () => [createLocationRuleDraft('circle')],
+  );
   const [templatePreview, setTemplatePreview] = useState<TemplatePreviewState>({
     category: 'account',
     displayName: '卡券展示名称',
@@ -135,7 +141,9 @@ export function ProviderTemplatesPanel() {
       key: variant.key,
       name: variant.name,
     }));
-  const visibleVariantOptions = currentVariantOptions.length ? currentVariantOptions : fallbackTemplateVariants[templateCategory];
+  const visibleVariantOptions = currentVariantOptions.length
+    ? currentVariantOptions
+    : fallbackTemplateVariants[templateCategory];
   const editingTemplate = templates.find((template) => template.id === editingTemplateId) ?? null;
 
   const updateTemplatePreview = (form: HTMLFormElement) => {
@@ -162,7 +170,8 @@ export function ProviderTemplatesPanel() {
     const backgroundImageUrl = String(form.get('backgroundImageUrl') ?? '').trim();
     const logoUrl = String(form.get('logoUrl') ?? '').trim();
     const category = String(form.get('category') ?? '');
-    const requireLocationVerification = category === 'identity_key' && form.get('requireLocationVerification') === 'on';
+    const requireLocationVerification =
+      category === 'identity_key' && form.get('requireLocationVerification') === 'on';
     const locationRulesJson = String(form.get('locationRulesJson') ?? '').trim();
     const payload: Record<string, unknown> = {
       category,
@@ -180,7 +189,9 @@ export function ProviderTemplatesPanel() {
       allowFrozenBalance: form.get('allowFrozenBalance') === 'on',
       allowTopUpIn: form.get('allowTopUpIn') === 'on',
       allowTopUpOut: form.get('allowTopUpOut') === 'on',
-      allowedRedemptionProviderIdentifiers: String(form.get('allowedRedemptionProviderIdentifiers') ?? ''),
+      allowedRedemptionProviderIdentifiers: String(
+        form.get('allowedRedemptionProviderIdentifiers') ?? '',
+      ),
       hideTitle: form.get('hideTitle') === 'on',
       requireServerVerifiedUser: form.get('requireServerVerifiedUser') === 'on',
       ...(category === 'identity_key' ? { requireLocationVerification } : {}),
@@ -193,7 +204,10 @@ export function ProviderTemplatesPanel() {
     }
 
     try {
-      const result = await postJson<CreateTemplateResponse>('/api/provider/pass-templates', payload);
+      const result = await postJson<CreateTemplateResponse>(
+        '/api/provider/pass-templates',
+        payload,
+      );
 
       setTemplates((currentTemplates) => [result.template, ...currentTemplates]);
       setMessage('卡券模板已提交管理员审核。');
@@ -222,7 +236,10 @@ export function ProviderTemplatesPanel() {
     setDetailTemplate(null);
   };
 
-  const submitTemplateVersion = async (event: FormEvent<HTMLFormElement>, template: ProviderTemplate) => {
+  const submitTemplateVersion = async (
+    event: FormEvent<HTMLFormElement>,
+    template: ProviderTemplate,
+  ) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setIsSubmittingVersion(true);
@@ -230,7 +247,8 @@ export function ProviderTemplatesPanel() {
     const backgroundImageUrl = String(form.get('backgroundImageUrl') ?? '').trim();
     const logoUrl = String(form.get('logoUrl') ?? '').trim();
     const category = template.category;
-    const requireLocationVerification = category === 'identity_key' && form.get('requireLocationVerification') === 'on';
+    const requireLocationVerification =
+      category === 'identity_key' && form.get('requireLocationVerification') === 'on';
     const locationRulesJson = String(form.get('locationRulesJson') ?? '').trim();
     const payload: Record<string, unknown> = {
       category,
@@ -248,7 +266,9 @@ export function ProviderTemplatesPanel() {
       allowFrozenBalance: form.get('allowFrozenBalance') === 'on',
       allowTopUpIn: form.get('allowTopUpIn') === 'on',
       allowTopUpOut: form.get('allowTopUpOut') === 'on',
-      allowedRedemptionProviderIdentifiers: String(form.get('allowedRedemptionProviderIdentifiers') ?? ''),
+      allowedRedemptionProviderIdentifiers: String(
+        form.get('allowedRedemptionProviderIdentifiers') ?? '',
+      ),
       hideTitle: form.get('hideTitle') === 'on',
       requireServerVerifiedUser: form.get('requireServerVerifiedUser') === 'on',
       ...(category === 'identity_key' ? { requireLocationVerification } : {}),
@@ -261,9 +281,14 @@ export function ProviderTemplatesPanel() {
     }
 
     try {
-      const result = await postJson<CreateTemplateResponse>(`/api/provider/pass-templates/${template.id}/versions`, payload);
+      const result = await postJson<CreateTemplateResponse>(
+        `/api/provider/pass-templates/${template.id}/versions`,
+        payload,
+      );
       setTemplates((currentTemplates) =>
-        currentTemplates.map((currentTemplate) => (currentTemplate.id === result.template.id ? result.template : currentTemplate)),
+        currentTemplates.map((currentTemplate) =>
+          currentTemplate.id === result.template.id ? result.template : currentTemplate,
+        ),
       );
       setEditingTemplateId(null);
       setMessage('新版本已提交管理员审核，审核通过前不会影响当前可发放版本。');
@@ -276,24 +301,36 @@ export function ProviderTemplatesPanel() {
 
   return (
     <section className="admin-panel" aria-labelledby="provider-templates-title">
-      <div className="admin-panel-heading">
-        <div>
-          <p>发卡方后台</p>
-          <h1 id="provider-templates-title">卡券模板</h1>
-        </div>
+      <BackofficeTopbarPageActions>
         <div className="admin-list-actions">
-          <button className="primary-action" type="button" onClick={() => setIsCreateDialogOpen(true)}>
+          <button
+            className="primary-action"
+            type="button"
+            title="新建模板"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               add
             </span>
             <span>新建模板</span>
           </button>
-          <button className="secondary-action" type="button" onClick={() => void loadTemplates()}>
-            刷新
+          <button
+            className="secondary-action"
+            type="button"
+            title="刷新"
+            onClick={() => void loadTemplates()}
+          >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              refresh
+            </span>
+            <span>刷新</span>
           </button>
-          <a className="secondary-action" href="/provider/dashboard">
-            工作台
-          </a>
+        </div>
+      </BackofficeTopbarPageActions>
+      <div className="admin-panel-heading">
+        <div>
+          <p>发卡方后台</p>
+          <h1 id="provider-templates-title">卡券模板</h1>
         </div>
       </div>
 
@@ -305,151 +342,196 @@ export function ProviderTemplatesPanel() {
 
       {isCreateDialogOpen ? (
         <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)} />
-          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="新建模板">
+          <button
+            className="admin-dialog-scrim"
+            type="button"
+            aria-label="关闭弹窗"
+            onClick={() => setIsCreateDialogOpen(false)}
+          />
+          <section
+            className="admin-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="新建模板"
+          >
             <div className="admin-dialog-heading">
               <h2>新建模板</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)}>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="关闭弹窗"
+                onClick={() => setIsCreateDialogOpen(false)}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   close
                 </span>
               </button>
             </div>
-      <form className="admin-dialog-form" onSubmit={createTemplate} onInput={(event) => updateTemplatePreview(event.currentTarget)} noValidate>
-        <div className="admin-adjustment-panel provider-template-form">
-          <label>
-            <span>分类</span>
-            <select
-              name="category"
-              value={templateCategory}
-              onChange={(event) => setTemplateCategory(event.target.value as 'account' | 'identity_key' | 'ticket')}
-              required
+            <form
+              className="admin-dialog-form"
+              onSubmit={createTemplate}
+              onInput={(event) => updateTemplatePreview(event.currentTarget)}
+              noValidate
             >
-              <option value="account">账户/卡</option>
-              <option value="identity_key">证件/钥匙</option>
-              <option value="ticket">票券</option>
-            </select>
-          </label>
-          <label>
-            <span>权益类型</span>
-            <select name="benefitType" defaultValue="amount" required>
-              <option value="amount">金额</option>
-              <option value="points">积分</option>
-              <option value="times">次数</option>
-            </select>
-          </label>
-          <label>
-            <span>展示名称</span>
-            <input name="displayName" placeholder="例如：南部湾银行卡" required minLength={2} maxLength={80} />
-          </label>
-          <label>
-            <span>卡面标题</span>
-            <input name="title" placeholder="例如：临东大学校园卡" required minLength={2} maxLength={80} />
-          </label>
-          <label>
-            <span>模板变体</span>
-            <select name="variantKey" defaultValue={visibleVariantOptions[0]?.key ?? 'standard'} key={templateCategory}>
-              {visibleVariantOptions.map((variant) => (
-                <option value={variant.key} key={variant.key}>
-                  {variant.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>卡面颜色</span>
-            <input type="text" name="cardColor" placeholder="#28a67b" maxLength={32} />
-          </label>
-        </div>
+              <div className="admin-adjustment-panel provider-template-form">
+                <label>
+                  <span>分类</span>
+                  <select
+                    name="category"
+                    value={templateCategory}
+                    onChange={(event) =>
+                      setTemplateCategory(
+                        event.target.value as 'account' | 'identity_key' | 'ticket',
+                      )
+                    }
+                    required
+                  >
+                    <option value="account">账户/卡</option>
+                    <option value="identity_key">证件/钥匙</option>
+                    <option value="ticket">票券</option>
+                  </select>
+                </label>
+                <label>
+                  <span>权益类型</span>
+                  <select name="benefitType" defaultValue="amount" required>
+                    <option value="amount">金额</option>
+                    <option value="points">积分</option>
+                    <option value="times">次数</option>
+                  </select>
+                </label>
+                <label>
+                  <span>展示名称</span>
+                  <input
+                    name="displayName"
+                    placeholder="例如：南部湾银行卡"
+                    required
+                    minLength={2}
+                    maxLength={80}
+                  />
+                </label>
+                <label>
+                  <span>卡面标题</span>
+                  <input
+                    name="title"
+                    placeholder="例如：临东大学校园卡"
+                    required
+                    minLength={2}
+                    maxLength={80}
+                  />
+                </label>
+                <label>
+                  <span>模板变体</span>
+                  <select
+                    name="variantKey"
+                    defaultValue={visibleVariantOptions[0]?.key ?? 'standard'}
+                    key={templateCategory}
+                  >
+                    {visibleVariantOptions.map((variant) => (
+                      <option value={variant.key} key={variant.key}>
+                        {variant.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>卡面颜色</span>
+                  <input type="text" name="cardColor" placeholder="#28a67b" maxLength={32} />
+                </label>
+              </div>
 
-        <TemplateCardPreview preview={templatePreview} />
+              <TemplateCardPreview preview={templatePreview} />
 
-        <label>
-          <span>说明</span>
-          <textarea name="description" maxLength={1000} />
-        </label>
-        <label>
-          <span>背景图链接</span>
-          <input type="url" name="backgroundImageUrl" placeholder="https://..." maxLength={1000} />
-        </label>
-        <label>
-          <span>Logo 链接</span>
-          <input type="url" name="logoUrl" placeholder="https://..." maxLength={1000} />
-        </label>
-
-        <div className="template-rule-grid">
-          <label className="checkbox-row">
-            <input type="checkbox" name="shareable" defaultChecked />
-            <span>允许通过链接分享领取入口</span>
-          </label>
-          <label className="checkbox-row">
-            <input type="checkbox" name="transferable" />
-            <span>允许转赠</span>
-          </label>
-          <label className="checkbox-row">
-            <input type="checkbox" name="allowFrozenBalance" defaultChecked />
-            <span>允许冻结余额/权益</span>
-          </label>
-          <label className="checkbox-row">
-            <input type="checkbox" name="allowTopUpIn" />
-            <span>允许被其他卡补充额度</span>
-          </label>
-          <label className="checkbox-row">
-            <input type="checkbox" name="allowTopUpOut" />
-            <span>允许作为额度补充来源</span>
-          </label>
-          <label className="checkbox-row">
-            <input type="checkbox" name="hideTitle" />
-            <span>隐藏卡面标题</span>
-          </label>
-          <label className="checkbox-row">
-            <input type="checkbox" name="allowOverdraft" />
-            <span>允许透支显示</span>
-          </label>
-          <label className="checkbox-row">
-            <input type="checkbox" name="requireServerVerifiedUser" />
-            <span>领取时要求服务器账号已验证</span>
-          </label>
-        </div>
-
-        <label>
-          <span>允许核销方名单</span>
-          <textarea
-            name="allowedRedemptionProviderIdentifiers"
-            maxLength={2000}
-            placeholder="留空时仅允许本发卡方核销；如需授权其他发卡方，可填写对方标识或 ID，多个用逗号或换行分隔。"
-          />
-        </label>
-
-        {templateCategory === 'identity_key' ? (
-          <section className="stacked-form-subsection" aria-label="位置核验规则">
-            <div className="detail-section-heading">
-              <h2>位置核验</h2>
-              <span>1分钟</span>
-            </div>
-            <div className="template-rule-grid">
-              <label className="checkbox-row">
-                <input type="checkbox" name="requireLocationVerification" />
-                <span>启用玩家位置范围核验</span>
+              <label>
+                <span>说明</span>
+                <textarea name="description" maxLength={1000} />
               </label>
-            </div>
-            <LocationRulesEditor
-              rules={newTemplateLocationRules}
-              onChange={setNewTemplateLocationRules}
-              summary="最多 10 个范围，用户命中任意一个范围即通过。"
-            />
-          </section>
-        ) : null}
+              <label>
+                <span>背景图链接</span>
+                <input
+                  type="url"
+                  name="backgroundImageUrl"
+                  placeholder="https://..."
+                  maxLength={1000}
+                />
+              </label>
+              <label>
+                <span>Logo 链接</span>
+                <input type="url" name="logoUrl" placeholder="https://..." maxLength={1000} />
+              </label>
 
-        <div className="form-actions">
-          <button className="primary-action" type="submit" disabled={isSubmitting}>
-            <span className="material-symbols-rounded" aria-hidden="true">
-              approval
-            </span>
-            <span>{isSubmitting ? '提交中' : '提交审核'}</span>
-          </button>
-        </div>
-      </form>
+              <div className="template-rule-grid">
+                <label className="checkbox-row">
+                  <input type="checkbox" name="shareable" defaultChecked />
+                  <span>允许通过链接分享领取入口</span>
+                </label>
+                <label className="checkbox-row">
+                  <input type="checkbox" name="transferable" />
+                  <span>允许转赠</span>
+                </label>
+                <label className="checkbox-row">
+                  <input type="checkbox" name="allowFrozenBalance" defaultChecked />
+                  <span>允许冻结余额/权益</span>
+                </label>
+                <label className="checkbox-row">
+                  <input type="checkbox" name="allowTopUpIn" />
+                  <span>允许被其他卡补充额度</span>
+                </label>
+                <label className="checkbox-row">
+                  <input type="checkbox" name="allowTopUpOut" />
+                  <span>允许作为额度补充来源</span>
+                </label>
+                <label className="checkbox-row">
+                  <input type="checkbox" name="hideTitle" />
+                  <span>隐藏卡面标题</span>
+                </label>
+                <label className="checkbox-row">
+                  <input type="checkbox" name="allowOverdraft" />
+                  <span>允许透支显示</span>
+                </label>
+                <label className="checkbox-row">
+                  <input type="checkbox" name="requireServerVerifiedUser" />
+                  <span>领取时要求服务器账号已验证</span>
+                </label>
+              </div>
+
+              <label>
+                <span>允许核销方名单</span>
+                <textarea
+                  name="allowedRedemptionProviderIdentifiers"
+                  maxLength={2000}
+                  placeholder="留空时仅允许本发卡方核销；如需授权其他发卡方，可填写对方标识或 ID，多个用逗号或换行分隔。"
+                />
+              </label>
+
+              {templateCategory === 'identity_key' ? (
+                <section className="stacked-form-subsection" aria-label="位置核验规则">
+                  <div className="detail-section-heading">
+                    <h2>位置核验</h2>
+                    <span>1分钟</span>
+                  </div>
+                  <div className="template-rule-grid">
+                    <label className="checkbox-row">
+                      <input type="checkbox" name="requireLocationVerification" />
+                      <span>启用玩家位置范围核验</span>
+                    </label>
+                  </div>
+                  <LocationRulesEditor
+                    rules={newTemplateLocationRules}
+                    onChange={setNewTemplateLocationRules}
+                    summary="最多 10 个范围，用户命中任意一个范围即通过。"
+                  />
+                </section>
+              ) : null}
+
+              <div className="form-actions">
+                <button className="primary-action" type="submit" disabled={isSubmitting}>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    approval
+                  </span>
+                  <span>{isSubmitting ? '提交中' : '提交审核'}</span>
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       ) : null}
@@ -467,16 +549,22 @@ export function ProviderTemplatesPanel() {
               <div>
                 <h2>{config.displayName}</h2>
                 <p>
-                  {categoryLabels[template.category] ?? template.category} · {benefitLabels[template.benefitType] ?? template.benefitType} · 状态：
+                  {categoryLabels[template.category] ?? template.category} ·{' '}
+                  {benefitLabels[template.benefitType] ?? template.benefitType} · 状态：
                   {template.status}
                 </p>
                 {template.latestVersion ? (
                   <p>
-                    v{template.latestVersion.version} · {template.latestVersion.title} · 版本状态：{template.latestVersion.status}
+                    v{template.latestVersion.version} · {template.latestVersion.title} · 版本状态：
+                    {template.latestVersion.status}
                   </p>
                 ) : null}
-                {template.latestVersion?.description ? <p>{template.latestVersion.description}</p> : null}
-                {template.latestVersion?.reviewReason ? <p>审核意见：{template.latestVersion.reviewReason}</p> : null}
+                {template.latestVersion?.description ? (
+                  <p>{template.latestVersion.description}</p>
+                ) : null}
+                {template.latestVersion?.reviewReason ? (
+                  <p>审核意见：{template.latestVersion.reviewReason}</p>
+                ) : null}
               </div>
               <div className="admin-list-actions">
                 <button
@@ -507,30 +595,63 @@ export function ProviderTemplatesPanel() {
               templateVariants,
               config.variantKey,
             );
-            const locationRules = readEditableLocationRules(editingTemplate.latestVersion?.locationRules);
+            const locationRules = readEditableLocationRules(
+              editingTemplate.latestVersion?.locationRules,
+            );
 
             return (
               <div className="admin-dialog-layer">
-                <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setEditingTemplateId(null)} />
-                <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="提交模板新版本">
+                <button
+                  className="admin-dialog-scrim"
+                  type="button"
+                  aria-label="关闭弹窗"
+                  onClick={() => setEditingTemplateId(null)}
+                />
+                <section
+                  className="admin-dialog-panel"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="提交模板新版本"
+                >
                   <div className="admin-dialog-heading">
                     <h2>提交新版本</h2>
-                    <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setEditingTemplateId(null)}>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      aria-label="关闭弹窗"
+                      onClick={() => setEditingTemplateId(null)}
+                    >
                       <span className="material-symbols-rounded" aria-hidden="true">
                         close
                       </span>
                     </button>
                   </div>
-                  <form className="admin-dialog-form" onSubmit={(event) => void submitTemplateVersion(event, editingTemplate)} noValidate>
+                  <form
+                    className="admin-dialog-form"
+                    onSubmit={(event) => void submitTemplateVersion(event, editingTemplate)}
+                    noValidate
+                  >
                     <span>需管理员审核，通过前不会影响当前可发放版本。</span>
                     <div className="admin-adjustment-panel provider-template-form">
                       <label>
                         <span>展示名称</span>
-                        <input name="displayName" defaultValue={config.displayName} required minLength={2} maxLength={80} />
+                        <input
+                          name="displayName"
+                          defaultValue={config.displayName}
+                          required
+                          minLength={2}
+                          maxLength={80}
+                        />
                       </label>
                       <label>
                         <span>卡面标题</span>
-                        <input name="title" defaultValue={editingTemplate.latestVersion?.title ?? ''} required minLength={2} maxLength={80} />
+                        <input
+                          name="title"
+                          defaultValue={editingTemplate.latestVersion?.title ?? ''}
+                          required
+                          minLength={2}
+                          maxLength={80}
+                        />
                       </label>
                       <label>
                         <span>模板变体</span>
@@ -549,15 +670,29 @@ export function ProviderTemplatesPanel() {
                     </div>
                     <label>
                       <span>说明</span>
-                      <textarea name="description" defaultValue={editingTemplate.latestVersion?.description ?? ''} maxLength={1000} />
+                      <textarea
+                        name="description"
+                        defaultValue={editingTemplate.latestVersion?.description ?? ''}
+                        maxLength={1000}
+                      />
                     </label>
                     <label>
                       <span>背景图链接</span>
-                      <input type="url" name="backgroundImageUrl" defaultValue={editingTemplate.latestVersion?.backgroundImageUrl ?? ''} maxLength={1000} />
+                      <input
+                        type="url"
+                        name="backgroundImageUrl"
+                        defaultValue={editingTemplate.latestVersion?.backgroundImageUrl ?? ''}
+                        maxLength={1000}
+                      />
                     </label>
                     <label>
                       <span>Logo 链接</span>
-                      <input type="url" name="logoUrl" defaultValue={editingTemplate.latestVersion?.logoUrl ?? ''} maxLength={1000} />
+                      <input
+                        type="url"
+                        name="logoUrl"
+                        defaultValue={editingTemplate.latestVersion?.logoUrl ?? ''}
+                        maxLength={1000}
+                      />
                     </label>
                     <div className="template-rule-grid">
                       <label className="checkbox-row">
@@ -565,19 +700,35 @@ export function ProviderTemplatesPanel() {
                         <span>允许通过链接分享领取入口</span>
                       </label>
                       <label className="checkbox-row">
-                        <input type="checkbox" name="transferable" defaultChecked={config.transferable} />
+                        <input
+                          type="checkbox"
+                          name="transferable"
+                          defaultChecked={config.transferable}
+                        />
                         <span>允许转赠</span>
                       </label>
                       <label className="checkbox-row">
-                        <input type="checkbox" name="allowFrozenBalance" defaultChecked={config.allowFrozenBalance} />
+                        <input
+                          type="checkbox"
+                          name="allowFrozenBalance"
+                          defaultChecked={config.allowFrozenBalance}
+                        />
                         <span>允许冻结余额/权益</span>
                       </label>
                       <label className="checkbox-row">
-                        <input type="checkbox" name="allowTopUpIn" defaultChecked={config.allowTopUpIn} />
+                        <input
+                          type="checkbox"
+                          name="allowTopUpIn"
+                          defaultChecked={config.allowTopUpIn}
+                        />
                         <span>允许被其他卡补充额度</span>
                       </label>
                       <label className="checkbox-row">
-                        <input type="checkbox" name="allowTopUpOut" defaultChecked={config.allowTopUpOut} />
+                        <input
+                          type="checkbox"
+                          name="allowTopUpOut"
+                          defaultChecked={config.allowTopUpOut}
+                        />
                         <span>允许作为额度补充来源</span>
                       </label>
                       <label className="checkbox-row">
@@ -585,11 +736,19 @@ export function ProviderTemplatesPanel() {
                         <span>隐藏卡面标题</span>
                       </label>
                       <label className="checkbox-row">
-                        <input type="checkbox" name="allowOverdraft" defaultChecked={config.allowOverdraft} />
+                        <input
+                          type="checkbox"
+                          name="allowOverdraft"
+                          defaultChecked={config.allowOverdraft}
+                        />
                         <span>允许透支显示</span>
                       </label>
                       <label className="checkbox-row">
-                        <input type="checkbox" name="requireServerVerifiedUser" defaultChecked={config.requireServerVerifiedUser} />
+                        <input
+                          type="checkbox"
+                          name="requireServerVerifiedUser"
+                          defaultChecked={config.requireServerVerifiedUser}
+                        />
                         <span>领取时要求服务器账号已验证</span>
                       </label>
                     </div>
@@ -610,18 +769,33 @@ export function ProviderTemplatesPanel() {
                         </div>
                         <div className="template-rule-grid">
                           <label className="checkbox-row">
-                            <input type="checkbox" name="requireLocationVerification" defaultChecked={config.requireLocationVerification} />
+                            <input
+                              type="checkbox"
+                              name="requireLocationVerification"
+                              defaultChecked={config.requireLocationVerification}
+                            />
                             <span>启用玩家位置范围核验</span>
                           </label>
                         </div>
-                        <TemplateVersionLocationRulesEditor key={editingTemplate.id} initialRules={locationRules} />
+                        <TemplateVersionLocationRulesEditor
+                          key={editingTemplate.id}
+                          initialRules={locationRules}
+                        />
                       </section>
                     ) : null}
                     <div className="form-actions">
-                      <button className="secondary-action" type="button" onClick={() => setEditingTemplateId(null)}>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        onClick={() => setEditingTemplateId(null)}
+                      >
                         取消
                       </button>
-                      <button className="primary-action" type="submit" disabled={isSubmittingVersion}>
+                      <button
+                        className="primary-action"
+                        type="submit"
+                        disabled={isSubmittingVersion}
+                      >
                         <span className="material-symbols-rounded" aria-hidden="true">
                           approval
                         </span>
@@ -636,11 +810,26 @@ export function ProviderTemplatesPanel() {
         : null}
       {detailTemplate ? (
         <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setDetailTemplate(null)} />
-          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="模板详情">
+          <button
+            className="admin-dialog-scrim"
+            type="button"
+            aria-label="关闭弹窗"
+            onClick={() => setDetailTemplate(null)}
+          />
+          <section
+            className="admin-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="模板详情"
+          >
             <div className="admin-dialog-heading">
               <h2>{readTemplateConfig(detailTemplate).displayName}</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setDetailTemplate(null)}>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="关闭弹窗"
+                onClick={() => setDetailTemplate(null)}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   close
                 </span>
@@ -716,7 +905,10 @@ function TemplateCardPreview({ preview }: { preview: TemplatePreviewState }) {
   };
 
   return (
-    <section className={`template-card-preview template-card-preview-${preview.category}`} aria-label="卡面预览">
+    <section
+      className={`template-card-preview template-card-preview-${preview.category}`}
+      aria-label="卡面预览"
+    >
       <div className="template-preview-pass" style={style}>
         <small>**** 5678</small>
       </div>
@@ -761,7 +953,11 @@ function TemplateDetail({ template }: { template: ProviderTemplate }) {
         </div>
         <div>
           <dt>当前版本</dt>
-          <dd>{template.latestVersion ? `v${template.latestVersion.version} · ${template.latestVersion.status}` : '暂无版本'}</dd>
+          <dd>
+            {template.latestVersion
+              ? `v${template.latestVersion.version} · ${template.latestVersion.status}`
+              : '暂无版本'}
+          </dd>
         </div>
         <div>
           <dt>标题</dt>
@@ -801,7 +997,11 @@ function TemplateDetail({ template }: { template: ProviderTemplate }) {
   );
 }
 
-function TemplateVersionLocationRulesEditor({ initialRules }: { initialRules: LocationRuleDraft[] }) {
+function TemplateVersionLocationRulesEditor({
+  initialRules,
+}: {
+  initialRules: LocationRuleDraft[];
+}) {
   const [rules, setRules] = useState<LocationRuleDraft[]>(() =>
     initialRules.length ? initialRules : [createLocationRuleDraft('circle')],
   );
@@ -869,12 +1069,23 @@ function LocationRulesEditor({
                 <select
                   aria-label={`范围 ${index + 1} 类型`}
                   value={rule.kind}
-                  onChange={(event) => replaceRule(convertLocationRuleKind(rule, event.target.value as LocationRuleDraft['kind']))}
+                  onChange={(event) =>
+                    replaceRule(
+                      convertLocationRuleKind(
+                        rule,
+                        event.target.value as LocationRuleDraft['kind'],
+                      ),
+                    )
+                  }
                 >
                   <option value="circle">圆形范围</option>
                   <option value="rectangle">矩形范围</option>
                 </select>
-                <button className="secondary-action danger-action" type="button" onClick={() => removeRule(rule.draftId)}>
+                <button
+                  className="secondary-action danger-action"
+                  type="button"
+                  onClick={() => removeRule(rule.draftId)}
+                >
                   删除
                 </button>
               </div>
@@ -896,7 +1107,9 @@ function LocationRulesEditor({
                   min={10}
                   max={300}
                   value={rule.expiresAfterSeconds}
-                  onChange={(event) => replaceRule({ ...rule, expiresAfterSeconds: event.target.value })}
+                  onChange={(event) =>
+                    replaceRule({ ...rule, expiresAfterSeconds: event.target.value })
+                  }
                 />
               </label>
               {rule.kind === 'circle' ? (
@@ -993,13 +1206,19 @@ function readTemplateConfig(template: ProviderTemplate): TemplateConfig {
     allowFrozenBalance: readBoolean(rules?.allowFrozenBalance, true),
     allowTopUpIn: readBoolean(rules?.allowTopUpIn, false),
     allowTopUpOut: readBoolean(rules?.allowTopUpOut, false),
-    allowedRedemptionProviderIdentifiers: readStringArray(rules?.allowedRedemptionProviderIds).join('\n'),
+    allowedRedemptionProviderIdentifiers: readStringArray(rules?.allowedRedemptionProviderIds).join(
+      '\n',
+    ),
     requireServerVerifiedUser: readBoolean(rules?.requireServerVerifiedUser, false),
     requireLocationVerification: readBoolean(rules?.requireLocationVerification, false),
   };
 }
 
-function buildVariantOptions(category: string, variants: CardTemplateVariant[], currentVariantKey: string): Array<{ key: string; name: string }> {
+function buildVariantOptions(
+  category: string,
+  variants: CardTemplateVariant[],
+  currentVariantKey: string,
+): Array<{ key: string; name: string }> {
   const safeCategory = isTemplateCategory(category) ? category : 'account';
   const options = variants
     .filter((variant) => variant.enabled && variant.category === safeCategory)
@@ -1091,7 +1310,10 @@ function createLocationRuleDraft(kind: LocationRuleDraft['kind']): LocationRuleD
   };
 }
 
-function convertLocationRuleKind(rule: LocationRuleDraft, nextKind: LocationRuleDraft['kind']): LocationRuleDraft {
+function convertLocationRuleKind(
+  rule: LocationRuleDraft,
+  nextKind: LocationRuleDraft['kind'],
+): LocationRuleDraft {
   if (rule.kind === nextKind) {
     return rule;
   }
@@ -1183,7 +1405,9 @@ function isTemplateCategory(value: string): value is TemplateCategory {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function readString(value: unknown): string {
@@ -1191,7 +1415,9 @@ function readString(value: unknown): string {
 }
 
 function readStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
 }
 
 function readBoolean(value: unknown, fallback: boolean): boolean {

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 import { ClaimLinkTools } from '../../claim-link-tools';
 
 interface CreateTokenResponse {
@@ -105,7 +106,9 @@ export function AddPassTokenForm() {
         search.set('status', nextStatus);
       }
 
-      const response = await getJson<AddPassTokensResponse>(`/api/admin/add-pass-tokens?${search.toString()}`);
+      const response = await getJson<AddPassTokensResponse>(
+        `/api/admin/add-pass-tokens?${search.toString()}`,
+      );
       setTokens(response.tokens);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '读取领取码列表失败。');
@@ -174,10 +177,15 @@ export function AddPassTokenForm() {
     setMessage(null);
 
     try {
-      const response = await postJson<RevokeAddPassTokenResponse>(`/api/admin/add-pass-tokens/${targetToken.id}/revoke`, {
-        reason: trimmedReason,
-      });
-      setTokens((currentTokens) => currentTokens.map((item) => (item.id === response.token.id ? response.token : item)));
+      const response = await postJson<RevokeAddPassTokenResponse>(
+        `/api/admin/add-pass-tokens/${targetToken.id}/revoke`,
+        {
+          reason: trimmedReason,
+        },
+      );
+      setTokens((currentTokens) =>
+        currentTokens.map((item) => (item.id === response.token.id ? response.token : item)),
+      );
       setMessage('领取码已撤销。');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '撤销领取码失败。');
@@ -187,7 +195,9 @@ export function AddPassTokenForm() {
   };
 
   const reissueToken = async (targetToken: AddPassTokenSummary) => {
-    const reason = window.prompt(`请输入作废并重发 ${targetToken.maskedClaimCode ?? '该领取码'} 的原因`);
+    const reason = window.prompt(
+      `请输入作废并重发 ${targetToken.maskedClaimCode ?? '该领取码'} 的原因`,
+    );
     const trimmedReason = reason?.trim();
     if (!trimmedReason) {
       return;
@@ -198,9 +208,12 @@ export function AddPassTokenForm() {
     setToken(null);
 
     try {
-      const response = await postJson<ReissueAddPassTokenResponse>(`/api/admin/add-pass-tokens/${targetToken.id}/reissue`, {
-        reason: trimmedReason,
-      });
+      const response = await postJson<ReissueAddPassTokenResponse>(
+        `/api/admin/add-pass-tokens/${targetToken.id}/reissue`,
+        {
+          reason: trimmedReason,
+        },
+      );
       setToken(response);
       setMessage(
         `旧领取码已作废，新领取码已生成，有效期至 ${formatDate(response.expiresAt)}，卡券有效期：${response.passExpiresAt ? formatDate(response.passExpiresAt) : '长期有效'}。`,
@@ -215,20 +228,32 @@ export function AddPassTokenForm() {
 
   return (
     <>
-      <div className="admin-list-actions">
-        <button className="primary-action" type="button" onClick={() => setIsCreateDialogOpen(true)}>
-          <span className="material-symbols-rounded" aria-hidden="true">
-            add_card
-          </span>
-          <span>生成领取码</span>
-        </button>
-        <button className="secondary-action" type="button" onClick={() => exportTokensCsv(visibleTokens, setMessage)}>
-          <span className="material-symbols-rounded" aria-hidden="true">
-            file_save
-          </span>
-          <span>导出 CSV</span>
-        </button>
-      </div>
+      <BackofficeTopbarPageActions>
+        <div className="admin-list-actions">
+          <button
+            className="primary-action"
+            type="button"
+            title="生成领取码"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              add_card
+            </span>
+            <span>生成领取码</span>
+          </button>
+          <button
+            className="secondary-action"
+            type="button"
+            title="导出 CSV"
+            onClick={() => exportTokensCsv(visibleTokens, setMessage)}
+          >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              file_save
+            </span>
+            <span>导出 CSV</span>
+          </button>
+        </div>
+      </BackofficeTopbarPageActions>
 
       {message ? (
         <div className="flow-notice" role="status" aria-live="polite">
@@ -269,7 +294,10 @@ export function AddPassTokenForm() {
           </label>
           <label>
             <span>分类</span>
-            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+            >
               <option value="all">全部分类</option>
               {Object.entries(categoryLabels).map(([value, label]) => (
                 <option value={value} key={value}>
@@ -279,7 +307,12 @@ export function AddPassTokenForm() {
             </select>
           </label>
           <div className="audit-filter-actions">
-            <button className="secondary-action" type="button" onClick={() => void loadTokens(keyword, statusFilter)} disabled={isLoadingTokens}>
+            <button
+              className="secondary-action"
+              type="button"
+              onClick={() => void loadTokens(keyword, statusFilter)}
+              disabled={isLoadingTokens}
+            >
               {isLoadingTokens ? '刷新中' : '刷新'}
             </button>
             <button className="secondary-action" type="submit" disabled={isLoadingTokens}>
@@ -316,7 +349,8 @@ export function AddPassTokenForm() {
                   </p>
                   <p>对应卡号：{formatPassNumber(item)}</p>
                   <p>
-                    状态：{statusLabels[item.status] ?? item.status} · 领取码有效期：{formatDate(item.expiresAt)}
+                    状态：{statusLabels[item.status] ?? item.status} · 领取码有效期：
+                    {formatDate(item.expiresAt)}
                   </p>
                   <p>
                     {item.claimedByUser
@@ -327,7 +361,10 @@ export function AddPassTokenForm() {
                 </div>
                 <div className="admin-list-actions">
                   {item.passId ? (
-                    <a className="secondary-action" href={`/admin/passes?keyword=${encodeURIComponent(item.passId)}`}>
+                    <a
+                      className="secondary-action"
+                      href={`/admin/passes?keyword=${encodeURIComponent(item.passId)}`}
+                    >
                       查看卡券
                     </a>
                   ) : null}
@@ -342,7 +379,9 @@ export function AddPassTokenForm() {
                   <button
                     className="secondary-action"
                     type="button"
-                    disabled={item.status === 'Claimed' || !item.passId || reissuingTokenId === item.id}
+                    disabled={
+                      item.status === 'Claimed' || !item.passId || reissuingTokenId === item.id
+                    }
                     onClick={() => void reissueToken(item)}
                   >
                     {reissuingTokenId === item.id ? '重发中' : '作废并重发'}
@@ -355,11 +394,26 @@ export function AddPassTokenForm() {
       </section>
       {isCreateDialogOpen ? (
         <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)} />
-          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="生成领取码">
+          <button
+            className="admin-dialog-scrim"
+            type="button"
+            aria-label="关闭弹窗"
+            onClick={() => setIsCreateDialogOpen(false)}
+          />
+          <section
+            className="admin-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="生成领取码"
+          >
             <div className="admin-dialog-heading">
               <h2>生成领取码</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setIsCreateDialogOpen(false)}>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="关闭弹窗"
+                onClick={() => setIsCreateDialogOpen(false)}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   close
                 </span>
@@ -404,18 +458,35 @@ export function AddPassTokenForm() {
               </label>
               <label>
                 <span>领取码有效天数</span>
-                <input type="number" name="expiresInDays" min={1} max={365} defaultValue={30} required />
+                <input
+                  type="number"
+                  name="expiresInDays"
+                  min={1}
+                  max={365}
+                  defaultValue={30}
+                  required
+                />
               </label>
               <label>
                 <span>卡券有效天数</span>
-                <input type="number" name="passExpiresInDays" min={1} max={3650} placeholder="留空表示长期有效" />
+                <input
+                  type="number"
+                  name="passExpiresInDays"
+                  min={1}
+                  max={3650}
+                  placeholder="留空表示长期有效"
+                />
               </label>
               <label className="checkbox-row">
                 <input type="checkbox" name="requireServerVerifiedUser" />
                 <span>要求领取用户已完成服务器账号验证</span>
               </label>
               <div className="admin-dialog-actions">
-                <button className="secondary-action" type="button" onClick={() => setIsCreateDialogOpen(false)}>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                >
                   取消
                 </button>
                 <button className="primary-action" type="submit" disabled={isSubmitting}>
@@ -428,11 +499,26 @@ export function AddPassTokenForm() {
       ) : null}
       {token && claimLink ? (
         <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setToken(null)} />
-          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="完整领取码">
+          <button
+            className="admin-dialog-scrim"
+            type="button"
+            aria-label="关闭弹窗"
+            onClick={() => setToken(null)}
+          />
+          <section
+            className="admin-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="完整领取码"
+          >
             <div className="admin-dialog-heading">
               <h2>完整领取码</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setToken(null)}>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="关闭弹窗"
+                onClick={() => setToken(null)}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   close
                 </span>
@@ -443,7 +529,11 @@ export function AddPassTokenForm() {
               <strong>{token.claimCode}</strong>
               <span>对应卡号：{formatPassNumber(token)}</span>
             </div>
-            <ClaimLinkTools claimCode={token.claimCode} claimLink={claimLink} onMessage={setMessage} />
+            <ClaimLinkTools
+              claimCode={token.claimCode}
+              claimLink={claimLink}
+              onMessage={setMessage}
+            />
           </section>
         </div>
       ) : null}
@@ -455,7 +545,10 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleString('zh-CN');
 }
 
-function formatPassNumber(pass: { publicNumber: string | null; maskedNumber: string | null }): string {
+function formatPassNumber(pass: {
+  publicNumber: string | null;
+  maskedNumber: string | null;
+}): string {
   if (pass.publicNumber && pass.maskedNumber) {
     return `${pass.maskedNumber}（${pass.publicNumber}）`;
   }
@@ -471,14 +564,19 @@ function CategoryTag({ category }: { category: string }) {
   );
 }
 
-function exportTokensCsv(tokens: AddPassTokenSummary[], onMessage: (message: string) => void): void {
+function exportTokensCsv(
+  tokens: AddPassTokenSummary[],
+  onMessage: (message: string) => void,
+): void {
   const rows = tokens.map((token) => ({
     tail: token.maskedClaimCode ?? '',
     name: token.templateName,
     provider: token.providerName,
     category: categoryLabels[token.category] ?? token.category,
     status: statusLabels[token.status] ?? token.status,
-    claimedBy: token.claimedByUser ? `${token.claimedByUser.username} <${token.claimedByUser.email}>` : '',
+    claimedBy: token.claimedByUser
+      ? `${token.claimedByUser.username} <${token.claimedByUser.email}>`
+      : '',
     passNumber: formatPassNumber(token),
     expiresAt: token.expiresAt,
   }));
@@ -493,7 +591,10 @@ function toCsv(rows: Array<Record<string, string>>): string {
   }
 
   const headers = Object.keys(rows[0] ?? {});
-  return [headers.join(','), ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(','))].join('\r\n');
+  return [
+    headers.join(','),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(',')),
+  ].join('\r\n');
 }
 
 function escapeCsvCell(value: string): string {

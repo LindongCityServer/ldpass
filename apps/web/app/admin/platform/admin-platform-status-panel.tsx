@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 import { ThemeSchedulePanel } from '../theme/theme-schedule-panel';
 
 type PlatformNoticeTone = 'info' | 'warning' | 'critical';
@@ -91,21 +92,26 @@ export function AdminPlatformStatusPanel() {
 
   return (
     <section className="admin-panel" aria-labelledby="admin-platform-title">
-      <div className="admin-panel-heading">
-        <div>
-          <p>平台管理</p>
-          <h1 id="admin-platform-title">平台状态</h1>
-        </div>
+      <BackofficeTopbarPageActions>
         <div className="admin-list-actions">
-          <button className="secondary-action" type="button" onClick={() => void loadStatus()} disabled={isLoading}>
+          <button
+            className="secondary-action"
+            type="button"
+            title="刷新"
+            onClick={() => void loadStatus()}
+            disabled={isLoading}
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               refresh
             </span>
             <span>刷新</span>
           </button>
-          <a className="secondary-action" href="/admin/audit">
-            审计记录
-          </a>
+        </div>
+      </BackofficeTopbarPageActions>
+      <div className="admin-panel-heading">
+        <div>
+          <p>平台管理</p>
+          <h1 id="admin-platform-title">平台状态</h1>
         </div>
       </div>
 
@@ -118,19 +124,31 @@ export function AdminPlatformStatusPanel() {
       {isLoading ? <p className="empty-note">正在读取平台状态。</p> : null}
 
       <div className="segmented-control" role="tablist" aria-label="平台状态设置">
-        <button className={activeView === 'announcement' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('announcement')}>
+        <button
+          className={activeView === 'announcement' ? 'is-selected' : undefined}
+          type="button"
+          onClick={() => setActiveView('announcement')}
+        >
           <span className="material-symbols-rounded" aria-hidden="true">
             campaign
           </span>
           <span>公告</span>
         </button>
-        <button className={activeView === 'maintenance' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('maintenance')}>
+        <button
+          className={activeView === 'maintenance' ? 'is-selected' : undefined}
+          type="button"
+          onClick={() => setActiveView('maintenance')}
+        >
           <span className="material-symbols-rounded" aria-hidden="true">
             construction
           </span>
           <span>维护</span>
         </button>
-        <button className={activeView === 'theme' ? 'is-selected' : undefined} type="button" onClick={() => setActiveView('theme')}>
+        <button
+          className={activeView === 'theme' ? 'is-selected' : undefined}
+          type="button"
+          onClick={() => setActiveView('theme')}
+        >
           <span className="material-symbols-rounded" aria-hidden="true">
             palette
           </span>
@@ -139,91 +157,99 @@ export function AdminPlatformStatusPanel() {
       </div>
 
       {activeView !== 'theme' ? (
-      <form className="stacked-form platform-status-form" onSubmit={saveStatus} noValidate>
-        {activeView === 'announcement' ? (
-        <fieldset>
-          <legend>全站公告</legend>
-          <label className="inline-toggle">
-            <input
-              type="checkbox"
-              checked={editable.announcementEnabled}
-              onChange={(event) => updateEditable({ announcementEnabled: event.target.checked })}
-            />
-            <span>启用公告横幅</span>
-          </label>
-          <label>
-            <span>公告标题</span>
-            <input
-              value={editable.announcementTitle}
-              onChange={(event) => updateEditable({ announcementTitle: event.target.value })}
-              maxLength={80}
-            />
-          </label>
-          <label>
-            <span>公告正文</span>
-            <textarea
-              value={editable.announcementBody}
-              onChange={(event) => updateEditable({ announcementBody: event.target.value })}
-              maxLength={500}
-            />
-          </label>
-          <label>
-            <span>公告级别</span>
-            <select
-              value={editable.announcementTone}
-              onChange={(event) => updateEditable({ announcementTone: event.target.value as PlatformNoticeTone })}
-            >
-              {toneOptions.map((tone) => (
-                <option value={tone.value} key={tone.value}>
-                  {tone.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </fieldset>
-        ) : null}
+        <form className="stacked-form platform-status-form" onSubmit={saveStatus} noValidate>
+          {activeView === 'announcement' ? (
+            <fieldset>
+              <legend>全站公告</legend>
+              <label className="inline-toggle">
+                <input
+                  type="checkbox"
+                  checked={editable.announcementEnabled}
+                  onChange={(event) =>
+                    updateEditable({ announcementEnabled: event.target.checked })
+                  }
+                />
+                <span>启用公告横幅</span>
+              </label>
+              <label>
+                <span>公告标题</span>
+                <input
+                  value={editable.announcementTitle}
+                  onChange={(event) => updateEditable({ announcementTitle: event.target.value })}
+                  maxLength={80}
+                />
+              </label>
+              <label>
+                <span>公告正文</span>
+                <textarea
+                  value={editable.announcementBody}
+                  onChange={(event) => updateEditable({ announcementBody: event.target.value })}
+                  maxLength={500}
+                />
+              </label>
+              <label>
+                <span>公告级别</span>
+                <select
+                  value={editable.announcementTone}
+                  onChange={(event) =>
+                    updateEditable({ announcementTone: event.target.value as PlatformNoticeTone })
+                  }
+                >
+                  {toneOptions.map((tone) => (
+                    <option value={tone.value} key={tone.value}>
+                      {tone.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </fieldset>
+          ) : null}
 
-        {activeView === 'maintenance' ? (
-        <fieldset>
-          <legend>维护状态</legend>
-          <label className="inline-toggle">
-            <input
-              type="checkbox"
-              checked={editable.maintenanceEnabled}
-              onChange={(event) => updateEditable({ maintenanceEnabled: event.target.checked })}
-            />
-            <span>启用维护提醒</span>
-          </label>
-          <label>
-            <span>维护标题</span>
-            <input
-              value={editable.maintenanceTitle}
-              onChange={(event) => updateEditable({ maintenanceTitle: event.target.value })}
-              maxLength={80}
-            />
-          </label>
-          <label>
-            <span>维护说明</span>
-            <textarea
-              value={editable.maintenanceBody}
-              onChange={(event) => updateEditable({ maintenanceBody: event.target.value })}
-              maxLength={500}
-            />
-          </label>
-        </fieldset>
-        ) : null}
+          {activeView === 'maintenance' ? (
+            <fieldset>
+              <legend>维护状态</legend>
+              <label className="inline-toggle">
+                <input
+                  type="checkbox"
+                  checked={editable.maintenanceEnabled}
+                  onChange={(event) => updateEditable({ maintenanceEnabled: event.target.checked })}
+                />
+                <span>启用维护提醒</span>
+              </label>
+              <label>
+                <span>维护标题</span>
+                <input
+                  value={editable.maintenanceTitle}
+                  onChange={(event) => updateEditable({ maintenanceTitle: event.target.value })}
+                  maxLength={80}
+                />
+              </label>
+              <label>
+                <span>维护说明</span>
+                <textarea
+                  value={editable.maintenanceBody}
+                  onChange={(event) => updateEditable({ maintenanceBody: event.target.value })}
+                  maxLength={500}
+                />
+              </label>
+            </fieldset>
+          ) : null}
 
-        <p className="empty-note">{updatedAt ? `最后更新：${new Date(updatedAt).toLocaleString('zh-CN')}` : '尚未保存平台状态。'}</p>
+          <p className="empty-note">
+            {updatedAt
+              ? `最后更新：${new Date(updatedAt).toLocaleString('zh-CN')}`
+              : '尚未保存平台状态。'}
+          </p>
 
-        <div className="form-actions">
-          <button className="primary-action" type="submit" disabled={isSaving || isLoading}>
-            <span className="material-symbols-rounded" aria-hidden="true">
-              campaign
-            </span>
-            <span>{isSaving ? '保存中' : '保存状态'}</span>
-          </button>
-        </div>
-      </form>
+          <div className="form-actions">
+            <button className="primary-action" type="submit" disabled={isSaving || isLoading}>
+              <span className="material-symbols-rounded" aria-hidden="true">
+                campaign
+              </span>
+              <span>{isSaving ? '保存中' : '保存状态'}</span>
+            </button>
+          </div>
+        </form>
       ) : (
         <ThemeSchedulePanel embedded />
       )}

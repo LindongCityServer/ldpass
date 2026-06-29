@@ -47,7 +47,17 @@ interface ProviderTicketUpdateRequest {
   reviewReason: string | null;
   reviewedAt: string | null;
   createdAt: string;
-  pass: Pick<ProviderPass, 'id' | 'displayName' | 'title' | 'category' | 'benefitType' | 'publicNumber' | 'maskedNumber' | 'user'>;
+  pass: Pick<
+    ProviderPass,
+    | 'id'
+    | 'displayName'
+    | 'title'
+    | 'category'
+    | 'benefitType'
+    | 'publicNumber'
+    | 'maskedNumber'
+    | 'user'
+  >;
 }
 
 interface ProviderPassesResponse {
@@ -220,7 +230,9 @@ export function ProviderPassesPanel() {
   const [ticketChangeStatus, setTicketChangeStatus] =
     useState<ProviderTicketInfo['changeStatus']>('none');
   const [ticketUpdateReason, setTicketUpdateReason] = useState('');
-  const [ticketUpdateRequests, setTicketUpdateRequests] = useState<ProviderTicketUpdateRequest[]>([]);
+  const [ticketUpdateRequests, setTicketUpdateRequests] = useState<ProviderTicketUpdateRequest[]>(
+    [],
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -937,17 +949,6 @@ export function ProviderPassesPanel() {
           <p>发卡方后台</p>
           <h1 id="provider-passes-title">卡券权益调整</h1>
         </div>
-        <div className="admin-list-actions">
-          <a className="secondary-action" href="/provider/issue">
-            生成领取码
-          </a>
-          <a className="secondary-action" href="/provider/templates">
-            模板管理
-          </a>
-          <a className="secondary-action" href="/provider/dashboard">
-            工作台
-          </a>
-        </div>
       </div>
 
       <form className="audit-filter-grid" onSubmit={submitSearch}>
@@ -1000,11 +1001,26 @@ export function ProviderPassesPanel() {
 
       {selectedPass && activePassDialog ? (
         <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setActivePassDialog(null)} />
-          <section className="admin-dialog-panel admin-pass-dialog-panel" role="dialog" aria-modal="true" aria-label={readProviderPassDialogTitle(activePassDialog, selectedPass)}>
+          <button
+            className="admin-dialog-scrim"
+            type="button"
+            aria-label="关闭弹窗"
+            onClick={() => setActivePassDialog(null)}
+          />
+          <section
+            className="admin-dialog-panel admin-pass-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label={readProviderPassDialogTitle(activePassDialog, selectedPass)}
+          >
             <div className="admin-dialog-heading">
               <h2>{readProviderPassDialogTitle(activePassDialog, selectedPass)}</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setActivePassDialog(null)}>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="关闭弹窗"
+                onClick={() => setActivePassDialog(null)}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   close
                 </span>
@@ -1012,534 +1028,545 @@ export function ProviderPassesPanel() {
             </div>
             {activePassDialog === 'detail' ? <ProviderPassDetail pass={selectedPass} /> : null}
             {activePassDialog === 'adjust' ? (
-          <form className="admin-adjustment-panel" onSubmit={submitAdjustment}>
-            <div>
-              <p>正在调整</p>
-              <h2>{selectedPass.displayName}</h2>
-              <span>
-                {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
-              </span>
-            </div>
-            <strong>
-              {formatBenefitValue(selectedPass.balanceValue, selectedPass.benefitType)}
-            </strong>
-            <label>
-              <span>增减量</span>
-              <input
-                value={changeValue}
-                onChange={(event) => setChangeValue(event.target.value)}
-                placeholder="+30 或 -5"
-                required
-              />
-            </label>
-            <label>
-              <span>原因</span>
-              <input
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="补发活动权益"
-                required
-              />
-            </label>
-            <label>
-              <span>备注</span>
-              <input
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="可选"
-              />
-            </label>
-            <button className="primary-action" type="submit" disabled={isSubmitting}>
-              <span className="material-symbols-rounded" aria-hidden="true">
-                tune
-              </span>
-              <span>{isSubmitting ? '提交中' : '提交调整'}</span>
-            </button>
-          </form>
+              <form className="admin-adjustment-panel" onSubmit={submitAdjustment}>
+                <div>
+                  <p>正在调整</p>
+                  <h2>{selectedPass.displayName}</h2>
+                  <span>
+                    {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
+                  </span>
+                </div>
+                <strong>
+                  {formatBenefitValue(selectedPass.balanceValue, selectedPass.benefitType)}
+                </strong>
+                <label>
+                  <span>增减量</span>
+                  <input
+                    value={changeValue}
+                    onChange={(event) => setChangeValue(event.target.value)}
+                    placeholder="+30 或 -5"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>原因</span>
+                  <input
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    placeholder="补发活动权益"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>备注</span>
+                  <input
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="可选"
+                  />
+                </label>
+                <button className="primary-action" type="submit" disabled={isSubmitting}>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    tune
+                  </span>
+                  <span>{isSubmitting ? '提交中' : '提交调整'}</span>
+                </button>
+              </form>
             ) : null}
 
             {activePassDialog === 'redemption' ? (
-          <form
-            className="admin-adjustment-panel provider-redemption-form"
-            onSubmit={submitRedemptionRequest}
-          >
-            <div>
-              <p>发起消耗</p>
-              <h2>{selectedPass.user ? selectedPass.user.username : '尚未领取'}</h2>
-              <span>
-                {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
-              </span>
-            </div>
-            <strong>
-              {formatBenefitValue(selectedPass.balanceValue, selectedPass.benefitType)}
-            </strong>
-            <label>
-              <span>消耗值</span>
-              <input
-                value={consumeValue}
-                onChange={(event) => setConsumeValue(event.target.value)}
-                placeholder="例如：18.7"
-                required
-              />
-            </label>
-            <label>
-              <span>验证方式</span>
-              <select
-                value={consumeMethod}
-                onChange={(event) =>
-                  setConsumeMethod(event.target.value as 'server_account' | 'pin')
-                }
+              <form
+                className="admin-adjustment-panel provider-redemption-form"
+                onSubmit={submitRedemptionRequest}
               >
-                <option value="server_account">服务器账号</option>
-                <option value="pin">PIN</option>
-              </select>
-            </label>
-            <label>
-              <span>有效秒数</span>
-              <input
-                value={consumeExpiresInSeconds}
-                onChange={(event) => setConsumeExpiresInSeconds(event.target.value)}
-                inputMode="numeric"
-                placeholder="120"
-                required
-              />
-            </label>
-            <label>
-              <span>最大尝试</span>
-              <input
-                value={consumeMaxVerificationAttempts}
-                onChange={(event) => setConsumeMaxVerificationAttempts(event.target.value)}
-                inputMode="numeric"
-                placeholder="3"
-                required
-              />
-            </label>
-            <button
-              className="primary-action"
-              type="submit"
-              disabled={isCreatingRedemption || !selectedPass.user}
-            >
-              <span className="material-symbols-rounded" aria-hidden="true">
-                point_of_sale
-              </span>
-              <span>{isCreatingRedemption ? '发起中' : '发起消耗'}</span>
-            </button>
-          </form>
-            ) : null}
-
-            {activePassDialog === 'actionLink' ? (
-          <form
-            className="admin-adjustment-panel provider-redemption-form"
-            onSubmit={submitActionLink}
-          >
-            <div>
-              <p>生成操作链接</p>
-              <h2>{selectedPass.user ? selectedPass.user.username : '尚未领取'}</h2>
-              <span>
-                {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
-              </span>
-            </div>
-            <strong>
-              {formatBenefitValue(selectedPass.balanceValue, selectedPass.benefitType)}
-            </strong>
-            <label>
-              <span>链接类型</span>
-              <select
-                value={actionLinkKind}
-                onChange={(event) => {
-                  const nextKind = event.target.value as 'use' | 'top_up';
-                  setActionLinkKind(nextKind);
-                }}
-              >
-                <option value="use">确认使用</option>
-                <option value="top_up">额度补充</option>
-              </select>
-            </label>
-            <label>
-              <span>{actionLinkKind === 'use' ? '消耗值' : '补充值'}</span>
-              <input
-                value={actionLinkValue}
-                onChange={(event) => setActionLinkValue(event.target.value)}
-                placeholder="例如：18.7"
-                required
-              />
-            </label>
-            <label>
-              <span>验证方式</span>
-              <select
-                value={actionLinkMethod}
-                onChange={(event) =>
-                  setActionLinkMethod(event.target.value as 'server_account' | 'pin')
-                }
-              >
-                <option value="pin">PIN</option>
-                <option value="server_account">服务器账号</option>
-              </select>
-            </label>
-            <label>
-              <span>有效秒数</span>
-              <input
-                value={actionLinkExpiresInSeconds}
-                onChange={(event) => setActionLinkExpiresInSeconds(event.target.value)}
-                inputMode="numeric"
-                placeholder="900"
-                required
-              />
-            </label>
-            <label>
-              <span>备注</span>
-              <input
-                value={actionLinkNote}
-                onChange={(event) => setActionLinkNote(event.target.value)}
-                placeholder="可选"
-              />
-            </label>
-            <button
-              className="primary-action"
-              type="submit"
-              disabled={isCreatingActionLink || !selectedPass.user}
-            >
-              <span className="material-symbols-rounded" aria-hidden="true">
-                link
-              </span>
-              <span>{isCreatingActionLink ? '生成中' : '生成链接'}</span>
-            </button>
-            {latestActionLink ? (
-              <div className="action-link-result">
-                <span>完整链接只显示一次</span>
-                <code>
-                  {latestActionLink.actionPath
-                    ? formatActionLinkUrl(latestActionLink.actionPath)
-                    : '链接已隐藏'}
-                </code>
-                <button
-                  className="secondary-action"
-                  type="button"
-                  onClick={() => void copyLatestActionLink()}
-                >
-                  复制链接
-                </button>
-              </div>
-            ) : null}
-            <div className="action-link-list">
-              <div className="action-link-list-heading">
-                <span>{actionLinkScope === 'current' ? '当前卡券操作链接' : '全部操作链接'}</span>
-                <div className="admin-list-actions">
-                  <button
-                    className="secondary-action"
-                    type="button"
-                    disabled={!selectableActionLinkIds.length}
-                    onClick={toggleAllVisibleActionLinks}
-                  >
-                    {selectableActionLinkIds.length > 0 &&
-                    selectableActionLinkIds.every((actionLinkId) =>
-                      selectedActionLinkIdSet.has(actionLinkId),
-                    )
-                      ? '取消全选'
-                      : '全选可用'}
-                  </button>
-                  <button
-                    className="secondary-action danger-action"
-                    type="button"
-                    disabled={!selectedActionLinkIds.length || isBatchRevokingActionLinks}
-                    onClick={() => void batchRevokeActionLinks()}
-                  >
-                    {isBatchRevokingActionLinks
-                      ? '撤销中'
-                      : `批量撤销 ${selectedActionLinkIds.length || ''}`}
-                  </button>
-                  <button
-                    className="secondary-action"
-                    type="button"
-                    disabled={isLoadingActionLinks}
-                    onClick={() => void loadActionLinks()}
-                  >
-                    {isLoadingActionLinks ? '刷新中' : '刷新'}
-                  </button>
+                <div>
+                  <p>发起消耗</p>
+                  <h2>{selectedPass.user ? selectedPass.user.username : '尚未领取'}</h2>
+                  <span>
+                    {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
+                  </span>
                 </div>
-              </div>
-              <div className="action-link-filters" aria-label="操作链接筛选">
+                <strong>
+                  {formatBenefitValue(selectedPass.balanceValue, selectedPass.benefitType)}
+                </strong>
                 <label>
-                  <span>范围</span>
+                  <span>消耗值</span>
+                  <input
+                    value={consumeValue}
+                    onChange={(event) => setConsumeValue(event.target.value)}
+                    placeholder="例如：18.7"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>验证方式</span>
                   <select
-                    value={actionLinkScope}
+                    value={consumeMethod}
                     onChange={(event) =>
-                      setActionLinkScope(event.target.value as 'current' | 'all')
+                      setConsumeMethod(event.target.value as 'server_account' | 'pin')
                     }
                   >
-                    <option value="current">当前卡券</option>
-                    <option value="all">全部卡券</option>
+                    <option value="server_account">服务器账号</option>
+                    <option value="pin">PIN</option>
                   </select>
                 </label>
                 <label>
-                  <span>类型</span>
+                  <span>有效秒数</span>
+                  <input
+                    value={consumeExpiresInSeconds}
+                    onChange={(event) => setConsumeExpiresInSeconds(event.target.value)}
+                    inputMode="numeric"
+                    placeholder="120"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>最大尝试</span>
+                  <input
+                    value={consumeMaxVerificationAttempts}
+                    onChange={(event) => setConsumeMaxVerificationAttempts(event.target.value)}
+                    inputMode="numeric"
+                    placeholder="3"
+                    required
+                  />
+                </label>
+                <button
+                  className="primary-action"
+                  type="submit"
+                  disabled={isCreatingRedemption || !selectedPass.user}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    point_of_sale
+                  </span>
+                  <span>{isCreatingRedemption ? '发起中' : '发起消耗'}</span>
+                </button>
+              </form>
+            ) : null}
+
+            {activePassDialog === 'actionLink' ? (
+              <form
+                className="admin-adjustment-panel provider-redemption-form"
+                onSubmit={submitActionLink}
+              >
+                <div>
+                  <p>生成操作链接</p>
+                  <h2>{selectedPass.user ? selectedPass.user.username : '尚未领取'}</h2>
+                  <span>
+                    {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
+                  </span>
+                </div>
+                <strong>
+                  {formatBenefitValue(selectedPass.balanceValue, selectedPass.benefitType)}
+                </strong>
+                <label>
+                  <span>链接类型</span>
                   <select
-                    value={actionLinkKindFilter}
-                    onChange={(event) =>
-                      setActionLinkKindFilter(event.target.value as ActionLinkKindFilter)
-                    }
+                    value={actionLinkKind}
+                    onChange={(event) => {
+                      const nextKind = event.target.value as 'use' | 'top_up';
+                      setActionLinkKind(nextKind);
+                    }}
                   >
-                    <option value="all">全部</option>
                     <option value="use">确认使用</option>
                     <option value="top_up">额度补充</option>
                   </select>
                 </label>
                 <label>
-                  <span>状态</span>
+                  <span>{actionLinkKind === 'use' ? '消耗值' : '补充值'}</span>
+                  <input
+                    value={actionLinkValue}
+                    onChange={(event) => setActionLinkValue(event.target.value)}
+                    placeholder="例如：18.7"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>验证方式</span>
                   <select
-                    value={actionLinkStatusFilter}
+                    value={actionLinkMethod}
                     onChange={(event) =>
-                      setActionLinkStatusFilter(event.target.value as ActionLinkStatusFilter)
+                      setActionLinkMethod(event.target.value as 'server_account' | 'pin')
                     }
                   >
-                    <option value="all">全部</option>
-                    <option value="Active">可用</option>
-                    <option value="Consumed">已使用</option>
-                    <option value="Expired">已过期</option>
-                    <option value="Revoked">已撤销</option>
+                    <option value="pin">PIN</option>
+                    <option value="server_account">服务器账号</option>
                   </select>
                 </label>
+                <label>
+                  <span>有效秒数</span>
+                  <input
+                    value={actionLinkExpiresInSeconds}
+                    onChange={(event) => setActionLinkExpiresInSeconds(event.target.value)}
+                    inputMode="numeric"
+                    placeholder="900"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>备注</span>
+                  <input
+                    value={actionLinkNote}
+                    onChange={(event) => setActionLinkNote(event.target.value)}
+                    placeholder="可选"
+                  />
+                </label>
                 <button
-                  className="secondary-action"
-                  type="button"
-                  disabled={isLoadingActionLinks}
-                  onClick={() => void loadActionLinks()}
+                  className="primary-action"
+                  type="submit"
+                  disabled={isCreatingActionLink || !selectedPass.user}
                 >
-                  应用筛选
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    link
+                  </span>
+                  <span>{isCreatingActionLink ? '生成中' : '生成链接'}</span>
                 </button>
-              </div>
-              {visibleActionLinks.length ? (
-                <ol>
-                  {visibleActionLinks.map((actionLink) => (
-                    <li key={actionLink.id}>
-                      <label className="action-link-select">
-                        <input
-                          type="checkbox"
-                          checked={selectedActionLinkIdSet.has(actionLink.id)}
-                          disabled={actionLink.status !== 'Active'}
-                          onChange={() => toggleActionLinkSelection(actionLink.id)}
-                        />
-                        <span className="material-symbols-rounded" aria-hidden="true">
-                          check
-                        </span>
-                      </label>
-                      <div>
-                        <strong>
-                          {formatActionLinkKind(actionLink.kind)} ·{' '}
-                          {formatActionLinkStatus(actionLink.status)}
-                        </strong>
-                        <span>
-                          {formatBenefitValue(
-                            actionLink.requestedValue,
-                            actionLink.targetPass.benefitType,
-                          )}{' '}
-                          · {formatVerificationMethod(actionLink.verificationMethod)}
-                        </span>
-                        <small>
-                          {actionLink.targetPass.displayName} · 到期{' '}
-                          {formatDate(actionLink.expiresAt)} ·{' '}
-                          {actionLink.targetPass.user?.username ?? '未知用户'}
-                        </small>
-                        {actionLink.revokeReason ? (
-                          <small>撤销原因：{actionLink.revokeReason}</small>
-                        ) : null}
-                      </div>
-                      {actionLink.status === 'Active' ? (
-                        <button
-                          className="secondary-action danger-action"
-                          type="button"
-                          disabled={revokingActionLinkId === actionLink.id}
-                          onClick={() => void revokeActionLink(actionLink)}
-                        >
-                          {revokingActionLinkId === actionLink.id ? '撤销中' : '撤销'}
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="empty-hint">
-                  {isLoadingActionLinks ? '正在读取操作链接。' : '当前筛选下暂无操作链接。'}
-                </p>
-              )}
-            </div>
-          </form>
+                {latestActionLink ? (
+                  <div className="action-link-result">
+                    <span>完整链接只显示一次</span>
+                    <code>
+                      {latestActionLink.actionPath
+                        ? formatActionLinkUrl(latestActionLink.actionPath)
+                        : '链接已隐藏'}
+                    </code>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      onClick={() => void copyLatestActionLink()}
+                    >
+                      复制链接
+                    </button>
+                  </div>
+                ) : null}
+                <div className="action-link-list">
+                  <div className="action-link-list-heading">
+                    <span>
+                      {actionLinkScope === 'current' ? '当前卡券操作链接' : '全部操作链接'}
+                    </span>
+                    <div className="admin-list-actions">
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        disabled={!selectableActionLinkIds.length}
+                        onClick={toggleAllVisibleActionLinks}
+                      >
+                        {selectableActionLinkIds.length > 0 &&
+                        selectableActionLinkIds.every((actionLinkId) =>
+                          selectedActionLinkIdSet.has(actionLinkId),
+                        )
+                          ? '取消全选'
+                          : '全选可用'}
+                      </button>
+                      <button
+                        className="secondary-action danger-action"
+                        type="button"
+                        disabled={!selectedActionLinkIds.length || isBatchRevokingActionLinks}
+                        onClick={() => void batchRevokeActionLinks()}
+                      >
+                        {isBatchRevokingActionLinks
+                          ? '撤销中'
+                          : `批量撤销 ${selectedActionLinkIds.length || ''}`}
+                      </button>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        disabled={isLoadingActionLinks}
+                        onClick={() => void loadActionLinks()}
+                      >
+                        {isLoadingActionLinks ? '刷新中' : '刷新'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="action-link-filters" aria-label="操作链接筛选">
+                    <label>
+                      <span>范围</span>
+                      <select
+                        value={actionLinkScope}
+                        onChange={(event) =>
+                          setActionLinkScope(event.target.value as 'current' | 'all')
+                        }
+                      >
+                        <option value="current">当前卡券</option>
+                        <option value="all">全部卡券</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>类型</span>
+                      <select
+                        value={actionLinkKindFilter}
+                        onChange={(event) =>
+                          setActionLinkKindFilter(event.target.value as ActionLinkKindFilter)
+                        }
+                      >
+                        <option value="all">全部</option>
+                        <option value="use">确认使用</option>
+                        <option value="top_up">额度补充</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>状态</span>
+                      <select
+                        value={actionLinkStatusFilter}
+                        onChange={(event) =>
+                          setActionLinkStatusFilter(event.target.value as ActionLinkStatusFilter)
+                        }
+                      >
+                        <option value="all">全部</option>
+                        <option value="Active">可用</option>
+                        <option value="Consumed">已使用</option>
+                        <option value="Expired">已过期</option>
+                        <option value="Revoked">已撤销</option>
+                      </select>
+                    </label>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      disabled={isLoadingActionLinks}
+                      onClick={() => void loadActionLinks()}
+                    >
+                      应用筛选
+                    </button>
+                  </div>
+                  {visibleActionLinks.length ? (
+                    <ol>
+                      {visibleActionLinks.map((actionLink) => (
+                        <li key={actionLink.id}>
+                          <label className="action-link-select">
+                            <input
+                              type="checkbox"
+                              checked={selectedActionLinkIdSet.has(actionLink.id)}
+                              disabled={actionLink.status !== 'Active'}
+                              onChange={() => toggleActionLinkSelection(actionLink.id)}
+                            />
+                            <span className="material-symbols-rounded" aria-hidden="true">
+                              check
+                            </span>
+                          </label>
+                          <div>
+                            <strong>
+                              {formatActionLinkKind(actionLink.kind)} ·{' '}
+                              {formatActionLinkStatus(actionLink.status)}
+                            </strong>
+                            <span>
+                              {formatBenefitValue(
+                                actionLink.requestedValue,
+                                actionLink.targetPass.benefitType,
+                              )}{' '}
+                              · {formatVerificationMethod(actionLink.verificationMethod)}
+                            </span>
+                            <small>
+                              {actionLink.targetPass.displayName} · 到期{' '}
+                              {formatDate(actionLink.expiresAt)} ·{' '}
+                              {actionLink.targetPass.user?.username ?? '未知用户'}
+                            </small>
+                            {actionLink.revokeReason ? (
+                              <small>撤销原因：{actionLink.revokeReason}</small>
+                            ) : null}
+                          </div>
+                          {actionLink.status === 'Active' ? (
+                            <button
+                              className="secondary-action danger-action"
+                              type="button"
+                              disabled={revokingActionLinkId === actionLink.id}
+                              onClick={() => void revokeActionLink(actionLink)}
+                            >
+                              {revokingActionLinkId === actionLink.id ? '撤销中' : '撤销'}
+                            </button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="empty-hint">
+                      {isLoadingActionLinks ? '正在读取操作链接。' : '当前筛选下暂无操作链接。'}
+                    </p>
+                  )}
+                </div>
+              </form>
             ) : null}
 
             {activePassDialog === 'status' ? (
-          <div className="admin-adjustment-panel provider-status-panel">
-            <div>
-              <p>状态管理</p>
-              <h2>{formatPassStatus(selectedPass.status)}</h2>
-              <span>
-                {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
-              </span>
-            </div>
-            <strong>{selectedPass.user ? selectedPass.user.username : '尚未领取'}</strong>
-            <div className="admin-list-actions">
-              <button
-                className="secondary-action"
-                type="button"
-                disabled={
-                  isChangingStatus ||
-                  selectedPass.status === 'Frozen' ||
-                  selectedPass.status === 'Archived'
-                }
-                onClick={() => void changePassStatus('freeze')}
-              >
-                冻结
-              </button>
-              <button
-                className="secondary-action"
-                type="button"
-                disabled={isChangingStatus || selectedPass.status !== 'Frozen'}
-                onClick={() => void changePassStatus('unfreeze')}
-              >
-                解冻
-              </button>
-              <button
-                className="danger-action"
-                type="button"
-                disabled={isChangingStatus || selectedPass.status === 'Archived'}
-                onClick={() => void changePassStatus('archive')}
-              >
-                取消
-              </button>
-            </div>
-          </div>
+              <div className="admin-adjustment-panel provider-status-panel">
+                <div>
+                  <p>状态管理</p>
+                  <h2>{formatPassStatus(selectedPass.status)}</h2>
+                  <span>
+                    {selectedPass.maskedNumber ?? selectedPass.publicNumber ?? selectedPass.id}
+                  </span>
+                </div>
+                <strong>{selectedPass.user ? selectedPass.user.username : '尚未领取'}</strong>
+                <div className="admin-list-actions">
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    disabled={
+                      isChangingStatus ||
+                      selectedPass.status === 'Frozen' ||
+                      selectedPass.status === 'Archived'
+                    }
+                    onClick={() => void changePassStatus('freeze')}
+                  >
+                    冻结
+                  </button>
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    disabled={isChangingStatus || selectedPass.status !== 'Frozen'}
+                    onClick={() => void changePassStatus('unfreeze')}
+                  >
+                    解冻
+                  </button>
+                  <button
+                    className="danger-action"
+                    type="button"
+                    disabled={isChangingStatus || selectedPass.status === 'Archived'}
+                    onClick={() => void changePassStatus('archive')}
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
             ) : null}
 
-          {selectedPass.category === 'ticket' && activePassDialog === 'ticketUpdate' ? (
-            <form
-              className="admin-adjustment-panel provider-ticket-form"
-              onSubmit={submitTicketUpdate}
-            >
-              <div>
-                <p>票券字段</p>
-                <h2>{selectedPass.ticketInfo?.eventName || selectedPass.title}</h2>
-                <span>{selectedPass.ticketInfo?.seatLabel || '未设置座位'}</span>
-              </div>
-              <strong>{formatTicketStatus(selectedPass.ticketInfo)}</strong>
-              <label>
-                <span>活动名称</span>
-                <input
-                  value={ticketEventName}
-                  onChange={(event) => setTicketEventName(event.target.value)}
-                  placeholder="活动名称"
-                />
-              </label>
-              <label>
-                <span>场地</span>
-                <input
-                  value={ticketVenue}
-                  onChange={(event) => setTicketVenue(event.target.value)}
-                  placeholder="场地"
-                />
-              </label>
-              <label>
-                <span>场次时间</span>
-                <input
-                  type="datetime-local"
-                  value={ticketStartsAt}
-                  onChange={(event) => setTicketStartsAt(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>座位</span>
-                <input
-                  value={ticketSeatLabel}
-                  onChange={(event) => setTicketSeatLabel(event.target.value)}
-                  placeholder="座位"
-                />
-              </label>
-              <label>
-                <span>检票状态</span>
-                <select
-                  value={ticketCheckInStatus}
-                  onChange={(event) =>
-                    setTicketCheckInStatus(
-                      event.target.value as ProviderTicketInfo['checkInStatus'],
-                    )
-                  }
-                >
-                  <option value="not_checked_in">未检票</option>
-                  <option value="checked_in">已检票</option>
-                  <option value="voided">已作废</option>
-                </select>
-              </label>
-              <label>
-                <span>改签/取消</span>
-                <select
-                  value={ticketChangeStatus}
-                  onChange={(event) =>
-                    setTicketChangeStatus(event.target.value as ProviderTicketInfo['changeStatus'])
-                  }
-                >
-                  <option value="none">无变更</option>
-                  <option value="rescheduled">已改签</option>
-                  <option value="cancelled">已取消</option>
-                </select>
-              </label>
-              <label>
-                <span>变更说明</span>
-                <input
-                  value={ticketUpdateReason}
-                  onChange={(event) => setTicketUpdateReason(event.target.value)}
-                  placeholder="例如场次调整、座位更正"
-                  maxLength={200}
-                />
-              </label>
-              <button className="primary-action" type="submit" disabled={isUpdatingTicket}>
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  confirmation_number
-                </span>
-                <span>{isUpdatingTicket ? '提交中' : '提交审核'}</span>
-              </button>
-              <p className="empty-hint">票券字段属于卡券可见信息，管理员审核通过后才会生效。</p>
-            </form>
-          ) : null}
-
-          {selectedPass.category === 'ticket' && activePassDialog === 'ticketRequests' ? (
-            <section className="admin-adjustment-panel provider-ticket-review-list" aria-label="票券变更申请">
-              <div>
-                <p>票券变更申请</p>
-                <h2>{visibleTicketUpdateRequests.length}</h2>
-                <span>显示当前票券最近的变更申请。</span>
-              </div>
-              <div className="admin-list-actions">
-                <button
-                  className="secondary-action"
-                  type="button"
-                  disabled={isLoadingTicketUpdateRequests}
-                  onClick={() => void loadTicketUpdateRequests()}
-                >
-                  {isLoadingTicketUpdateRequests ? '刷新中' : '刷新申请'}
+            {selectedPass.category === 'ticket' && activePassDialog === 'ticketUpdate' ? (
+              <form
+                className="admin-adjustment-panel provider-ticket-form"
+                onSubmit={submitTicketUpdate}
+              >
+                <div>
+                  <p>票券字段</p>
+                  <h2>{selectedPass.ticketInfo?.eventName || selectedPass.title}</h2>
+                  <span>{selectedPass.ticketInfo?.seatLabel || '未设置座位'}</span>
+                </div>
+                <strong>{formatTicketStatus(selectedPass.ticketInfo)}</strong>
+                <label>
+                  <span>活动名称</span>
+                  <input
+                    value={ticketEventName}
+                    onChange={(event) => setTicketEventName(event.target.value)}
+                    placeholder="活动名称"
+                  />
+                </label>
+                <label>
+                  <span>场地</span>
+                  <input
+                    value={ticketVenue}
+                    onChange={(event) => setTicketVenue(event.target.value)}
+                    placeholder="场地"
+                  />
+                </label>
+                <label>
+                  <span>场次时间</span>
+                  <input
+                    type="datetime-local"
+                    value={ticketStartsAt}
+                    onChange={(event) => setTicketStartsAt(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>座位</span>
+                  <input
+                    value={ticketSeatLabel}
+                    onChange={(event) => setTicketSeatLabel(event.target.value)}
+                    placeholder="座位"
+                  />
+                </label>
+                <label>
+                  <span>检票状态</span>
+                  <select
+                    value={ticketCheckInStatus}
+                    onChange={(event) =>
+                      setTicketCheckInStatus(
+                        event.target.value as ProviderTicketInfo['checkInStatus'],
+                      )
+                    }
+                  >
+                    <option value="not_checked_in">未检票</option>
+                    <option value="checked_in">已检票</option>
+                    <option value="voided">已作废</option>
+                  </select>
+                </label>
+                <label>
+                  <span>改签/取消</span>
+                  <select
+                    value={ticketChangeStatus}
+                    onChange={(event) =>
+                      setTicketChangeStatus(
+                        event.target.value as ProviderTicketInfo['changeStatus'],
+                      )
+                    }
+                  >
+                    <option value="none">无变更</option>
+                    <option value="rescheduled">已改签</option>
+                    <option value="cancelled">已取消</option>
+                  </select>
+                </label>
+                <label>
+                  <span>变更说明</span>
+                  <input
+                    value={ticketUpdateReason}
+                    onChange={(event) => setTicketUpdateReason(event.target.value)}
+                    placeholder="例如场次调整、座位更正"
+                    maxLength={200}
+                  />
+                </label>
+                <button className="primary-action" type="submit" disabled={isUpdatingTicket}>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    confirmation_number
+                  </span>
+                  <span>{isUpdatingTicket ? '提交中' : '提交审核'}</span>
                 </button>
-              </div>
-              {visibleTicketUpdateRequests.length ? (
-                <ol>
-                  {visibleTicketUpdateRequests.map((request) => (
-                    <li key={request.id}>
-                      <div>
-                        <strong>{formatTicketUpdateRequestStatus(request.status)}</strong>
-                        <span>{formatTicketStatus(request.proposedTicketInfo)}</span>
-                        <small>
-                          {formatTicketSummary(request.proposedTicketInfo)} · 提交{' '}
-                          {formatDate(request.createdAt)}
-                        </small>
-                        {request.reason ? <small>说明：{request.reason}</small> : null}
-                        {request.reviewReason ? <small>审核意见：{request.reviewReason}</small> : null}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="empty-hint">
-                  {isLoadingTicketUpdateRequests ? '正在读取票券变更申请。' : '当前票券暂无变更申请。'}
-                </p>
-              )}
-            </section>
-          ) : null}
+                <p className="empty-hint">票券字段属于卡券可见信息，管理员审核通过后才会生效。</p>
+              </form>
+            ) : null}
+
+            {selectedPass.category === 'ticket' && activePassDialog === 'ticketRequests' ? (
+              <section
+                className="admin-adjustment-panel provider-ticket-review-list"
+                aria-label="票券变更申请"
+              >
+                <div>
+                  <p>票券变更申请</p>
+                  <h2>{visibleTicketUpdateRequests.length}</h2>
+                  <span>显示当前票券最近的变更申请。</span>
+                </div>
+                <div className="admin-list-actions">
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    disabled={isLoadingTicketUpdateRequests}
+                    onClick={() => void loadTicketUpdateRequests()}
+                  >
+                    {isLoadingTicketUpdateRequests ? '刷新中' : '刷新申请'}
+                  </button>
+                </div>
+                {visibleTicketUpdateRequests.length ? (
+                  <ol>
+                    {visibleTicketUpdateRequests.map((request) => (
+                      <li key={request.id}>
+                        <div>
+                          <strong>{formatTicketUpdateRequestStatus(request.status)}</strong>
+                          <span>{formatTicketStatus(request.proposedTicketInfo)}</span>
+                          <small>
+                            {formatTicketSummary(request.proposedTicketInfo)} · 提交{' '}
+                            {formatDate(request.createdAt)}
+                          </small>
+                          {request.reason ? <small>说明：{request.reason}</small> : null}
+                          {request.reviewReason ? (
+                            <small>审核意见：{request.reviewReason}</small>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="empty-hint">
+                    {isLoadingTicketUpdateRequests
+                      ? '正在读取票券变更申请。'
+                      : '当前票券暂无变更申请。'}
+                  </p>
+                )}
+              </section>
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -1560,7 +1587,8 @@ export function ProviderPassesPanel() {
               <div>
                 <h2>{pass.displayName}</h2>
                 <p>
-                  {formatPassStatus(pass.status)} · {formatBenefitLabel(pass.benefitType)} · 当前值：
+                  {formatPassStatus(pass.status)} · {formatBenefitLabel(pass.benefitType)} ·
+                  当前值：
                   {formatBenefitValue(pass.balanceValue, pass.benefitType)}
                 </p>
                 <p>

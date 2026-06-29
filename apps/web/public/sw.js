@@ -1,4 +1,4 @@
-const cacheName = 'ldpass-app-shell-v2';
+const cacheName = 'ldpass-app-shell-v3';
 const appShellUrls = [
   '/',
   '/manifest.webmanifest',
@@ -24,7 +24,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== cacheName).map((key) => caches.delete(key))))
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== cacheName).map((key) => caches.delete(key))),
+      )
       .then(() => self.clients.claim()),
   );
 });
@@ -42,6 +44,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (url.pathname.startsWith('/_next/static/')) {
+    return;
+  }
+
+  if (isBackofficePath(url.pathname)) {
+    return;
+  }
+
   if (request.mode === 'navigate') {
     event.respondWith(networkFirst(request, '/'));
     return;
@@ -51,6 +61,15 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(staleWhileRevalidate(request));
   }
 });
+
+function isBackofficePath(pathname) {
+  return (
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/') ||
+    pathname === '/provider' ||
+    pathname.startsWith('/provider/')
+  );
+}
 
 async function networkFirst(request, fallbackUrl) {
   const cache = await caches.open(cacheName);
@@ -62,12 +81,16 @@ async function networkFirst(request, fallbackUrl) {
     }
     return response;
   } catch {
-    return (await cache.match(request)) ?? (await cache.match(fallbackUrl)) ?? new Response('离线状态下暂时无法打开该页面。', {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-      },
-      status: 503,
-    });
+    return (
+      (await cache.match(request)) ??
+      (await cache.match(fallbackUrl)) ??
+      new Response('离线状态下暂时无法打开该页面。', {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+        },
+        status: 503,
+      })
+    );
   }
 }
 

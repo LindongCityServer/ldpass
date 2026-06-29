@@ -110,14 +110,6 @@ export function AuditLogPanel() {
           <p>平台管理</p>
           <h1 id="audit-title">审计日志</h1>
         </div>
-        <div className="admin-list-actions">
-          <a className="secondary-action" href="/admin/users">
-            用户审核
-          </a>
-          <a className="secondary-action" href="/admin/disputes">
-            争议处理
-          </a>
-        </div>
       </div>
 
       <form className="audit-filter-grid" onSubmit={submitFilters}>
@@ -125,7 +117,9 @@ export function AuditLogPanel() {
           <span>事件类型</span>
           <input
             value={filters.eventType}
-            onChange={(event) => setFilters((current) => ({ ...current, eventType: event.target.value }))}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, eventType: event.target.value }))
+            }
             placeholder="PassIssued"
           />
         </label>
@@ -133,7 +127,9 @@ export function AuditLogPanel() {
           <span>操作者 ID</span>
           <input
             value={filters.actorId}
-            onChange={(event) => setFilters((current) => ({ ...current, actorId: event.target.value }))}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, actorId: event.target.value }))
+            }
             placeholder="user/admin id"
           />
         </label>
@@ -141,7 +137,9 @@ export function AuditLogPanel() {
           <span>对象 ID</span>
           <input
             value={filters.subjectId}
-            onChange={(event) => setFilters((current) => ({ ...current, subjectId: event.target.value }))}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, subjectId: event.target.value }))
+            }
             placeholder="subject id"
           />
         </label>
@@ -152,7 +150,12 @@ export function AuditLogPanel() {
           <button className="secondary-action" type="button" onClick={clearFilters}>
             清空
           </button>
-          <button className="secondary-action" type="button" disabled={isExporting} onClick={() => void exportLogsCsv()}>
+          <button
+            className="secondary-action"
+            type="button"
+            disabled={isExporting}
+            onClick={() => void exportLogsCsv()}
+          >
             {isExporting ? '导出中' : '导出审计 CSV'}
           </button>
           <button className="primary-action" type="submit">
@@ -183,7 +186,9 @@ export function AuditLogPanel() {
                 {log.actorId ? ` · ${log.actorId}` : ''} / {log.subjectType ?? 'event'}
                 {log.subjectId ? ` · ${log.subjectId}` : ''}
               </p>
-              <p>{formatDate(log.createdAt)} · {log.retentionPolicy}</p>
+              <p>
+                {formatDate(log.createdAt)} · {log.retentionPolicy}
+              </p>
               <p className="audit-summary">{readSummaryText(log.summary)}</p>
             </div>
           </article>

@@ -3,7 +3,14 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { getJson, postJson } from '../../api-client';
 
-type DisputeStatus = 'Submitted' | 'InReview' | 'NeedMoreInfo' | 'Approved' | 'Rejected' | 'Reversed' | 'Closed';
+type DisputeStatus =
+  | 'Submitted'
+  | 'InReview'
+  | 'NeedMoreInfo'
+  | 'Approved'
+  | 'Rejected'
+  | 'Reversed'
+  | 'Closed';
 type AdminNextDisputeStatus = Exclude<DisputeStatus, 'Submitted'>;
 type DisputeDialog =
   | { kind: 'detail'; dispute: AdminDispute }
@@ -60,7 +67,10 @@ interface ReverseRedemptionResponse {
   };
 }
 
-const nextStatusOptions: Array<{ value: Exclude<AdminNextDisputeStatus, 'Reversed'>; label: string }> = [
+const nextStatusOptions: Array<{
+  value: Exclude<AdminNextDisputeStatus, 'Reversed'>;
+  label: string;
+}> = [
   { value: 'InReview', label: '处理中' },
   { value: 'NeedMoreInfo', label: '需要补充' },
   { value: 'Approved', label: '已认可' },
@@ -74,7 +84,9 @@ export function AdminDisputesPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [reversingTopUpDisputeId, setReversingTopUpDisputeId] = useState<string | null>(null);
-  const [reversingRedemptionDisputeId, setReversingRedemptionDisputeId] = useState<string | null>(null);
+  const [reversingRedemptionDisputeId, setReversingRedemptionDisputeId] = useState<string | null>(
+    null,
+  );
   const [filters, setFilters] = useState({
     status: '',
     keyword: '',
@@ -84,7 +96,9 @@ export function AdminDisputesPanel() {
   const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
   const [topUpReverseReasons, setTopUpReverseReasons] = useState<Record<string, string>>({});
   const [topUpReversePins, setTopUpReversePins] = useState<Record<string, string>>({});
-  const [redemptionReverseReasons, setRedemptionReverseReasons] = useState<Record<string, string>>({});
+  const [redemptionReverseReasons, setRedemptionReverseReasons] = useState<Record<string, string>>(
+    {},
+  );
   const [redemptionReversePins, setRedemptionReversePins] = useState<Record<string, string>>({});
 
   const loadDisputes = async (nextFilters = filters) => {
@@ -101,7 +115,9 @@ export function AdminDisputesPanel() {
     }
 
     try {
-      const result = await getJson<AdminDisputesResponse>(`/api/admin/disputes?${search.toString()}`);
+      const result = await getJson<AdminDisputesResponse>(
+        `/api/admin/disputes?${search.toString()}`,
+      );
       setDisputes(result.disputes);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '读取争议记录失败。');
@@ -144,12 +160,17 @@ export function AdminDisputesPanel() {
     setMessage(null);
 
     try {
-      const result = await postJson<UpdateDisputeResponse>(`/api/admin/disputes/${dispute.id}/status`, {
-        status,
-        resolutionNote: resolutionNote || undefined,
-      });
+      const result = await postJson<UpdateDisputeResponse>(
+        `/api/admin/disputes/${dispute.id}/status`,
+        {
+          status,
+          resolutionNote: resolutionNote || undefined,
+        },
+      );
       setDisputes((currentDisputes) =>
-        currentDisputes.map((currentDispute) => (currentDispute.id === result.dispute.id ? result.dispute : currentDispute)),
+        currentDisputes.map((currentDispute) =>
+          currentDispute.id === result.dispute.id ? result.dispute : currentDispute,
+        ),
       );
       setResolutionNotes((currentNotes) => ({ ...currentNotes, [dispute.id]: '' }));
       setActiveDialog(null);
@@ -228,7 +249,10 @@ export function AdminDisputesPanel() {
     }
   };
 
-  const reverseRedemptionDispute = async (event: FormEvent<HTMLFormElement>, dispute: AdminDispute) => {
+  const reverseRedemptionDispute = async (
+    event: FormEvent<HTMLFormElement>,
+    dispute: AdminDispute,
+  ) => {
     event.preventDefault();
 
     if (dispute.subjectType !== 'redemption_request') {
@@ -298,15 +322,17 @@ export function AdminDisputesPanel() {
           <p>平台管理</p>
           <h1 id="admin-disputes-title">争议审核</h1>
         </div>
-        <a className="secondary-action" href="/admin/audit">
-          审计日志
-        </a>
       </div>
 
       <form className="audit-filter-grid" onSubmit={submitFilters}>
         <label>
           <span>状态</span>
-          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+          <select
+            value={filters.status}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, status: event.target.value }))
+            }
+          >
             <option value="">全部状态</option>
             <option value="Submitted">已提交</option>
             <option value="InReview">处理中</option>
@@ -321,15 +347,25 @@ export function AdminDisputesPanel() {
           <span>搜索</span>
           <input
             value={filters.keyword}
-            onChange={(event) => setFilters((current) => ({ ...current, keyword: event.target.value }))}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, keyword: event.target.value }))
+            }
             placeholder="用户、卡号、提供方、原因"
           />
         </label>
         <div className="audit-filter-actions">
-          <button className="secondary-action" type="button" onClick={() => void loadDisputes(filters)}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => void loadDisputes(filters)}
+          >
             刷新
           </button>
-          <button className="secondary-action" type="button" onClick={() => exportDisputesCsv(disputes, setMessage)}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => exportDisputesCsv(disputes, setMessage)}
+          >
             导出 CSV
           </button>
           <button className="primary-action" type="submit">
@@ -348,7 +384,9 @@ export function AdminDisputesPanel() {
       ) : null}
 
       {isLoading ? <p className="empty-note">正在读取争议记录。</p> : null}
-      {!isLoading && disputes.length === 0 ? <p className="empty-note">暂无匹配的争议记录。</p> : null}
+      {!isLoading && disputes.length === 0 ? (
+        <p className="empty-note">暂无匹配的争议记录。</p>
+      ) : null}
 
       <div className="admin-list">
         {disputes.map((dispute) => (
@@ -356,26 +394,50 @@ export function AdminDisputesPanel() {
             <div>
               <h2>{formatDisputeStatus(dispute.status)}</h2>
               <p>{readDisputePassLabel(dispute)}</p>
-              <p>{dispute.user ? `${dispute.user.username} · ${dispute.user.email}` : '用户已删除或不可用'}</p>
-              <p>对象：{formatSubjectType(dispute.subjectType)} · {dispute.subjectId}</p>
+              <p>
+                {dispute.user
+                  ? `${dispute.user.username} · ${dispute.user.email}`
+                  : '用户已删除或不可用'}
+              </p>
+              <p>
+                对象：{formatSubjectType(dispute.subjectType)} · {dispute.subjectId}
+              </p>
               <p className="audit-summary">{dispute.reason}</p>
-              {dispute.resolutionNote ? <p className="audit-summary">处理备注：{dispute.resolutionNote}</p> : null}
+              {dispute.resolutionNote ? (
+                <p className="audit-summary">处理备注：{dispute.resolutionNote}</p>
+              ) : null}
               <p>{formatDate(dispute.updatedAt)}</p>
             </div>
             <div className="admin-list-actions">
-              <button className="secondary-action" type="button" onClick={() => setActiveDialog({ kind: 'detail', dispute })}>
+              <button
+                className="secondary-action"
+                type="button"
+                onClick={() => setActiveDialog({ kind: 'detail', dispute })}
+              >
                 详情
               </button>
-              <button className="secondary-action" type="button" onClick={() => setActiveDialog({ kind: 'status', dispute })}>
+              <button
+                className="secondary-action"
+                type="button"
+                onClick={() => setActiveDialog({ kind: 'status', dispute })}
+              >
                 处理
               </button>
               {dispute.subjectType === 'pass_top_up' && dispute.status !== 'Closed' ? (
-                <button className="danger-action" type="button" onClick={() => setActiveDialog({ kind: 'top_up_reverse', dispute })}>
+                <button
+                  className="danger-action"
+                  type="button"
+                  onClick={() => setActiveDialog({ kind: 'top_up_reverse', dispute })}
+                >
                   补充冲正
                 </button>
               ) : null}
               {dispute.subjectType === 'redemption_request' && dispute.status !== 'Closed' ? (
-                <button className="danger-action" type="button" onClick={() => setActiveDialog({ kind: 'redemption_reverse', dispute })}>
+                <button
+                  className="danger-action"
+                  type="button"
+                  onClick={() => setActiveDialog({ kind: 'redemption_reverse', dispute })}
+                >
                   核销冲正
                 </button>
               ) : null}
@@ -385,11 +447,26 @@ export function AdminDisputesPanel() {
       </div>
       {activeDialog ? (
         <div className="admin-dialog-layer">
-          <button className="admin-dialog-scrim" type="button" aria-label="关闭弹窗" onClick={() => setActiveDialog(null)} />
-          <section className="admin-dialog-panel" role="dialog" aria-modal="true" aria-label="争议详情">
+          <button
+            className="admin-dialog-scrim"
+            type="button"
+            aria-label="关闭弹窗"
+            onClick={() => setActiveDialog(null)}
+          />
+          <section
+            className="admin-dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="争议详情"
+          >
             <div className="admin-dialog-heading">
               <h2>{readDisputeDialogTitle(activeDialog)}</h2>
-              <button className="icon-button" type="button" aria-label="关闭弹窗" onClick={() => setActiveDialog(null)}>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="关闭弹窗"
+                onClick={() => setActiveDialog(null)}
+              >
                 <span className="material-symbols-rounded" aria-hidden="true">
                   close
                 </span>
@@ -397,7 +474,10 @@ export function AdminDisputesPanel() {
             </div>
             <DisputeDetail dispute={activeDialog.dispute} />
             {activeDialog.kind === 'status' ? (
-              <form className="dispute-status-form" onSubmit={(event) => void updateStatus(event, activeDialog.dispute)}>
+              <form
+                className="dispute-status-form"
+                onSubmit={(event) => void updateStatus(event, activeDialog.dispute)}
+              >
                 <label>
                   <span>下一步状态</span>
                   <select
@@ -432,17 +512,28 @@ export function AdminDisputesPanel() {
                   />
                 </label>
                 <div className="admin-dialog-actions">
-                  <button className="secondary-action" type="button" onClick={() => setActiveDialog(null)}>
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => setActiveDialog(null)}
+                  >
                     取消
                   </button>
-                  <button className="primary-action" type="submit" disabled={updatingId === activeDialog.dispute.id}>
+                  <button
+                    className="primary-action"
+                    type="submit"
+                    disabled={updatingId === activeDialog.dispute.id}
+                  >
                     {updatingId === activeDialog.dispute.id ? '更新中' : '更新状态'}
                   </button>
                 </div>
               </form>
             ) : null}
             {activeDialog.kind === 'top_up_reverse' ? (
-              <form className="dispute-status-form" onSubmit={(event) => void reverseTopUpDispute(event, activeDialog.dispute)}>
+              <form
+                className="dispute-status-form"
+                onSubmit={(event) => void reverseTopUpDispute(event, activeDialog.dispute)}
+              >
                 <label>
                   <span>冲正原因</span>
                   <input
@@ -473,17 +564,30 @@ export function AdminDisputesPanel() {
                   />
                 </label>
                 <div className="admin-dialog-actions">
-                  <button className="secondary-action" type="button" onClick={() => setActiveDialog(null)}>
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => setActiveDialog(null)}
+                  >
                     取消
                   </button>
-                  <button className="danger-action" type="submit" disabled={reversingTopUpDisputeId === activeDialog.dispute.id}>
-                    {reversingTopUpDisputeId === activeDialog.dispute.id ? '冲正中' : '冲正并标记已反转'}
+                  <button
+                    className="danger-action"
+                    type="submit"
+                    disabled={reversingTopUpDisputeId === activeDialog.dispute.id}
+                  >
+                    {reversingTopUpDisputeId === activeDialog.dispute.id
+                      ? '冲正中'
+                      : '冲正并标记已反转'}
                   </button>
                 </div>
               </form>
             ) : null}
             {activeDialog.kind === 'redemption_reverse' ? (
-              <form className="dispute-status-form" onSubmit={(event) => void reverseRedemptionDispute(event, activeDialog.dispute)}>
+              <form
+                className="dispute-status-form"
+                onSubmit={(event) => void reverseRedemptionDispute(event, activeDialog.dispute)}
+              >
                 <label>
                   <span>冲正原因</span>
                   <input
@@ -514,11 +618,21 @@ export function AdminDisputesPanel() {
                   />
                 </label>
                 <div className="admin-dialog-actions">
-                  <button className="secondary-action" type="button" onClick={() => setActiveDialog(null)}>
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => setActiveDialog(null)}
+                  >
                     取消
                   </button>
-                  <button className="danger-action" type="submit" disabled={reversingRedemptionDisputeId === activeDialog.dispute.id}>
-                    {reversingRedemptionDisputeId === activeDialog.dispute.id ? '冲正中' : '冲正并标记已反转'}
+                  <button
+                    className="danger-action"
+                    type="submit"
+                    disabled={reversingRedemptionDisputeId === activeDialog.dispute.id}
+                  >
+                    {reversingRedemptionDisputeId === activeDialog.dispute.id
+                      ? '冲正中'
+                      : '冲正并标记已反转'}
                   </button>
                 </div>
               </form>
@@ -543,7 +657,10 @@ function DisputeDetail({ dispute }: { dispute: AdminDispute }) {
     ['状态', formatDisputeStatus(dispute.status)],
     ['对象', `${formatSubjectType(dispute.subjectType)} · ${dispute.subjectId}`],
     ['卡券', readDisputePassLabel(dispute)],
-    ['用户', dispute.user ? `${dispute.user.username} / ${dispute.user.email}` : '用户已删除或不可用'],
+    [
+      '用户',
+      dispute.user ? `${dispute.user.username} / ${dispute.user.email}` : '用户已删除或不可用',
+    ],
     ['更新时间', formatDate(dispute.updatedAt)],
   ];
 
@@ -637,7 +754,10 @@ function toCsv(rows: Array<Record<string, string>>): string {
   }
 
   const headers = Object.keys(rows[0] ?? {});
-  return [headers.join(','), ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(','))].join('\r\n');
+  return [
+    headers.join(','),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header] ?? '')).join(',')),
+  ].join('\r\n');
 }
 
 function escapeCsvCell(value: string): string {

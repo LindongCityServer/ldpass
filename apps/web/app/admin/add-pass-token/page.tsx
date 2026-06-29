@@ -8,14 +8,6 @@ export default function AdminAddPassTokenPage() {
           <p>管理员后台</p>
           <h1 id="add-pass-token-title">领取码</h1>
         </div>
-        <div className="admin-list-actions">
-          <a className="secondary-action" href="/admin/users">
-            用户管理
-          </a>
-          <a className="secondary-action" href="/admin/passes">
-            卡券管理
-          </a>
-        </div>
       </div>
       <AddPassTokenForm />
     </section>

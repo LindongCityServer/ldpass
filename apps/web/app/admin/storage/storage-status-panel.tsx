@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 
 interface StorageAlert {
   id: string;
@@ -74,7 +75,11 @@ export function StorageStatusPanel() {
     try {
       const result = await postJson<StorageStatusResponse>('/api/admin/storage/check');
       setStatus(result);
-      setMessage(result.storage.status === 'low' ? '检测完成：当前存储空间低于阈值。' : '检测完成：当前存储空间正常。');
+      setMessage(
+        result.storage.status === 'low'
+          ? '检测完成：当前存储空间低于阈值。'
+          : '检测完成：当前存储空间正常。',
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '检测存储空间失败。');
     } finally {
@@ -86,20 +91,27 @@ export function StorageStatusPanel() {
 
   return (
     <section className="admin-panel" aria-labelledby="storage-title">
+      <BackofficeTopbarPageActions>
+        <div className="admin-list-actions">
+          <button
+            className="primary-action"
+            type="button"
+            title={isLoading ? '检测中' : '立即检测'}
+            onClick={() => void checkNow()}
+            disabled={isLoading}
+          >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              hard_drive
+            </span>
+            <span>{isLoading ? '检测中' : '立即检测'}</span>
+          </button>
+        </div>
+      </BackofficeTopbarPageActions>
       <div className="admin-panel-heading">
         <div>
           <p>平台管理</p>
           <h1 id="storage-title">存储情况</h1>
         </div>
-        <a className="secondary-action" href="/admin/audit">
-          审计日志
-        </a>
-        <button className="primary-action" type="button" onClick={() => void checkNow()} disabled={isLoading}>
-          <span className="material-symbols-rounded" aria-hidden="true">
-            hard_drive
-          </span>
-          <span>{isLoading ? '检测中' : '立即检测'}</span>
-        </button>
       </div>
 
       {message ? (
@@ -189,7 +201,8 @@ export function StorageStatusPanel() {
           <div>
             <h2>活动告警</h2>
             <p>
-              {status.activeAlert.drive} · {formatBytes(status.activeAlert.freeBytes)} 可用 / {formatBytes(status.activeAlert.totalBytes)} 总计
+              {status.activeAlert.drive} · {formatBytes(status.activeAlert.freeBytes)} 可用 /{' '}
+              {formatBytes(status.activeAlert.totalBytes)} 总计
             </p>
             <p>触发时间：{new Date(status.activeAlert.createdAt).toLocaleString('zh-CN')}</p>
           </div>
