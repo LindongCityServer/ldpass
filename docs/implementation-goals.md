@@ -254,7 +254,7 @@
 
 本轮已经涉及后端、数据库 schema 和 Next rewrites，因此要验证真实效果，需要执行：
 
-1. `npx --yes pnpm@10.14.0 db:push`：把 `UserRole`、`AuthSession`、验证码检查字段、验证码用途字段（含 `server_account_rebind`）、卡券排序字段、`PassTransfer` 转赠表、`UserNotification` 站内提醒表、`DeviceLoginApproval` 新设备确认表、`ProviderWebhookEndpoint` 回调端点表、`ProviderWebhookChangeRequest` 端点创建申请表、`ProviderWebhookDelivery` 投递记录表等同步到本地数据库。
+1. `npx --yes pnpm@10.14.0 db:push`：把 `UserRole`、`AuthSession`、登录设备最后登录 IP/属地/时间字段、验证码检查字段、验证码用途字段（含 `server_account_rebind`）、卡券排序字段、`PassTransfer` 转赠表、`UserNotification` 站内提醒表、`DeviceLoginApproval` 新设备确认表、`ProviderWebhookEndpoint` 回调端点表、`ProviderWebhookChangeRequest` 端点创建申请表、`ProviderWebhookDelivery` 投递记录表等同步到本地数据库。
 2. `npx --yes pnpm@10.14.0 seed:super-admin`：使用 `.env` 中的 `SEED_ADMIN_*` 创建或更新超级管理员。
 3. 重新构建并重启 Web 进程：后端业务模块现在由 Next.js API Route 内嵌加载，生产环境改动后需要重新构建。
 4. 打开 `/api/health`：预热并确认 Next.js API Route 已加载后端 application context。

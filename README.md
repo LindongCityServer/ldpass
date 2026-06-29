@@ -19,7 +19,7 @@
 2. 复制 `.env.example` 为 `.env`，按本地 SQLite 文件路径、域名和密钥配置修改。
 3. 执行 `npx --yes pnpm@10.14.0 install`。
 4. 执行 `npx --yes pnpm@10.14.0 db:generate` 生成 Prisma Client。
-5. 执行 `npx --yes pnpm@10.14.0 db:push` 创建或同步默认 SQLite 数据库。
+5. 执行 `npx --yes pnpm@10.14.0 db:push` 创建或同步默认 SQLite 数据库；拉取包含 Prisma schema 变更的提交后也需要重新执行。
 6. 执行 `npx --yes pnpm@10.14.0 typecheck` 检查类型。
 
 部署说明见 `docs/deployment-windows-bt.md`。

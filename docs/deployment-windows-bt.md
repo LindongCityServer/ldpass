@@ -102,6 +102,8 @@ Remove-Item Env:\SEED_ADMIN_PIN
 
 当前仓库还没有提交正式 Prisma migrations 目录，所以第一阶段本地和单机部署先使用 `db:push` 把 schema 同步到数据库。后续生成并提交初始 migration 后，生产部署再切换为 `db:deploy`。
 
+拉取包含 `packages/database/prisma/schema.prisma` 变更的提交后，也需要重新执行 `db:push`，例如登录设备最后登录 IP、IP 属地和登录时间字段这类结构更新。
+
 首次部署没有锁文件时，先在开发机生成并提交 `pnpm-lock.yaml`；服务器上使用 `--frozen-lockfile`。
 
 仓库根 `pnpm-workspace.yaml` 已显式允许 Prisma、esbuild 和 sharp 的构建脚本。如果 pnpm 版本升级后仍提示 build scripts 审批，需要检查 `onlyBuiltDependencies` 是否被保留。
