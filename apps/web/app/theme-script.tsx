@@ -2,6 +2,10 @@ const themeScript = `
 (function () {
   var appearance = localStorage.getItem('ldpass.appearance') || 'system';
   var accent = localStorage.getItem('ldpass.accent') || 'auto';
+  var font = localStorage.getItem('ldpass.font') || 'harmony';
+  if (font !== 'harmony' && font !== 'system') {
+    font = 'harmony';
+  }
   var resolvedAppearance = appearance === 'system'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : appearance;
@@ -49,6 +53,7 @@ const themeScript = `
   root.dataset.resolvedAppearance = resolvedAppearance;
   root.dataset.accent = accent;
   root.dataset.resolvedAccent = resolvedAccent;
+  root.dataset.fontFamily = font;
   root.style.colorScheme = resolvedAppearance;
 })();
 `;

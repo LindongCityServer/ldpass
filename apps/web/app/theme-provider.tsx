@@ -15,6 +15,7 @@ import {
 export type AppearanceMode = 'light' | 'dark' | 'system';
 export type AccentMode = 'teal' | 'red' | 'gray' | 'auto';
 export type AccentTone = 'teal' | 'red' | 'gray';
+export type FontMode = 'harmony' | 'system';
 
 const appearanceModes: Array<{ value: AppearanceMode; label: string }> = [
   { value: 'light', label: '浅色' },
@@ -29,9 +30,15 @@ const accentModes: Array<{ value: AccentMode; label: string }> = [
   { value: 'auto', label: '自动切换' },
 ];
 
+const fontModes: Array<{ value: FontMode; label: string }> = [
+  { value: 'harmony', label: 'HarmonyOS Sans' },
+  { value: 'system', label: '系统字体' },
+];
+
 const storageKeys = {
   appearance: 'ldpass.appearance',
   accent: 'ldpass.accent',
+  font: 'ldpass.font',
 } as const;
 
 function readStoredAppearance(): AppearanceMode {
@@ -52,6 +59,15 @@ function readStoredAccent(): AccentMode {
   return value === 'teal' || value === 'red' || value === 'gray' || value === 'auto' ? value : 'auto';
 }
 
+function readStoredFont(): FontMode {
+  if (typeof window === 'undefined') {
+    return 'harmony';
+  }
+
+  const value = window.localStorage.getItem(storageKeys.font);
+  return value === 'harmony' || value === 'system' ? value : 'harmony';
+}
+
 function resolveAppearance(appearance: AppearanceMode): 'light' | 'dark' {
   if (appearance !== 'system') {
     return appearance;
@@ -68,7 +84,12 @@ export function resolveAccentTone(accent: AccentMode, autoTone: AccentTone): Acc
   return accent === 'auto' ? autoTone : accent;
 }
 
-export function applyThemePreferences(appearance: AppearanceMode, accent: AccentMode, autoTone: AccentTone): void {
+export function applyThemePreferences(
+  appearance: AppearanceMode,
+  accent: AccentMode,
+  autoTone: AccentTone,
+  font: FontMode,
+): void {
   if (typeof document === 'undefined') {
     return;
   }
@@ -81,6 +102,7 @@ export function applyThemePreferences(appearance: AppearanceMode, accent: Accent
   root.dataset.resolvedAppearance = resolvedAppearance;
   root.dataset.accent = accent;
   root.dataset.resolvedAccent = resolvedAccent;
+  root.dataset.fontFamily = font;
   root.style.colorScheme = resolvedAppearance;
 }
 
@@ -92,6 +114,7 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const [appearance, setAppearance] = useState<AppearanceMode>('system');
   const [accent, setAccent] = useState<AccentMode>('auto');
+  const [font, setFont] = useState<FontMode>('harmony');
   const [isOpen, setIsOpen] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
   const [platformThemeConfig, setPlatformThemeConfig] = useState<PlatformThemeConfig>(fallbackPlatformThemeConfig);
@@ -100,6 +123,7 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
   useEffect(() => {
     setAppearance(readStoredAppearance());
     setAccent(readStoredAccent());
+    setFont(readStoredFont());
     setPlatformThemeConfig(readCachedPlatformThemeConfig());
   }, []);
 
@@ -136,8 +160,8 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
   }, []);
 
   useEffect(() => {
-    applyThemePreferences(appearance, accent, scheduledAutoTone);
-  }, [accent, appearance, scheduledAutoTone]);
+    applyThemePreferences(appearance, accent, scheduledAutoTone, font);
+  }, [accent, appearance, font, scheduledAutoTone]);
 
   const updatePopoverPosition = useCallback(() => {
     if (typeof window === 'undefined') {
@@ -224,11 +248,11 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
     }
 
     const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const syncSystemTheme = () => applyThemePreferences(appearance, accent, scheduledAutoTone);
+    const syncSystemTheme = () => applyThemePreferences(appearance, accent, scheduledAutoTone, font);
     media.addEventListener('change', syncSystemTheme);
 
     return () => media.removeEventListener('change', syncSystemTheme);
-  }, [accent, appearance, scheduledAutoTone]);
+  }, [accent, appearance, font, scheduledAutoTone]);
 
   const setAppearancePreference = useCallback((nextAppearance: AppearanceMode) => {
     setAppearance(nextAppearance);
@@ -238,6 +262,11 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
   const setAccentPreference = useCallback((nextAccent: AccentMode) => {
     setAccent(nextAccent);
     window.localStorage.setItem(storageKeys.accent, nextAccent);
+  }, []);
+
+  const setFontPreference = useCallback((nextFont: FontMode) => {
+    setFont(nextFont);
+    window.localStorage.setItem(storageKeys.font, nextFont);
   }, []);
 
   const resolvedAccentLabel = useMemo(() => {
@@ -296,6 +325,23 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
               ))}
             </div>
             {resolvedAccentLabel ? <p>{resolvedAccentLabel}</p> : null}
+          </div>
+
+          <div className="theme-group">
+            <h2>字体</h2>
+            <div className="segmented-control">
+              {fontModes.map((mode) => (
+                <button
+                  className={font === mode.value ? 'is-selected' : ''}
+                  type="button"
+                  aria-pressed={font === mode.value}
+                  key={mode.value}
+                  onClick={() => setFontPreference(mode.value)}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
       ) : null}

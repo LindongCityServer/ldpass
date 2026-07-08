@@ -1,4 +1,28 @@
 @font-face {
+  font-family: 'HarmonyOS Sans SC';
+  font-weight: 400;
+  font-style: normal;
+  src: url('/fonts/HARMONYOS_SANS_SC_REGULAR.TTF') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  font-weight: 500;
+  font-style: normal;
+  src: url('/fonts/HARMONYOS_SANS_SC_MEDIUM.TTF') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HarmonyOS Sans SC';
+  font-weight: 700;
+  font-style: normal;
+  src: url('/fonts/HARMONYOS_SANS_SC_BOLD.TTF') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
   font-family: '阿里妈妈数黑体 Bold';
   font-weight: 700;
   src:
@@ -27,6 +51,20 @@
   --danger: #d34b45;
   --shadow: 0 16px 40px rgba(15, 18, 22, 0.08);
   --image-filter: none;
+  --system-font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Microsoft YaHei',
+    sans-serif;
+  --harmony-font-family: 'HarmonyOS Sans SC', var(--system-font-family);
+  --app-font-family: var(--harmony-font-family);
+}
+
+:root[data-font-family='system'] {
+  --app-font-family: var(--system-font-family);
 }
 
 :root[data-resolved-appearance='dark'] {
@@ -97,15 +135,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    'Microsoft YaHei',
-    sans-serif;
+  font-family: var(--app-font-family);
   letter-spacing: 0;
 }
 
@@ -3107,6 +3137,10 @@ textarea {
   gap: 8px;
 }
 
+.admin-user-main p {
+  overflow-wrap: anywhere;
+}
+
 .admin-user-avatar {
   display: grid;
   width: 38px;
@@ -3117,6 +3151,11 @@ textarea {
   color: var(--muted);
   font-size: 16px;
   font-weight: 900;
+}
+
+.admin-user-avatar:is(img) {
+  display: block;
+  object-fit: cover;
 }
 
 .admin-status-pill {
