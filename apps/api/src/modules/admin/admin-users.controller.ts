@@ -1,8 +1,15 @@
-import { Body, Controller, Get, Header, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, Query, Req } from '../../framework.js';
 import { SessionAuthService } from '../../shared/auth/session-auth.service.js';
 import type { ApiRequestLike } from '../../shared/auth/request-context.js';
 import { AdminUsersService } from './admin-users.service.js';
-import { AdminUserSensitiveActionDto, AdminUsersQueryDto, RejectUserDto, ResetUserPasswordDto } from './dto.js';
+import {
+  AdminUserSensitiveActionDto,
+  AdminUsersQueryDto,
+  RejectUserAvatarChangeDto,
+  RejectUserDto,
+  ResetUserPasswordDto,
+  RevertUserAvatarDto,
+} from './dto.js';
 
 @Controller('admin/users')
 export class AdminUsersController {
@@ -29,6 +36,28 @@ export class AdminUsersController {
   async exportUsersCsv(@Query() query: AdminUsersQueryDto, @Req() request: ApiRequestLike) {
     await this.sessionAuth.requireAdmin(request);
     return this.adminUsersService.exportUsersCsv(query);
+  }
+
+  @Get('avatar-requests')
+  async listPendingAvatarChangeRequests(@Req() request: ApiRequestLike) {
+    await this.sessionAuth.requireAdmin(request);
+    return this.adminUsersService.listPendingAvatarChangeRequests();
+  }
+
+  @Post('avatar-requests/:requestId/approve')
+  async approveAvatarChangeRequest(@Param('requestId') requestId: string, @Req() request: ApiRequestLike) {
+    const admin = await this.sessionAuth.requireAdmin(request);
+    return this.adminUsersService.approveAvatarChangeRequest(requestId, admin);
+  }
+
+  @Post('avatar-requests/:requestId/reject')
+  async rejectAvatarChangeRequest(
+    @Param('requestId') requestId: string,
+    @Body() dto: RejectUserAvatarChangeDto,
+    @Req() request: ApiRequestLike,
+  ) {
+    const admin = await this.sessionAuth.requireAdmin(request);
+    return this.adminUsersService.rejectAvatarChangeRequest(requestId, dto.reason, admin);
   }
 
   @Post(':userId/approve')
@@ -59,6 +88,12 @@ export class AdminUsersController {
   async resetUserPassword(@Param('userId') userId: string, @Body() dto: ResetUserPasswordDto, @Req() request: ApiRequestLike) {
     const admin = await this.sessionAuth.requireAdmin(request);
     return this.adminUsersService.resetUserPassword(userId, dto, admin);
+  }
+
+  @Post(':userId/avatar/revert')
+  async revertUserAvatar(@Param('userId') userId: string, @Body() dto: RevertUserAvatarDto, @Req() request: ApiRequestLike) {
+    const admin = await this.sessionAuth.requireAdmin(request);
+    return this.adminUsersService.revertUserAvatar(userId, dto.reason, admin);
   }
 
   @Post(':userId/delete')

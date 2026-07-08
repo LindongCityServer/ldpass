@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '../../framework.js';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';
@@ -39,6 +39,7 @@ export class AdminUsersService {
         registrationIpRegion: true,
         serverAccountName: true,
         serverAccountVerified: true,
+        avatarUrl: true,
         pinHash: true,
         createdAt: true,
         updatedAt: true,
@@ -72,6 +73,7 @@ export class AdminUsersService {
         registrationIpRegion: true,
         serverAccountName: true,
         serverAccountVerified: true,
+        avatarUrl: true,
         pinHash: true,
         createdAt: true,
         updatedAt: true,
@@ -80,6 +82,35 @@ export class AdminUsersService {
 
     return {
       users: users.map((user) => this.toAdminUser(user)),
+    };
+  }
+
+  async listPendingAvatarChangeRequests() {
+    const requests = await this.prisma.userAvatarChangeRequest.findMany({
+      where: {
+        status: 'PendingReview',
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 50,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            status: true,
+            avatarUrl: true,
+            serverAccountName: true,
+            serverAccountVerified: true,
+          },
+        },
+      },
+    });
+
+    return {
+      requests: requests.map((request) => this.toAvatarChangeRequestView(request)),
     };
   }
 
@@ -102,6 +133,7 @@ export class AdminUsersService {
         registrationIpRegion: true,
         serverAccountName: true,
         serverAccountVerified: true,
+        avatarUrl: true,
         pinHash: true,
         createdAt: true,
         updatedAt: true,
@@ -120,6 +152,7 @@ export class AdminUsersService {
       { header: 'IP属地', value: (user) => formatIpRegionForCsv(user.registrationIpRegion) },
       { header: '服务器ID', value: (user) => user.serverAccountName },
       { header: '服务器账号已验证', value: (user) => (user.serverAccountVerified ? '是' : '否') },
+      { header: '当前头像', value: (user) => user.avatarUrl },
       { header: 'PIN已设置', value: (user) => (user.pinHash ? '是' : '否') },
       { header: '创建时间', value: (user) => formatCsvDate(user.createdAt) },
       { header: '更新时间', value: (user) => formatCsvDate(user.updatedAt) },
@@ -235,6 +268,183 @@ export class AdminUsersService {
 
     return {
       user: this.toPublicUser(updated),
+    };
+  }
+
+  async approveAvatarChangeRequest(requestId: string, admin: AuthenticatedUser) {
+    const request = await this.readAvatarChangeRequest(requestId);
+
+    if (request.status !== 'PendingReview') {
+      throw new BadRequestException('这条头像申请已经处理。');
+    }
+
+    if (request.user.status === 'Deleted') {
+      throw new BadRequestException('已删除用户不能继续变更头像。');
+    }
+
+    if (!request.proposedAvatarUrl) {
+      throw new BadRequestException('头像申请缺少待审核链接。');
+    }
+
+    const now = new Date();
+    const updatedRequest = await this.prisma.$transaction(async (transaction) => {
+      await transaction.user.update({
+        where: {
+          id: request.userId,
+        },
+        data: {
+          avatarUrl: request.proposedAvatarUrl,
+        },
+      });
+
+      return transaction.userAvatarChangeRequest.update({
+        where: {
+          id: request.id,
+        },
+        data: {
+          status: 'Approved',
+          reviewedById: admin.id,
+          reviewedAt: now,
+          reviewReason: null,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              email: true,
+              status: true,
+              avatarUrl: true,
+              serverAccountName: true,
+              serverAccountVerified: true,
+            },
+          },
+        },
+      });
+    });
+
+    await this.eventBus.publish({
+      type: 'UserAvatarChangeApproved',
+      eventId: randomUUID(),
+      occurredAt: now.toISOString(),
+      actorType: 'admin',
+      actorId: admin.id,
+      payload: {
+        avatarChangeRequestId: request.id,
+        userId: request.userId,
+        currentAvatarUrl: request.currentAvatarUrl,
+        proposedAvatarUrl: request.proposedAvatarUrl,
+        approvedBy: admin.id,
+      },
+    });
+
+    return {
+      request: this.toAvatarChangeRequestView(updatedRequest),
+    };
+  }
+
+  async rejectAvatarChangeRequest(requestId: string, reason: string, admin: AuthenticatedUser) {
+    const request = await this.readAvatarChangeRequest(requestId);
+
+    if (request.status !== 'PendingReview') {
+      throw new BadRequestException('这条头像申请已经处理。');
+    }
+
+    const reviewReason = reason.trim();
+    const now = new Date();
+    const updatedRequest = await this.prisma.userAvatarChangeRequest.update({
+      where: {
+        id: request.id,
+      },
+      data: {
+        status: 'Rejected',
+        reviewedById: admin.id,
+        reviewedAt: now,
+        reviewReason,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            status: true,
+            avatarUrl: true,
+            serverAccountName: true,
+            serverAccountVerified: true,
+          },
+        },
+      },
+    });
+
+    await this.eventBus.publish({
+      type: 'UserAvatarChangeRejected',
+      eventId: randomUUID(),
+      occurredAt: now.toISOString(),
+      actorType: 'admin',
+      actorId: admin.id,
+      payload: {
+        avatarChangeRequestId: request.id,
+        userId: request.userId,
+        proposedAvatarUrl: request.proposedAvatarUrl ?? '',
+        rejectedBy: admin.id,
+        reason: reviewReason,
+      },
+    });
+
+    return {
+      request: this.toAvatarChangeRequestView(updatedRequest),
+    };
+  }
+
+  async revertUserAvatar(userId: string, reason: string, admin: AuthenticatedUser) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('用户不存在。');
+    }
+
+    if (user.status === 'Deleted') {
+      throw new BadRequestException('已删除用户不能打回头像。');
+    }
+
+    if (!user.avatarUrl) {
+      throw new BadRequestException('该用户当前没有自定义头像。');
+    }
+
+    const reviewReason = reason.trim();
+    const now = new Date();
+    const updated = await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        avatarUrl: null,
+      },
+    });
+
+    await this.eventBus.publish({
+      type: 'UserAvatarReverted',
+      eventId: randomUUID(),
+      occurredAt: now.toISOString(),
+      actorType: 'admin',
+      actorId: admin.id,
+      payload: {
+        userId,
+        previousAvatarUrl: user.avatarUrl,
+        revertedToAvatarUrl: null,
+        revertedBy: admin.id,
+        reason: reviewReason,
+        source: 'admin_rejection',
+      },
+    });
+
+    return {
+      user: this.toAdminUser(updated),
     };
   }
 
@@ -409,6 +619,7 @@ export class AdminUsersService {
           registrationIpRegion: Prisma.JsonNull,
           serverAccountName: null,
           serverAccountVerified: false,
+          avatarUrl: null,
         },
       });
 
@@ -549,6 +760,33 @@ export class AdminUsersService {
     return user;
   }
 
+  private async readAvatarChangeRequest(requestId: string) {
+    const request = await this.prisma.userAvatarChangeRequest.findUnique({
+      where: {
+        id: requestId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            status: true,
+            avatarUrl: true,
+            serverAccountName: true,
+            serverAccountVerified: true,
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('头像申请不存在。');
+    }
+
+    return request;
+  }
+
   private async verifyAdminPin(admin: AuthenticatedUser, pin: string, challengeId: string, verifiedAt: Date): Promise<void> {
     const adminUser = await this.prisma.user.findUnique({
       where: {
@@ -593,6 +831,7 @@ export class AdminUsersService {
     registrationIpRegion: unknown;
     serverAccountName: string | null;
     serverAccountVerified: boolean;
+    avatarUrl: string | null;
     pinHash: string | null;
     createdAt: Date;
     updatedAt: Date;
@@ -609,9 +848,58 @@ export class AdminUsersService {
       registrationIpRegion: user.registrationIpRegion,
       serverAccountName: user.serverAccountName,
       serverAccountVerified: user.serverAccountVerified,
+      avatarUrl: this.resolveUserAvatarUrl(user),
+      avatarFallbackUrl: this.resolveUserAvatarFallbackUrl(user),
+      customAvatarUrl: user.avatarUrl,
       hasPin: Boolean(user.pinHash),
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
+    };
+  }
+
+  private toAvatarChangeRequestView(request: {
+    id: string;
+    userId: string;
+    status: string;
+    currentAvatarUrl: string | null;
+    proposedAvatarUrl: string | null;
+    reason: string | null;
+    reviewedById: string | null;
+    reviewReason: string | null;
+    reviewedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    user: {
+      id: string;
+      username: string;
+      email: string;
+      status: string;
+      avatarUrl: string | null;
+      serverAccountName: string | null;
+      serverAccountVerified: boolean;
+    };
+  }) {
+    return {
+      id: request.id,
+      userId: request.userId,
+      status: request.status,
+      currentAvatarUrl: request.currentAvatarUrl,
+      proposedAvatarUrl: request.proposedAvatarUrl,
+      reason: request.reason,
+      reviewedById: request.reviewedById,
+      reviewReason: request.reviewReason,
+      reviewedAt: request.reviewedAt?.toISOString() ?? null,
+      createdAt: request.createdAt.toISOString(),
+      updatedAt: request.updatedAt.toISOString(),
+      user: {
+        id: request.user.id,
+        username: request.user.username,
+        email: request.user.email,
+        status: request.user.status,
+        avatarUrl: this.resolveUserAvatarUrl(request.user),
+        avatarFallbackUrl: this.resolveUserAvatarFallbackUrl(request.user),
+        customAvatarUrl: request.user.avatarUrl,
+      },
     };
   }
 
@@ -631,6 +919,40 @@ export class AdminUsersService {
       status: user.status,
       serverAccountVerified: user.serverAccountVerified,
     };
+  }
+
+  private resolveUserAvatarUrl(user: {
+    avatarUrl?: string | null;
+    serverAccountName?: string | null;
+    serverAccountVerified: boolean;
+  }): string | null {
+    return (
+      user.avatarUrl ??
+      this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'mc-heads')
+    );
+  }
+
+  private resolveUserAvatarFallbackUrl(user: {
+    serverAccountName?: string | null;
+    serverAccountVerified: boolean;
+  }): string | null {
+    return this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'minotar');
+  }
+
+  private buildMinecraftAvatarUrl(
+    serverAccountName: string | null | undefined,
+    verified: boolean,
+    provider: 'mc-heads' | 'minotar',
+  ): string | null {
+    const normalizedName = serverAccountName?.trim();
+    if (!verified || !normalizedName) {
+      return null;
+    }
+
+    const encodedName = encodeURIComponent(normalizedName);
+    return provider === 'mc-heads'
+      ? `https://mc-heads.net/avatar/${encodedName}/64.png`
+      : `https://minotar.net/avatar/${encodedName}/64.png`;
   }
 }
 

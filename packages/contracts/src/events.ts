@@ -15,6 +15,7 @@ import type {
   ProviderWebhookChangeRequestStatus,
   ProviderApiKeyScope,
   ThemeAccentTone,
+  UserAvatarChangeRequestStatus,
   UserStatus,
   VerificationMethod,
   WalletActionLinkKind,
@@ -258,6 +259,54 @@ export interface UserPreferencesUpdated extends BaseEvent {
     userId: string;
     expirationReminderDays: number;
     previousExpirationReminderDays: number;
+  };
+}
+
+export interface UserAvatarChangeSubmitted extends BaseEvent {
+  type: 'UserAvatarChangeSubmitted';
+  payload: {
+    avatarChangeRequestId: string;
+    userId: string;
+    requestedBy: string;
+    currentAvatarUrl: string | null;
+    proposedAvatarUrl: string;
+    source: 'image_url';
+    status: Extract<UserAvatarChangeRequestStatus, 'PendingReview'>;
+    reason?: string;
+  };
+}
+
+export interface UserAvatarChangeApproved extends BaseEvent {
+  type: 'UserAvatarChangeApproved';
+  payload: {
+    avatarChangeRequestId: string;
+    userId: string;
+    currentAvatarUrl: string | null;
+    proposedAvatarUrl: string;
+    approvedBy: string;
+  };
+}
+
+export interface UserAvatarChangeRejected extends BaseEvent {
+  type: 'UserAvatarChangeRejected';
+  payload: {
+    avatarChangeRequestId: string;
+    userId: string;
+    proposedAvatarUrl: string;
+    rejectedBy: string;
+    reason: string;
+  };
+}
+
+export interface UserAvatarReverted extends BaseEvent {
+  type: 'UserAvatarReverted';
+  payload: {
+    userId: string;
+    previousAvatarUrl: string | null;
+    revertedToAvatarUrl: string | null;
+    revertedBy: string;
+    reason: string;
+    source: 'admin_rejection' | 'self_reset';
   };
 }
 
@@ -1236,6 +1285,10 @@ export type DomainEvent =
   | UserUnsuspended
   | UserDeletedByAdmin
   | UserPreferencesUpdated
+  | UserAvatarChangeSubmitted
+  | UserAvatarChangeApproved
+  | UserAvatarChangeRejected
+  | UserAvatarReverted
   | CredentialChanged
   | ProviderSubmitted
   | ProviderCreatedByAdmin

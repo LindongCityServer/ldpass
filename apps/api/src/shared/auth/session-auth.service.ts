@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '../../framework.js';
 import { createHmac, randomBytes } from 'node:crypto';
 import type { UserRole } from '@ldpass/contracts';
 import { PrismaService } from '../database/prisma.service.js';
@@ -9,6 +9,7 @@ import {
   readHeader,
   readUserAgent,
 } from './request-context.js';
+import { serializeAuthCookie, serializeExpiredAuthCookies } from './cookie.js';
 
 export const SESSION_COOKIE_NAME = 'ldpass_session';
 
@@ -22,6 +23,8 @@ export interface AuthenticatedUser {
   reviewRejectedReason: string | null;
   serverAccountName: string | null;
   serverAccountVerified: boolean;
+  avatarUrl: string | null;
+  avatarFallbackUrl: string | null;
   expirationReminderDays: number;
 }
 
@@ -35,7 +38,12 @@ export interface AuthenticatedSessionContext {
 export class SessionAuthService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createSession(userId: string, request: ApiRequestLike, response: ApiResponseLike, deviceId?: string): Promise<void> {
+  async createSession(
+    userId: string,
+    request: ApiRequestLike,
+    response: ApiResponseLike,
+    deviceId?: string,
+  ): Promise<void> {
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
 
@@ -50,16 +58,18 @@ export class SessionAuthService {
       },
     });
 
-    this.setSessionCookie(response, token, expiresAt);
+    this.setSessionCookie(request, response, token, expiresAt);
   }
 
   async clearSession(request: ApiRequestLike, response: ApiResponseLike): Promise<void> {
-    const token = this.readSessionToken(request);
+    const tokens = this.readSessionTokens(request);
 
-    if (token) {
+    if (tokens.length > 0) {
       await this.prisma.authSession.updateMany({
         where: {
-          tokenHash: this.hashSessionToken(token),
+          tokenHash: {
+            in: [...new Set(tokens.map((token) => this.hashSessionToken(token)))],
+          },
           revokedAt: null,
         },
         data: {
@@ -68,7 +78,7 @@ export class SessionAuthService {
       });
     }
 
-    this.clearSessionCookie(response);
+    this.clearSessionCookie(request, response);
   }
 
   async getCurrentUser(request: ApiRequestLike): Promise<AuthenticatedUser | null> {
@@ -76,22 +86,32 @@ export class SessionAuthService {
   }
 
   async getCurrentSession(request: ApiRequestLike): Promise<AuthenticatedSessionContext | null> {
-    const token = this.readSessionToken(request);
+    const tokens = this.readSessionTokens(request);
 
-    if (!token) {
+    if (tokens.length === 0) {
       return null;
     }
 
-    const session = await this.prisma.authSession.findUnique({
+    const tokenHashes = [...new Set(tokens.map((token) => this.hashSessionToken(token)))];
+    const session = await this.prisma.authSession.findFirst({
       where: {
-        tokenHash: this.hashSessionToken(token),
+        tokenHash: {
+          in: tokenHashes,
+        },
+        revokedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
       },
       include: {
         user: true,
       },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
-    if (!session || session.revokedAt || session.expiresAt <= new Date()) {
+    if (!session) {
       return null;
     }
 
@@ -108,6 +128,8 @@ export class SessionAuthService {
         reviewRejectedReason: user.reviewRejectedReason,
         serverAccountName: user.serverAccountName,
         serverAccountVerified: user.serverAccountVerified,
+        avatarUrl: this.resolveUserAvatarUrl(user),
+        avatarFallbackUrl: this.resolveUserAvatarFallbackUrl(user),
         expirationReminderDays: user.expirationReminderDays,
       },
       sessionId: session.id,
@@ -166,18 +188,20 @@ export class SessionAuthService {
   }
 
   private readSessionToken(request: ApiRequestLike): string | null {
+    return this.readSessionTokens(request)[0] ?? null;
+  }
+
+  private readSessionTokens(request: ApiRequestLike): string[] {
     const cookieHeader = readHeader(request, 'cookie');
     if (!cookieHeader) {
-      return null;
+      return [];
     }
 
     const cookies = cookieHeader.split(';').map((part) => part.trim());
-    const sessionCookie = cookies.find((cookie) => cookie.startsWith(`${SESSION_COOKIE_NAME}=`));
-    if (!sessionCookie) {
-      return null;
-    }
-
-    return decodeURIComponent(sessionCookie.slice(SESSION_COOKIE_NAME.length + 1));
+    return cookies
+      .filter((cookie) => cookie.startsWith(`${SESSION_COOKIE_NAME}=`))
+      .map((cookie) => decodeURIComponent(cookie.slice(SESSION_COOKIE_NAME.length + 1)))
+      .filter(Boolean);
   }
 
   private hashSessionToken(token: string): string {
@@ -189,49 +213,57 @@ export class SessionAuthService {
     return createHmac('sha256', secret).update(token).digest('base64url');
   }
 
-  private setSessionCookie(response: ApiResponseLike, token: string, expiresAt: Date): void {
+  private resolveUserAvatarUrl(user: {
+    avatarUrl?: string | null;
+    serverAccountName: string | null;
+    serverAccountVerified: boolean;
+  }): string | null {
+    return (
+      user.avatarUrl ??
+      this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'mc-heads')
+    );
+  }
+
+  private resolveUserAvatarFallbackUrl(user: {
+    avatarUrl?: string | null;
+    serverAccountName: string | null;
+    serverAccountVerified: boolean;
+  }): string | null {
+    return this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'minotar');
+  }
+
+  private buildMinecraftAvatarUrl(
+    serverAccountName: string | null | undefined,
+    verified: boolean,
+    provider: 'mc-heads' | 'minotar',
+  ): string | null {
+    const normalizedName = serverAccountName?.trim();
+    if (!verified || !normalizedName) {
+      return null;
+    }
+
+    const encodedName = encodeURIComponent(normalizedName);
+    return provider === 'mc-heads'
+      ? `https://mc-heads.net/avatar/${encodedName}/64.png`
+      : `https://minotar.net/avatar/${encodedName}/64.png`;
+  }
+
+  private setSessionCookie(
+    request: ApiRequestLike,
+    response: ApiResponseLike,
+    token: string,
+    expiresAt: Date,
+  ): void {
     response.setHeader(
       'Set-Cookie',
-      this.serializeCookie(SESSION_COOKIE_NAME, token, {
+      serializeAuthCookie(request, SESSION_COOKIE_NAME, token, {
         expiresAt,
         maxAgeSeconds: Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)),
       }),
     );
   }
 
-  private clearSessionCookie(response: ApiResponseLike): void {
-    response.setHeader(
-      'Set-Cookie',
-      this.serializeCookie(SESSION_COOKIE_NAME, '', {
-        expiresAt: new Date(0),
-        maxAgeSeconds: 0,
-      }),
-    );
-  }
-
-  private serializeCookie(
-    name: string,
-    value: string,
-    options: {
-      expiresAt: Date;
-      maxAgeSeconds: number;
-    },
-  ): string {
-    const parts = [
-      `${name}=${encodeURIComponent(value)}`,
-      'Path=/',
-      'HttpOnly',
-      'SameSite=Lax',
-      `Expires=${options.expiresAt.toUTCString()}`,
-      `Max-Age=${options.maxAgeSeconds}`,
-    ];
-
-    const cookieDomain = process.env.AUTH_COOKIE_DOMAIN;
-    if (process.env.NODE_ENV === 'production' && cookieDomain) {
-      parts.push(`Domain=${cookieDomain}`);
-      parts.push('Secure');
-    }
-
-    return parts.join('; ');
+  private clearSessionCookie(request: ApiRequestLike, response: ApiResponseLike): void {
+    response.setHeader('Set-Cookie', serializeExpiredAuthCookies(request, SESSION_COOKIE_NAME));
   }
 }

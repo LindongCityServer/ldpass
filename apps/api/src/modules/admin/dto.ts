@@ -19,6 +19,20 @@ export class RejectUserDto {
   reason!: string;
 }
 
+export class RejectUserAvatarChangeDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  reason!: string;
+}
+
+export class RevertUserAvatarDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  reason!: string;
+}
+
 export class ResetUserPinDto {
   @IsString()
   @Matches(/^\d{4,12}$/)

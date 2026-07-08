@@ -6,7 +6,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
-} from '@nestjs/common';
+} from '../../framework.js';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import type { DeviceSystem, IpRegion } from '@ldpass/contracts';
 import { Prisma } from '@ldpass/database';
@@ -38,6 +38,7 @@ import type {
   RegisterServerStartDto,
   ResubmitReviewDto,
   StartServerAccountRebindDto,
+  UpdateAccountAvatarDto,
   UpdateAccountPreferencesDto,
 } from './dto.js';
 
@@ -525,16 +526,8 @@ export class IdentityService {
             reviewRejectedReason: activeUser.reviewRejectedReason,
             serverAccountName: activeUser.serverAccountName,
             serverAccountVerified: activeUser.serverAccountVerified,
-            avatarUrl: this.buildMinecraftAvatarUrl(
-              activeUser.serverAccountName,
-              activeUser.serverAccountVerified,
-              'mc-heads',
-            ),
-            avatarFallbackUrl: this.buildMinecraftAvatarUrl(
-              activeUser.serverAccountName,
-              activeUser.serverAccountVerified,
-              'minotar',
-            ),
+            avatarUrl: activeUser.avatarUrl,
+            avatarFallbackUrl: activeUser.avatarFallbackUrl,
             expirationReminderDays: activeUser.expirationReminderDays,
           }
         : null,
@@ -717,6 +710,7 @@ export class IdentityService {
           registrationIpRegion: Prisma.JsonNull,
           serverAccountName: null,
           serverAccountVerified: false,
+          avatarUrl: null,
         },
       });
 
@@ -1127,6 +1121,147 @@ export class IdentityService {
 
     return {
       user: this.toPublicUser(updatedUser),
+    };
+  }
+
+  async updateAccountAvatar(
+    user: AuthenticatedUser,
+    dto: UpdateAccountAvatarDto,
+  ): Promise<{
+    user: PublicUser;
+    nextAction: 'pending_review' | 'updated';
+    request?: {
+      id: string;
+      status: string;
+      currentAvatarUrl: string | null;
+      proposedAvatarUrl: string | null;
+      reason: string | null;
+      createdAt: string;
+    };
+  }> {
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        id: user.id,
+      },
+    });
+
+    if (!existingUser) {
+      throw new UnauthorizedException('账户不存在或已经被删除。');
+    }
+
+    if (existingUser.status !== 'Active') {
+      throw new BadRequestException('只有已激活账户可以修改头像。');
+    }
+
+    const proposedAvatarUrl = this.normalizeUserAvatarUrl(dto.avatarUrl);
+    const reason = dto.reason?.trim() || null;
+
+    if (!proposedAvatarUrl) {
+      if (!existingUser.avatarUrl) {
+        throw new BadRequestException('当前已经使用默认头像。');
+      }
+
+      const pendingRequest = await this.prisma.userAvatarChangeRequest.findFirst({
+        where: {
+          userId: user.id,
+          status: 'PendingReview',
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (pendingRequest) {
+        throw new ConflictException('已有待审核的头像变更，请等待管理员处理后再恢复默认头像。');
+      }
+
+      const updatedUser = await this.prisma.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          avatarUrl: null,
+        },
+      });
+
+      await this.eventBus.publish({
+        type: 'UserAvatarReverted',
+        eventId: randomUUID(),
+        occurredAt: new Date().toISOString(),
+        actorType: 'user',
+        actorId: user.id,
+        payload: {
+          userId: user.id,
+          previousAvatarUrl: existingUser.avatarUrl,
+          revertedToAvatarUrl: null,
+          revertedBy: user.id,
+          reason: reason ?? '用户恢复默认头像。',
+          source: 'self_reset',
+        },
+      });
+
+      return {
+        user: this.toPublicUser(updatedUser),
+        nextAction: 'updated',
+      };
+    }
+
+    if ((existingUser.avatarUrl ?? '') === proposedAvatarUrl) {
+      throw new BadRequestException('提交的头像链接与当前头像一致。');
+    }
+
+    const pendingRequest = await this.prisma.userAvatarChangeRequest.findFirst({
+      where: {
+        userId: user.id,
+        status: 'PendingReview',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (pendingRequest) {
+      throw new ConflictException('已有待审核的头像变更，请等待管理员处理后再提交。');
+    }
+
+    const request = await this.prisma.userAvatarChangeRequest.create({
+      data: {
+        userId: user.id,
+        currentAvatarUrl: existingUser.avatarUrl,
+        proposedAvatarUrl,
+        reason,
+      },
+    });
+
+    await this.eventBus.publish({
+      type: 'UserAvatarChangeSubmitted',
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actorType: 'user',
+      actorId: user.id,
+      payload: {
+        avatarChangeRequestId: request.id,
+        userId: user.id,
+        requestedBy: user.id,
+        currentAvatarUrl: request.currentAvatarUrl,
+        proposedAvatarUrl: request.proposedAvatarUrl ?? proposedAvatarUrl,
+        source: 'image_url',
+        status: 'PendingReview',
+        ...(reason ? { reason } : {}),
+      },
+    });
+
+    return {
+      user: this.toPublicUser(existingUser),
+      nextAction: 'pending_review',
+      request: {
+        id: request.id,
+        status: request.status,
+        currentAvatarUrl: request.currentAvatarUrl,
+        proposedAvatarUrl: request.proposedAvatarUrl,
+        reason: request.reason,
+        createdAt: request.createdAt.toISOString(),
+      },
     };
   }
 
@@ -1782,25 +1917,97 @@ export class IdentityService {
   }
 
   private async ensureUniqueIdentity(username: string, email: string): Promise<void> {
-    const existing = await this.prisma.user.findFirst({
+    const existingUsers = await this.prisma.user.findMany({
       where: {
         OR: [{ username }, { email }],
       },
       select: {
+        id: true,
         username: true,
         email: true,
+        status: true,
+        serverAccountName: true,
       },
     });
 
-    if (!existing) {
+    if (existingUsers.length === 0) {
       return;
     }
 
-    if (existing.username === username) {
+    const activeUsernameConflict = existingUsers.find(
+      (existingUser) => existingUser.status !== 'Deleted' && existingUser.username === username,
+    );
+    if (activeUsernameConflict) {
+      throw new ConflictException('用户名已被占用。');
+    }
+
+    const activeEmailConflict = existingUsers.find(
+      (existingUser) => existingUser.status !== 'Deleted' && existingUser.email === email,
+    );
+    if (activeEmailConflict) {
+      throw new ConflictException('邮箱已被占用。');
+    }
+
+    const released = await this.releaseDeletedIdentityConflicts(existingUsers);
+    if (released) {
+      await this.ensureUniqueIdentity(username, email);
+      return;
+    }
+
+    if (existingUsers.some((existingUser) => existingUser.username === username)) {
       throw new ConflictException('用户名已被占用。');
     }
 
     throw new ConflictException('邮箱已被占用。');
+  }
+
+  private async releaseDeletedIdentityConflicts(
+    users: Array<{
+      id: string;
+      username: string;
+      email: string;
+      status: string;
+      serverAccountName: string | null;
+    }>,
+  ): Promise<boolean> {
+    let released = false;
+
+    for (const user of users) {
+      if (user.status !== 'Deleted') {
+        continue;
+      }
+
+      const deletedIdentity = createDeletedUserIdentity(user.id);
+      if (user.username === deletedIdentity.username && user.email === deletedIdentity.email) {
+        continue;
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            username: deletedIdentity.username,
+            email: deletedIdentity.email,
+            passwordHash: deletedIdentity.passwordHash,
+            pinHash: null,
+            reviewInfo: null,
+            reviewRejectedReason: 'identity_released',
+            registrationIp: null,
+            registrationIpRegion: Prisma.JsonNull,
+            serverAccountName: null,
+            serverAccountVerified: false,
+          },
+        });
+
+        await anonymizeUserAuditLogs(tx, user, deletedIdentity);
+      });
+
+      released = true;
+    }
+
+    return released;
   }
 
   private async ensureServerAccountAvailable(
@@ -2520,6 +2727,7 @@ export class IdentityService {
     reviewRejectedReason?: string | null;
     serverAccountName?: string | null;
     serverAccountVerified: boolean;
+    avatarUrl?: string | null;
     expirationReminderDays: number;
   }): PublicUser {
     return {
@@ -2532,18 +2740,52 @@ export class IdentityService {
       reviewRejectedReason: user.reviewRejectedReason ?? null,
       serverAccountName: user.serverAccountName ?? null,
       serverAccountVerified: user.serverAccountVerified,
-      avatarUrl: this.buildMinecraftAvatarUrl(
-        user.serverAccountName,
-        user.serverAccountVerified,
-        'mc-heads',
-      ),
-      avatarFallbackUrl: this.buildMinecraftAvatarUrl(
-        user.serverAccountName,
-        user.serverAccountVerified,
-        'minotar',
-      ),
+      avatarUrl: this.resolveUserAvatarUrl(user),
+      avatarFallbackUrl: this.resolveUserAvatarFallbackUrl(user),
       expirationReminderDays: user.expirationReminderDays,
     };
+  }
+
+  private normalizeUserAvatarUrl(value: string | undefined): string | null {
+    const trimmedValue = value?.trim() ?? '';
+    if (!trimmedValue) {
+      return null;
+    }
+
+    let url: URL;
+    try {
+      url = new URL(trimmedValue);
+    } catch {
+      throw new BadRequestException('头像链接格式不正确。');
+    }
+
+    if (url.protocol !== 'https:') {
+      throw new BadRequestException('头像链接必须使用 HTTPS。');
+    }
+
+    if (!/\.(png|jpe?g|webp|gif|avif)$/i.test(url.pathname)) {
+      throw new BadRequestException('头像链接只支持 png、jpg、jpeg、webp、gif 或 avif 图片。');
+    }
+
+    return url.toString();
+  }
+
+  private resolveUserAvatarUrl(user: {
+    avatarUrl?: string | null;
+    serverAccountName?: string | null;
+    serverAccountVerified: boolean;
+  }): string | null {
+    return (
+      user.avatarUrl ??
+      this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'mc-heads')
+    );
+  }
+
+  private resolveUserAvatarFallbackUrl(user: {
+    serverAccountName?: string | null;
+    serverAccountVerified: boolean;
+  }): string | null {
+    return this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'minotar');
   }
 
   private buildMinecraftAvatarUrl(

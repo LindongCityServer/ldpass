@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { BdslmModule } from '../bdslm/bdslm.module.js';
 import { IdentityController } from './identity.controller.js';
 import { IdentityService } from './identity.service.js';

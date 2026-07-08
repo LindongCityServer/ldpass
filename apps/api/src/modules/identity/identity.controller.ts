@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Options, Param, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Options, Param, Post, Query, Req, Res } from '../../framework.js';
 import { SessionAuthService } from '../../shared/auth/session-auth.service.js';
 import type { ApiRequestLike, ApiResponseLike } from '../../shared/auth/request-context.js';
 import {
@@ -13,6 +13,7 @@ import {
   ResubmitReviewDto,
   SetPinDto,
   StartServerAccountRebindDto,
+  UpdateAccountAvatarDto,
   UpdateAccountPreferencesDto,
 } from './dto.js';
 import { IdentityService } from './identity.service.js';
@@ -219,6 +220,12 @@ export class IdentityController {
   async updateAccountPreferences(@Body() dto: UpdateAccountPreferencesDto, @Req() request: ApiRequestLike) {
     const user = await this.sessionAuth.requireActiveUser(request);
     return this.identityService.updateAccountPreferences(user, dto);
+  }
+
+  @Post('account/avatar')
+  async updateAccountAvatar(@Body() dto: UpdateAccountAvatarDto, @Req() request: ApiRequestLike) {
+    const user = await this.sessionAuth.requireActiveUser(request);
+    return this.identityService.updateAccountAvatar(user, dto);
   }
 
   @Get('account/devices')

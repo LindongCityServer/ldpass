@@ -23,6 +23,8 @@ export type ProviderStatus = 'PendingReview' | 'Rejected' | 'Active' | 'Suspende
 
 export type ProviderProfileChangeRequestStatus = 'PendingReview' | 'Approved' | 'Rejected';
 
+export type UserAvatarChangeRequestStatus = 'PendingReview' | 'Approved' | 'Rejected';
+
 export type ProviderWebhookChangeRequestStatus = 'PendingReview' | 'Approved' | 'Rejected';
 
 export type ProviderWebhookChangeRequestKind =

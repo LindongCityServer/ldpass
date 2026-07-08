@@ -75,6 +75,11 @@ interface AccountPreferencesResponse {
   user: NonNullable<SessionResponse['user']>;
 }
 
+interface AccountAvatarResponse {
+  user: NonNullable<SessionResponse['user']>;
+  nextAction: 'pending_review' | 'updated';
+}
+
 interface ResubmitReviewResponse {
   user: NonNullable<SessionResponse['user']>;
 }
@@ -98,6 +103,7 @@ interface ServerAccountRebindCheckResponse {
 }
 
 type AccountDialog =
+  | 'avatar'
   | 'preferences'
   | 'password'
   | 'pin'
@@ -115,6 +121,10 @@ function UserAvatar({
   fallbackUrl: string | null;
 }) {
   const [currentUrl, setCurrentUrl] = useState(avatarUrl);
+
+  useEffect(() => {
+    setCurrentUrl(avatarUrl);
+  }, [avatarUrl]);
 
   if (!currentUrl) {
     return <span className="avatar" aria-hidden="true" />;
@@ -145,6 +155,7 @@ export function AccountPanel() {
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const [isStartingServerRebind, setIsStartingServerRebind] = useState(false);
   const [isCheckingServerRebind, setIsCheckingServerRebind] = useState(false);
   const [isResubmittingReview, setIsResubmittingReview] = useState(false);
@@ -386,6 +397,62 @@ export function AccountPanel() {
       setMessage(error instanceof Error ? error.message : '保存提醒偏好失败。');
     } finally {
       setIsSavingPreferences(false);
+    }
+  };
+
+  const saveAvatar = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const form = new FormData(event.currentTarget);
+    const avatarUrl = String(form.get('avatarUrl') ?? '').trim();
+    const reason = String(form.get('reason') ?? '').trim();
+
+    if (!avatarUrl) {
+      setMessage('请输入图床头像链接。');
+      return;
+    }
+
+    setIsSavingAvatar(true);
+    setMessage(null);
+
+    try {
+      const result = await postJson<AccountAvatarResponse>('/api/auth/account/avatar', {
+        avatarUrl,
+        ...(reason ? { reason } : {}),
+      });
+      setSession(result.user);
+      setMessage(
+        result.nextAction === 'pending_review'
+          ? '头像链接已提交，管理员审核通过后生效。'
+          : '头像已更新。',
+      );
+      setActiveDialog(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '提交头像失败。');
+    } finally {
+      setIsSavingAvatar(false);
+    }
+  };
+
+  const restoreDefaultAvatar = async () => {
+    if (!window.confirm('恢复默认头像吗？当前自定义头像会被移除。')) {
+      return;
+    }
+
+    setIsSavingAvatar(true);
+    setMessage(null);
+
+    try {
+      const result = await postJson<AccountAvatarResponse>('/api/auth/account/avatar', {
+        avatarUrl: '',
+      });
+      setSession(result.user);
+      setMessage('头像已恢复为默认头像。');
+      setActiveDialog(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '恢复默认头像失败。');
+    } finally {
+      setIsSavingAvatar(false);
     }
   };
 
@@ -659,6 +726,22 @@ export function AccountPanel() {
               <button
                 className="account-setting-item"
                 type="button"
+                onClick={() => setActiveDialog('avatar')}
+              >
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  face
+                </span>
+                <div>
+                  <strong>头像</strong>
+                  <small>图床链接审核通过后生效</small>
+                </div>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  chevron_right
+                </span>
+              </button>
+              <button
+                className="account-setting-item"
+                type="button"
                 onClick={() => setActiveDialog('preferences')}
               >
                 <span className="material-symbols-rounded" aria-hidden="true">
@@ -850,6 +933,37 @@ export function AccountPanel() {
                 </span>
               </button>
             </div>
+
+            {activeDialog === 'avatar' ? (
+              <form className="stacked-form" onSubmit={saveAvatar} noValidate>
+                <label>
+                  <span>图床头像链接</span>
+                  <input
+                    type="url"
+                    name="avatarUrl"
+                    placeholder="https://example.com/avatar.png"
+                    maxLength={1000}
+                  />
+                </label>
+                <label>
+                  <span>申请说明</span>
+                  <textarea name="reason" rows={3} maxLength={1000} />
+                </label>
+                <div className="form-actions">
+                  <button className="primary-action" type="submit" disabled={isSavingAvatar}>
+                    {isSavingAvatar ? '提交中' : '提交审核'}
+                  </button>
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    disabled={isSavingAvatar}
+                    onClick={() => void restoreDefaultAvatar()}
+                  >
+                    恢复默认头像
+                  </button>
+                </div>
+              </form>
+            ) : null}
 
             {activeDialog === 'preferences' ? (
               <form className="stacked-form" onSubmit={savePreferences} noValidate>
@@ -1118,6 +1232,7 @@ export function AccountPanel() {
 
 function getAccountDialogTitle(dialog: AccountDialog): string {
   const labels: Record<AccountDialog, string> = {
+    avatar: '头像',
     preferences: '提醒偏好',
     password: '密码',
     pin: 'PIN',

@@ -148,3 +148,15 @@ export class UpdateAccountPreferencesDto {
   @Max(90)
   expirationReminderDays!: number;
 }
+
+export class UpdateAccountAvatarDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  avatarUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  reason?: string;
+}

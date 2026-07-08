@@ -3527,6 +3527,10 @@ function formatPassTailNumber(maskedNumber: string | null): string | null {
 function UserAvatar({ avatarUrl, fallbackUrl }: { avatarUrl: string | null; fallbackUrl: string | null }) {
   const [currentUrl, setCurrentUrl] = useState(avatarUrl);
 
+  useEffect(() => {
+    setCurrentUrl(avatarUrl);
+  }, [avatarUrl]);
+
   if (!currentUrl) {
     return <span className="avatar" aria-hidden="true" />;
   }

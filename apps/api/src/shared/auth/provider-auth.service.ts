@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '../../framework.js';
 import { createHmac, randomBytes } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service.js';
 import {
@@ -8,6 +8,7 @@ import {
   readHeader,
   readUserAgent,
 } from './request-context.js';
+import { serializeAuthCookie, serializeExpiredAuthCookies } from './cookie.js';
 
 export const PROVIDER_SESSION_COOKIE_NAME = 'ldpass_provider_session';
 
@@ -32,7 +33,11 @@ export interface AuthenticatedProviderAccount {
 export class ProviderAuthService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createSession(providerAccountId: string, request: ApiRequestLike, response: ApiResponseLike): Promise<void> {
+  async createSession(
+    providerAccountId: string,
+    request: ApiRequestLike,
+    response: ApiResponseLike,
+  ): Promise<void> {
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
 
@@ -46,16 +51,18 @@ export class ProviderAuthService {
       },
     });
 
-    this.setSessionCookie(response, token, expiresAt);
+    this.setSessionCookie(request, response, token, expiresAt);
   }
 
   async clearSession(request: ApiRequestLike, response: ApiResponseLike): Promise<void> {
-    const token = this.readSessionToken(request);
+    const tokens = this.readSessionTokens(request);
 
-    if (token) {
+    if (tokens.length > 0) {
       await this.prisma.providerAuthSession.updateMany({
         where: {
-          tokenHash: this.hashSessionToken(token),
+          tokenHash: {
+            in: [...new Set(tokens.map((token) => this.hashSessionToken(token)))],
+          },
           revokedAt: null,
         },
         data: {
@@ -64,19 +71,28 @@ export class ProviderAuthService {
       });
     }
 
-    this.clearSessionCookie(response);
+    this.clearSessionCookie(request, response);
   }
 
-  async getCurrentProviderAccount(request: ApiRequestLike): Promise<AuthenticatedProviderAccount | null> {
-    const token = this.readSessionToken(request);
+  async getCurrentProviderAccount(
+    request: ApiRequestLike,
+  ): Promise<AuthenticatedProviderAccount | null> {
+    const tokens = this.readSessionTokens(request);
 
-    if (!token) {
+    if (tokens.length === 0) {
       return null;
     }
 
-    const session = await this.prisma.providerAuthSession.findUnique({
+    const tokenHashes = [...new Set(tokens.map((token) => this.hashSessionToken(token)))];
+    const session = await this.prisma.providerAuthSession.findFirst({
       where: {
-        tokenHash: this.hashSessionToken(token),
+        tokenHash: {
+          in: tokenHashes,
+        },
+        revokedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
       },
       include: {
         providerAccount: {
@@ -85,9 +101,12 @@ export class ProviderAuthService {
           },
         },
       },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
-    if (!session || session.revokedAt || session.expiresAt <= new Date()) {
+    if (!session) {
       return null;
     }
 
@@ -132,18 +151,20 @@ export class ProviderAuthService {
   }
 
   private readSessionToken(request: ApiRequestLike): string | null {
+    return this.readSessionTokens(request)[0] ?? null;
+  }
+
+  private readSessionTokens(request: ApiRequestLike): string[] {
     const cookieHeader = readHeader(request, 'cookie');
     if (!cookieHeader) {
-      return null;
+      return [];
     }
 
     const cookies = cookieHeader.split(';').map((part) => part.trim());
-    const sessionCookie = cookies.find((cookie) => cookie.startsWith(`${PROVIDER_SESSION_COOKIE_NAME}=`));
-    if (!sessionCookie) {
-      return null;
-    }
-
-    return decodeURIComponent(sessionCookie.slice(PROVIDER_SESSION_COOKIE_NAME.length + 1));
+    return cookies
+      .filter((cookie) => cookie.startsWith(`${PROVIDER_SESSION_COOKIE_NAME}=`))
+      .map((cookie) => decodeURIComponent(cookie.slice(PROVIDER_SESSION_COOKIE_NAME.length + 1)))
+      .filter(Boolean);
   }
 
   private hashSessionToken(token: string): string {
@@ -155,49 +176,25 @@ export class ProviderAuthService {
     return createHmac('sha256', secret).update(`provider:${token}`).digest('base64url');
   }
 
-  private setSessionCookie(response: ApiResponseLike, token: string, expiresAt: Date): void {
+  private setSessionCookie(
+    request: ApiRequestLike,
+    response: ApiResponseLike,
+    token: string,
+    expiresAt: Date,
+  ): void {
     response.setHeader(
       'Set-Cookie',
-      this.serializeCookie(PROVIDER_SESSION_COOKIE_NAME, token, {
+      serializeAuthCookie(request, PROVIDER_SESSION_COOKIE_NAME, token, {
         expiresAt,
         maxAgeSeconds: Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)),
       }),
     );
   }
 
-  private clearSessionCookie(response: ApiResponseLike): void {
+  private clearSessionCookie(request: ApiRequestLike, response: ApiResponseLike): void {
     response.setHeader(
       'Set-Cookie',
-      this.serializeCookie(PROVIDER_SESSION_COOKIE_NAME, '', {
-        expiresAt: new Date(0),
-        maxAgeSeconds: 0,
-      }),
+      serializeExpiredAuthCookies(request, PROVIDER_SESSION_COOKIE_NAME),
     );
-  }
-
-  private serializeCookie(
-    name: string,
-    value: string,
-    options: {
-      expiresAt: Date;
-      maxAgeSeconds: number;
-    },
-  ): string {
-    const parts = [
-      `${name}=${encodeURIComponent(value)}`,
-      'Path=/',
-      'HttpOnly',
-      'SameSite=Lax',
-      `Expires=${options.expiresAt.toUTCString()}`,
-      `Max-Age=${options.maxAgeSeconds}`,
-    ];
-
-    const cookieDomain = process.env.AUTH_COOKIE_DOMAIN;
-    if (process.env.NODE_ENV === 'production' && cookieDomain) {
-      parts.push(`Domain=${cookieDomain}`);
-      parts.push('Secure');
-    }
-
-    return parts.join('; ');
   }
 }

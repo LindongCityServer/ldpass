@@ -16,6 +16,9 @@ interface AdminUser {
   registrationIpRegion: IpRegionLike | null;
   serverAccountName: string | null;
   serverAccountVerified: boolean;
+  avatarUrl: string | null;
+  avatarFallbackUrl: string | null;
+  customAvatarUrl: string | null;
   hasPin: boolean;
   createdAt: string;
   updatedAt: string;
@@ -30,6 +33,33 @@ interface IpRegionLike {
 
 interface AdminUsersResponse {
   users: AdminUser[];
+}
+
+interface UserAvatarChangeRequest {
+  id: string;
+  userId: string;
+  status: string;
+  currentAvatarUrl: string | null;
+  proposedAvatarUrl: string | null;
+  reason: string | null;
+  reviewedById: string | null;
+  reviewReason: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    status: string;
+    avatarUrl: string | null;
+    avatarFallbackUrl: string | null;
+    customAvatarUrl: string | null;
+  };
+}
+
+interface UserAvatarChangeRequestsResponse {
+  requests: UserAvatarChangeRequest[];
 }
 
 interface GovernanceInput {
@@ -68,6 +98,7 @@ const userStatusFilters: Array<{ value: UserStatusFilter; label: string }> = [
 export function AdminUsersPanel() {
   const [pendingUsers, setPendingUsers] = useState<AdminUser[]>([]);
   const [directoryUsers, setDirectoryUsers] = useState<AdminUser[]>([]);
+  const [avatarChangeRequests, setAvatarChangeRequests] = useState<UserAvatarChangeRequest[]>([]);
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('all');
   const [governanceInputs, setGovernanceInputs] = useState<Record<string, GovernanceInput>>({});
@@ -76,7 +107,9 @@ export function AdminUsersPanel() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDirectoryLoading, setIsDirectoryLoading] = useState(true);
+  const [isAvatarRequestsLoading, setIsAvatarRequestsLoading] = useState(true);
   const [governanceActionKey, setGovernanceActionKey] = useState<string | null>(null);
+  const [avatarActionKey, setAvatarActionKey] = useState<string | null>(null);
   const [isExportingUsers, setIsExportingUsers] = useState(false);
 
   const allUsers = useMemo(
@@ -122,13 +155,30 @@ export function AdminUsersPanel() {
     }
   };
 
+  const loadAvatarChangeRequests = async () => {
+    setIsAvatarRequestsLoading(true);
+    setMessage(null);
+
+    try {
+      const result = await getJson<UserAvatarChangeRequestsResponse>(
+        '/api/admin/users/avatar-requests',
+      );
+      setAvatarChangeRequests(result.requests);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '读取头像申请列表失败。');
+    } finally {
+      setIsAvatarRequestsLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadPendingUsers();
     void loadDirectoryUsers('');
+    void loadAvatarChangeRequests();
   }, []);
 
   const refreshUsers = async () => {
-    await Promise.all([loadPendingUsers(), loadDirectoryUsers(keyword)]);
+    await Promise.all([loadPendingUsers(), loadDirectoryUsers(keyword), loadAvatarChangeRequests()]);
   };
 
   const submitDirectorySearch = (event: FormEvent<HTMLFormElement>) => {
@@ -194,6 +244,69 @@ export function AdminUsersPanel() {
             ? '审核通过失败。'
             : '驳回注册失败。',
       );
+    }
+  };
+
+  const approveAvatarChangeRequest = async (request: UserAvatarChangeRequest) => {
+    if (!window.confirm(`确定通过 ${request.user.username} 的头像申请吗？`)) {
+      return;
+    }
+
+    setAvatarActionKey(`${request.id}:approve`);
+    setMessage(null);
+
+    try {
+      await postJson(`/api/admin/users/avatar-requests/${request.id}/approve`);
+      setMessage('已通过头像申请。');
+      await refreshUsers();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '通过头像申请失败。');
+    } finally {
+      setAvatarActionKey(null);
+    }
+  };
+
+  const rejectAvatarChangeRequest = async (request: UserAvatarChangeRequest) => {
+    const reason = window.prompt('请输入打回原因');
+    if (!reason?.trim()) {
+      return;
+    }
+
+    setAvatarActionKey(`${request.id}:reject`);
+    setMessage(null);
+
+    try {
+      await postJson(`/api/admin/users/avatar-requests/${request.id}/reject`, {
+        reason: reason.trim(),
+      });
+      setMessage('已打回头像申请。');
+      await loadAvatarChangeRequests();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '打回头像申请失败。');
+    } finally {
+      setAvatarActionKey(null);
+    }
+  };
+
+  const revertUserAvatar = async (user: AdminUser) => {
+    const reason = window.prompt(`请输入打回 ${user.username} 当前头像的原因`);
+    if (!reason?.trim()) {
+      return;
+    }
+
+    setAvatarActionKey(`${user.id}:revert`);
+    setMessage(null);
+
+    try {
+      await postJson(`/api/admin/users/${user.id}/avatar/revert`, {
+        reason: reason.trim(),
+      });
+      setMessage(`已打回 ${user.username} 的当前头像。`);
+      await refreshUsers();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '打回当前头像失败。');
+    } finally {
+      setAvatarActionKey(null);
     }
   };
 
@@ -382,6 +495,64 @@ export function AdminUsersPanel() {
           </div>
         </form>
 
+        <section className="admin-list-section" aria-labelledby="admin-users-avatar-title">
+          <div className="detail-section-heading">
+            <h2 id="admin-users-avatar-title">头像申请</h2>
+            <span>{avatarChangeRequests.length}</span>
+          </div>
+          {isAvatarRequestsLoading ? <p className="empty-note">正在读取头像申请。</p> : null}
+          {!isAvatarRequestsLoading && avatarChangeRequests.length === 0 ? (
+            <p className="empty-note">暂无待审核头像。</p>
+          ) : null}
+          <div className="admin-list">
+            {avatarChangeRequests.map((request) => (
+              <article className="admin-list-item admin-user-row" key={request.id}>
+                <div className="admin-user-main">
+                  <AdminUserAvatar
+                    avatarUrl={request.proposedAvatarUrl}
+                    fallbackUrl={request.user.avatarFallbackUrl}
+                    initial={readAvatarRequestInitial(request)}
+                  />
+                  <div>
+                    <h2>
+                      {request.user.username}
+                      <span className="admin-status-pill">头像待审</span>
+                    </h2>
+                    <p>{request.user.email}</p>
+                    <p>当前：{request.currentAvatarUrl ?? '默认头像'}</p>
+                    <p>拟用：{request.proposedAvatarUrl ?? '未提供'}</p>
+                    {request.reason ? <p>说明：{request.reason}</p> : null}
+                    <p>提交时间：{new Date(request.createdAt).toLocaleString('zh-CN')}</p>
+                  </div>
+                </div>
+                <div className="admin-list-actions">
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    disabled={avatarActionKey === `${request.id}:reject`}
+                    onClick={() => void rejectAvatarChangeRequest(request)}
+                  >
+                    {avatarActionKey === `${request.id}:reject` ? '打回中' : '打回'}
+                  </button>
+                  <button
+                    className="primary-action"
+                    type="button"
+                    disabled={avatarActionKey === `${request.id}:approve`}
+                    onClick={() => void approveAvatarChangeRequest(request)}
+                  >
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      check
+                    </span>
+                    <span>
+                      {avatarActionKey === `${request.id}:approve` ? '通过中' : '通过'}
+                    </span>
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
         <section className="admin-list-section" aria-labelledby="admin-users-directory-title">
           <div className="detail-section-heading">
             <h2 id="admin-users-directory-title">用户列表</h2>
@@ -400,9 +571,11 @@ export function AdminUsersPanel() {
                 key={user.id}
               >
                 <div className="admin-user-main">
-                  <span className="admin-user-avatar" aria-hidden="true">
-                    {readUserInitial(user)}
-                  </span>
+                  <AdminUserAvatar
+                    avatarUrl={user.avatarUrl}
+                    fallbackUrl={user.avatarFallbackUrl}
+                    initial={readUserInitial(user)}
+                  />
                   <div>
                     <h2>
                       {user.username}
@@ -423,6 +596,16 @@ export function AdminUsersPanel() {
                   >
                     详情
                   </button>
+                  {user.customAvatarUrl && user.status !== 'Deleted' ? (
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      disabled={avatarActionKey === `${user.id}:revert`}
+                      onClick={() => void revertUserAvatar(user)}
+                    >
+                      {avatarActionKey === `${user.id}:revert` ? '打回中' : '打回头像'}
+                    </button>
+                  ) : null}
                   {user.status === 'PendingReview' ? (
                     <>
                       <button
@@ -525,6 +708,41 @@ export function AdminUsersPanel() {
         ) : null}
       </section>
     </>
+  );
+}
+
+function AdminUserAvatar({
+  avatarUrl,
+  fallbackUrl,
+  initial,
+}: {
+  avatarUrl: string | null;
+  fallbackUrl: string | null;
+  initial: string;
+}) {
+  const [currentUrl, setCurrentUrl] = useState(avatarUrl);
+
+  useEffect(() => {
+    setCurrentUrl(avatarUrl);
+  }, [avatarUrl]);
+
+  if (!currentUrl) {
+    return (
+      <span className="admin-user-avatar" aria-hidden="true">
+        {initial}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      className="admin-user-avatar"
+      src={currentUrl}
+      alt=""
+      width={44}
+      height={44}
+      onError={() => setCurrentUrl(currentUrl === fallbackUrl ? null : fallbackUrl)}
+    />
   );
 }
 
@@ -711,6 +929,7 @@ function UserDetail({ user, compact = false }: { user: AdminUser; compact?: bool
     ['邮箱', user.email],
     ['服务端 ID', user.serverAccountName ?? '未绑定'],
     ['服务器验证', user.serverAccountVerified ? '已验证' : '未验证'],
+    ['当前头像', user.customAvatarUrl ?? '默认头像'],
     ['状态', formatUserStatus(user.status)],
     ['角色', user.role],
     ['PIN', user.hasPin ? '已设置' : '未设置'],
@@ -774,6 +993,14 @@ function readDialogTitle(dialog: UserDialog): string {
 
 function readUserInitial(user: AdminUser): string {
   return (user.username.trim().charAt(0) || user.email.trim().charAt(0) || '?').toUpperCase();
+}
+
+function readAvatarRequestInitial(request: UserAvatarChangeRequest): string {
+  return (
+    request.user.username.trim().charAt(0) ||
+    request.user.email.trim().charAt(0) ||
+    '?'
+  ).toUpperCase();
 }
 
 function formatShortId(id: string): string {
