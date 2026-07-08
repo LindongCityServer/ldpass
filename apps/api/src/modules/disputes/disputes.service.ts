@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '../../framework.js';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';

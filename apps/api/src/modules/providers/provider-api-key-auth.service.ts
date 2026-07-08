@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Injectable,
   UnauthorizedException,
-} from '@nestjs/common';
+} from '../../framework.js';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { ProviderApiKeyScope } from '@ldpass/contracts';
 import type { Prisma } from '@ldpass/database';

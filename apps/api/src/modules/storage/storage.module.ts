@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { StorageMonitorService } from './storage-monitor.service.js';
 import { StorageController } from './storage.controller.js';
 

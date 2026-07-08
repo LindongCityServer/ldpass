@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '../../framework.js';
 import { ProviderAuthService } from '../../shared/auth/provider-auth.service.js';
 import { SessionAuthService } from '../../shared/auth/session-auth.service.js';
 import type { ApiRequestLike } from '../../shared/auth/request-context.js';

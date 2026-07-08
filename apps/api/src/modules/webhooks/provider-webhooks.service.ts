@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '../../framework.js';
 import { randomUUID } from 'node:crypto';
 import type { ProviderWebhookChangeRequestKind } from '@ldpass/contracts';
 import type { Prisma } from '@ldpass/database';

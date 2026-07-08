@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { BdslmModule } from '../bdslm/bdslm.module.js';
 import { WalletController } from './wallet.controller.js';
 import { WalletService } from './wallet.service.js';

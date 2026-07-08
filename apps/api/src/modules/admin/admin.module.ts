@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { AddPassTokensController } from './add-pass-tokens.controller.js';
 import { AddPassTokensService } from './add-pass-tokens.service.js';
 import { AdminDashboardController } from './admin-dashboard.controller.js';

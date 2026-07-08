@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from '../../framework.js';
 import type { Prisma } from '@ldpass/database';
 import { PrismaService } from '../../shared/database/prisma.service.js';
 import type { AuditLogQueryDto } from './audit-query.dto.js';

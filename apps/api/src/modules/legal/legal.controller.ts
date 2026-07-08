@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req } from '../../framework.js';
 import { SessionAuthService } from '../../shared/auth/session-auth.service.js';
 import type { ApiRequestLike } from '../../shared/auth/request-context.js';
 import { UpdateLegalDocumentDto } from './dto.js';

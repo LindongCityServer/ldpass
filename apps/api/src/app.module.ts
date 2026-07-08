@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from './framework.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { ActionLinksModule } from './modules/action-links/action-links.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';

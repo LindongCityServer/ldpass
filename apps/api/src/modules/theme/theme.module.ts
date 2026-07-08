@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { ThemeScheduleService } from './theme-schedule.service.js';
 import { ThemeController } from './theme.controller.js';
 

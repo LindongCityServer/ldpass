@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res } from '../../framework.js';
 import { ProviderAuthService } from '../../shared/auth/provider-auth.service.js';
 import type { ApiRequestLike, ApiResponseLike } from '../../shared/auth/request-context.js';
 import { ProviderLoginDto, RegisterProviderDto, SubmitProviderProfileChangeDto } from './dto.js';

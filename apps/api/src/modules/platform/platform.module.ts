@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { PlatformStatusController } from './platform-status.controller.js';
 import { PlatformStatusService } from './platform-status.service.js';
 

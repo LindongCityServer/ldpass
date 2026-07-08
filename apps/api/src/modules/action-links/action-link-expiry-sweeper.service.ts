@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '../../framework.js';
 import { ActionLinksService } from './action-links.service.js';
 
 @Injectable()

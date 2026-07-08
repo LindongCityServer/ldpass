@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '../../framework.js';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 const secretPrefix = 'ldwh_';

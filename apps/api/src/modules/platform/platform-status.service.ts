@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '../../framework.js';
 import { randomUUID } from 'node:crypto';
 import type { PlatformNoticeTone } from '@ldpass/contracts';
 import type { EventBus } from '@ldpass/event-bus';

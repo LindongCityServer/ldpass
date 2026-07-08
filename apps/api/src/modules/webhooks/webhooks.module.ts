@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { ProviderWebhookDispatcherService } from './provider-webhook-dispatcher.service.js';
 import {
   AdminProviderWebhookChangeRequestsController,

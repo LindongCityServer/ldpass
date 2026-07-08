@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { BdslmModule } from '../bdslm/bdslm.module.js';
 import { ProvidersModule } from '../providers/providers.module.js';
 import { OpenProviderRedemptionController } from './open-provider-redemption.controller.js';

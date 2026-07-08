@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '../../framework.js';
 import { ProviderApiKeyAuthService } from '../providers/provider-api-key-auth.service.js';
 import type { ApiRequestLike } from '../../shared/auth/request-context.js';
 import { CancelRedemptionRequestDto, CreateRedemptionRequestDto, RedemptionQueryDto, ReverseRedemptionRequestDto } from './dto.js';

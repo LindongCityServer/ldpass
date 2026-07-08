@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { LegalController } from './legal.controller.js';
 import { LegalService } from './legal.service.js';
 

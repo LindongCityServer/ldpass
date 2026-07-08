@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { AuditController } from './audit.controller.js';
 import { AuditEventSubscriberService } from './audit-event-subscriber.service.js';
 import { AuditQueryService } from './audit-query.service.js';

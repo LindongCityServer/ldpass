@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from '../../framework.js';
 import type { BdslmChatMessage, BdslmPlayerMarker } from '@ldpass/contracts';
 
 const defaultBdslmRequestTimeoutMs = 5000;

@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, UnauthorizedException } from '../../framework.js';
 import { randomUUID } from 'node:crypto';
 import type { BenefitType } from '@ldpass/contracts';
 import type { Prisma } from '@ldpass/database';

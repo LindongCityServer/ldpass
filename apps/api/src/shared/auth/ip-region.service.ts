@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from '../../framework.js';
 import type { IpRegion } from '@ldpass/contracts';
 import { classifyIpRegion } from './request-context.js';
 

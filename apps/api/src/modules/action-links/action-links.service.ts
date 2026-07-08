@@ -8,7 +8,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
-} from '@nestjs/common';
+} from '../../framework.js';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import type { BenefitType, PassTopUpStatus, VerificationMethod } from '@ldpass/contracts';
 import type { Prisma } from '@ldpass/database';

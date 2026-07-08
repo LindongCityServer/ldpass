@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { HealthController } from './health.controller.js';
 
 @Module({

@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '../../framework.js';
 import type { ActorType, DomainEvent, DomainEventType } from '@ldpass/contracts';
 import type { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';
@@ -28,6 +28,10 @@ const auditedEventTypes: DomainEventType[] = [
   'UserUnsuspended',
   'UserDeletedByAdmin',
   'UserPreferencesUpdated',
+  'UserAvatarChangeSubmitted',
+  'UserAvatarChangeApproved',
+  'UserAvatarChangeRejected',
+  'UserAvatarReverted',
   'CredentialChanged',
   'ProviderSubmitted',
   'ProviderCreatedByAdmin',
@@ -190,6 +194,7 @@ export class AuditEventSubscriberService implements OnModuleInit, OnModuleDestro
     const payload = event.payload as Record<string, unknown>;
     const orderedSubjectKeys = [
       'topUpId',
+      'avatarChangeRequestId',
       'apiKeyChangeRequestId',
       'webhookChangeRequestId',
       'profileChangeRequestId',
@@ -250,6 +255,7 @@ export class AuditEventSubscriberService implements OnModuleInit, OnModuleDestro
       key: 'legal_document',
       passId: 'pass',
       apiKeyChangeRequestId: 'provider_api_key_change_request',
+      avatarChangeRequestId: 'user_avatar_change_request',
       apiKeyId: 'provider_api_key',
       nextApiKeyId: 'provider_api_key',
       previousApiKeyId: 'provider_api_key',

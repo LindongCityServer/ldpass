@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module } from '../../framework.js';
 import { ProvidersModule } from '../providers/providers.module.js';
 import { IssuingController } from './issuing.controller.js';
 import { IssuingService } from './issuing.service.js';

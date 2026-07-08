@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '../../framework.js';
 import { createHmac } from 'node:crypto';
 import type { Prisma } from '@ldpass/database';
 import { PrismaService } from '../../shared/database/prisma.service.js';

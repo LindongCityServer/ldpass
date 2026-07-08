@@ -6,7 +6,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
-} from '@nestjs/common';
+} from '../../framework.js';
 import { randomInt, randomUUID } from 'node:crypto';
 import type {
   BenefitType,

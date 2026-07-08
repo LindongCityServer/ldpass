@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
-} from '@nestjs/common';
+} from '../../framework.js';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';

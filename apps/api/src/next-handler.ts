@@ -1,47 +1,31 @@
-import 'reflect-metadata';
+import { ApiApplicationContext } from './api-container.js';
+import { AppModule } from './app.module.js';
 import {
   BadRequestException,
   HttpException,
   HttpStatus,
-  RequestMethod,
-  ValidationPipe,
-  type INestApplicationContext,
+  readControllerMetadata,
+  readControllerRoutes,
+  transformRouteArgument,
+  type RouteArgumentKind,
+  type RouteArgumentMetadata,
+  type RouteHeaderMetadata,
+  type RouteHttpMethod,
   type Type,
-} from '@nestjs/common';
-import {
-  HEADERS_METADATA,
-  HTTP_CODE_METADATA,
-  METHOD_METADATA,
-  MODULE_METADATA,
-  PATH_METADATA,
-  ROUTE_ARGS_METADATA,
-} from '@nestjs/common/constants.js';
-import { RouteParamtypes } from '@nestjs/common/enums/route-paramtypes.enum.js';
-import { NestFactory } from '@nestjs/core';
+} from './framework.js';
 import type { ApiRequestLike, ApiResponseLike } from './shared/auth/request-context.js';
-import { AppModule } from './app.module.js';
 
 type ControllerInstance = object;
-
-interface RouteHeader {
-  name: string;
-  value: string;
-}
-
-interface RouteArgumentMetadata {
-  index: number;
-  data?: string;
-}
 
 interface CompiledRoute {
   controllerType: Type<ControllerInstance>;
   methodName: string;
-  requestMethod: RequestMethod;
+  requestMethod: RouteHttpMethod;
   path: string;
   regex: RegExp;
   paramNames: string[];
-  argumentMetadata: Map<RouteParamtypes, RouteArgumentMetadata[]>;
-  headers: RouteHeader[];
+  argumentMetadata: RouteArgumentMetadata[];
+  headers: RouteHeaderMetadata[];
   httpCode?: number;
   score: number;
 }
@@ -51,23 +35,7 @@ interface ParsedBody {
   rawBody: Buffer;
 }
 
-const requestMethodNames = new Map<RequestMethod, string>([
-  [RequestMethod.GET, 'GET'],
-  [RequestMethod.POST, 'POST'],
-  [RequestMethod.PUT, 'PUT'],
-  [RequestMethod.DELETE, 'DELETE'],
-  [RequestMethod.PATCH, 'PATCH'],
-  [RequestMethod.OPTIONS, 'OPTIONS'],
-  [RequestMethod.HEAD, 'HEAD'],
-]);
-
-const validationPipe = new ValidationPipe({
-  forbidUnknownValues: true,
-  transform: true,
-  whitelist: true,
-});
-
-let applicationContextPromise: Promise<INestApplicationContext> | null = null;
+let applicationContextPromise: Promise<ApiApplicationContext> | null = null;
 let compiledRoutes: CompiledRoute[] | null = null;
 
 export async function handleNextApiRequest(
@@ -75,8 +43,9 @@ export async function handleNextApiRequest(
   pathSegments: string[] = [],
 ): Promise<Response> {
   try {
+    const context = await getApplicationContext();
     const routePath = normalizeRequestPath(pathSegments);
-    const route = findRoute(request.method, routePath);
+    const route = findRoute(request.method, routePath, context);
 
     if (!route) {
       return createJsonResponse(
@@ -89,8 +58,7 @@ export async function handleNextApiRequest(
       );
     }
 
-    const context = await getApplicationContext();
-    const controller = context.get(route.controllerType, { strict: false });
+    const controller = await context.get(route.controllerType);
     const response = new HeaderCollector();
     const parsedBody = await readRequestBody(request);
     const url = new URL(request.url);
@@ -120,121 +88,70 @@ export async function handleNextApiRequest(
   }
 }
 
-async function getApplicationContext(): Promise<INestApplicationContext> {
-  applicationContextPromise ??= NestFactory.createApplicationContext(AppModule, {
-    logger: ['error', 'warn'],
-  });
-
+async function getApplicationContext(): Promise<ApiApplicationContext> {
+  applicationContextPromise ??= createApplicationContext();
   return applicationContextPromise;
 }
 
-function findRoute(method: string, path: string): CompiledRoute | null {
+async function createApplicationContext(): Promise<ApiApplicationContext> {
+  const context = new ApiApplicationContext(AppModule);
+  await context.init();
+  return context;
+}
+
+function findRoute(
+  method: string,
+  path: string,
+  context: ApiApplicationContext,
+): CompiledRoute | null {
   const requestMethod = method.toUpperCase();
   return (
-    getCompiledRoutes().find((route) => {
-      const routeMethod = requestMethodNames.get(route.requestMethod);
+    getCompiledRoutes(context).find((route) => {
       return (
-        (routeMethod === requestMethod || route.requestMethod === RequestMethod.ALL) &&
+        (route.requestMethod === requestMethod || route.requestMethod === 'ALL') &&
         route.regex.test(path)
       );
     }) ?? null
   );
 }
 
-function getCompiledRoutes(): CompiledRoute[] {
+function getCompiledRoutes(context: ApiApplicationContext): CompiledRoute[] {
   if (compiledRoutes) {
     return compiledRoutes;
   }
 
-  compiledRoutes = readControllerTypes(AppModule).flatMap((controllerType) =>
-    compileControllerRoutes(controllerType),
-  );
+  compiledRoutes = context
+    .readControllerTypes()
+    .flatMap((controllerType) =>
+      compileControllerRoutes(controllerType as Type<ControllerInstance>),
+    );
   compiledRoutes.sort((left, right) => right.score - left.score);
   return compiledRoutes;
 }
 
-function readControllerTypes(
-  moduleType: Type<unknown>,
-  visitedModules = new Set<Type<unknown>>(),
-): Type<ControllerInstance>[] {
-  if (visitedModules.has(moduleType)) {
+function compileControllerRoutes(controllerType: Type<ControllerInstance>): CompiledRoute[] {
+  const controller = readControllerMetadata(controllerType);
+  if (!controller) {
     return [];
   }
 
-  visitedModules.add(moduleType);
-
-  const controllers =
-    (Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, moduleType) as
-      | Type<ControllerInstance>[]
-      | undefined) ?? [];
-  const importedModules =
-    (Reflect.getMetadata(MODULE_METADATA.IMPORTS, moduleType) as unknown[] | undefined) ?? [];
-
-  return [
-    ...controllers,
-    ...importedModules.flatMap((importedModule) => {
-      const importedModuleType = resolveImportedModuleType(importedModule);
-      return importedModuleType ? readControllerTypes(importedModuleType, visitedModules) : [];
-    }),
-  ];
-}
-
-function resolveImportedModuleType(importedModule: unknown): Type<unknown> | null {
-  if (typeof importedModule === 'function') {
-    return importedModule as Type<unknown>;
-  }
-
-  if (!importedModule || typeof importedModule !== 'object') {
-    return null;
-  }
-
-  if (
-    'forwardRef' in importedModule &&
-    typeof (importedModule as { forwardRef?: unknown }).forwardRef === 'function'
-  ) {
-    return (importedModule as { forwardRef: () => Type<unknown> }).forwardRef();
-  }
-
-  if (
-    'module' in importedModule &&
-    typeof (importedModule as { module?: unknown }).module === 'function'
-  ) {
-    return (importedModule as { module: Type<unknown> }).module;
-  }
-
-  return null;
-}
-
-function compileControllerRoutes(controllerType: Type<ControllerInstance>): CompiledRoute[] {
-  const controllerPath = readRoutePaths(Reflect.getMetadata(PATH_METADATA, controllerType));
   const routeDefinitions: CompiledRoute[] = [];
 
-  for (const methodName of Object.getOwnPropertyNames(controllerType.prototype)) {
-    if (methodName === 'constructor') {
-      continue;
-    }
-
-    const method = (controllerType.prototype as Record<string, unknown>)[methodName] as object;
-    const requestMethod = Reflect.getMetadata(METHOD_METADATA, method) as RequestMethod | undefined;
-    if (requestMethod === undefined) {
-      continue;
-    }
-
-    const methodPaths = readRoutePaths(Reflect.getMetadata(PATH_METADATA, method));
-    for (const basePath of controllerPath) {
-      for (const methodPath of methodPaths) {
+  for (const route of readControllerRoutes(controllerType)) {
+    for (const basePath of controller.paths) {
+      for (const methodPath of route.paths) {
         const path = joinRoutePath(basePath, methodPath);
         const { regex, paramNames } = compilePathRegex(path);
         routeDefinitions.push({
           controllerType,
-          methodName,
-          requestMethod,
+          methodName: route.methodName,
+          requestMethod: route.requestMethod,
           path,
           regex,
           paramNames,
-          argumentMetadata: readArgumentMetadata(controllerType, methodName),
-          headers: Reflect.getMetadata(HEADERS_METADATA, method) ?? [],
-          httpCode: Reflect.getMetadata(HTTP_CODE_METADATA, method),
+          argumentMetadata: [...route.arguments].sort((left, right) => left.index - right.index),
+          headers: route.headers,
+          ...(route.httpCode !== undefined ? { httpCode: route.httpCode } : {}),
           score: scoreRoute(path),
         });
       }
@@ -242,36 +159,6 @@ function compileControllerRoutes(controllerType: Type<ControllerInstance>): Comp
   }
 
   return routeDefinitions;
-}
-
-function readRoutePaths(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeRoutePath(String(item)));
-  }
-
-  if (value === undefined || value === null) {
-    return [''];
-  }
-
-  return [normalizeRoutePath(String(value))];
-}
-
-function readArgumentMetadata(
-  controllerType: Type<ControllerInstance>,
-  methodName: string,
-): Map<RouteParamtypes, RouteArgumentMetadata[]> {
-  const rawMetadata = (Reflect.getMetadata(ROUTE_ARGS_METADATA, controllerType, methodName) ??
-    {}) as Record<string, RouteArgumentMetadata>;
-  const result = new Map<RouteParamtypes, RouteArgumentMetadata[]>();
-
-  for (const [key, metadata] of Object.entries(rawMetadata)) {
-    const type = Number.parseInt(key.split(':')[0] ?? '', 10) as RouteParamtypes;
-    const entries = result.get(type) ?? [];
-    entries.push(metadata);
-    result.set(type, entries);
-  }
-
-  return result;
 }
 
 async function buildRouteArguments(
@@ -290,19 +177,16 @@ async function buildRouteArguments(
     'design:paramtypes',
     controller.constructor.prototype,
     route.methodName,
-  ) as Type<unknown>[] | undefined;
+  ) as Type[] | undefined;
   const args: unknown[] = [];
 
-  for (const [type, metadataEntries] of route.argumentMetadata) {
-    for (const metadata of metadataEntries) {
-      const value = await readArgumentValue(type, metadata, input);
-      args[metadata.index] = await transformArgumentValue(
-        value,
-        type,
-        metadata,
-        paramTypes?.[metadata.index],
-      );
-    }
+  for (const metadata of route.argumentMetadata) {
+    const value = readArgumentValue(metadata.kind, metadata, input);
+    args[metadata.index] = await transformRouteArgument(
+      value,
+      metadata.kind,
+      paramTypes?.[metadata.index],
+    );
   }
 
   if (typeof method !== 'function') {
@@ -312,8 +196,8 @@ async function buildRouteArguments(
   return args;
 }
 
-async function readArgumentValue(
-  type: RouteParamtypes,
+function readArgumentValue(
+  kind: RouteArgumentKind,
   metadata: RouteArgumentMetadata,
   input: {
     body: unknown;
@@ -322,57 +206,26 @@ async function readArgumentValue(
     request: ApiRequestLike;
     response: ApiResponseLike;
   },
-): Promise<unknown> {
-  switch (type) {
-    case RouteParamtypes.REQUEST:
+): unknown {
+  switch (kind) {
+    case 'request':
       return input.request;
-    case RouteParamtypes.RESPONSE:
+    case 'response':
       return input.response;
-    case RouteParamtypes.BODY:
+    case 'body':
       return metadata.data ? readObjectField(input.body, metadata.data) : input.body;
-    case RouteParamtypes.QUERY:
+    case 'query':
       return metadata.data ? input.query[metadata.data] : input.query;
-    case RouteParamtypes.PARAM:
+    case 'param':
       return metadata.data ? input.params[metadata.data] : input.params;
-    case RouteParamtypes.HEADERS:
+    case 'headers':
       return metadata.data
         ? input.request.headers[metadata.data.toLowerCase()]
         : input.request.headers;
-    case RouteParamtypes.RAW_BODY:
+    case 'rawBody':
       return input.request.rawBody;
     default:
       return undefined;
-  }
-}
-
-async function transformArgumentValue(
-  value: unknown,
-  type: RouteParamtypes,
-  metadata: RouteArgumentMetadata,
-  metatype: Type<unknown> | undefined,
-): Promise<unknown> {
-  const argumentType = toArgumentType(type);
-  if (!argumentType) {
-    return value;
-  }
-
-  return validationPipe.transform(value, {
-    type: argumentType,
-    metatype,
-    data: metadata.data,
-  });
-}
-
-function toArgumentType(type: RouteParamtypes): 'body' | 'query' | 'param' | 'custom' | null {
-  switch (type) {
-    case RouteParamtypes.BODY:
-      return 'body';
-    case RouteParamtypes.QUERY:
-      return 'query';
-    case RouteParamtypes.PARAM:
-      return 'param';
-    default:
-      return null;
   }
 }
 
@@ -519,8 +372,8 @@ function readObjectField(value: unknown, key: string): unknown {
   return (value as Record<string, unknown>)[key];
 }
 
-function defaultStatusFor(requestMethod: RequestMethod): number {
-  if (requestMethod === RequestMethod.POST) {
+function defaultStatusFor(requestMethod: RouteHttpMethod): number {
+  if (requestMethod === 'POST') {
     return HttpStatus.CREATED;
   }
 

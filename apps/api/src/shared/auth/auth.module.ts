@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module } from '../../framework.js';
 import { IpRegionService } from './ip-region.service.js';
 import { ProviderAuthService } from './provider-auth.service.js';
 import { SecretHashService } from './secret-hash.service.js';

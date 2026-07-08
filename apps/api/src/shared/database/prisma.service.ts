@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '../../framework.js';
 import { createPrismaClientOptions, PrismaClient } from '@ldpass/database';
 
 @Injectable()
