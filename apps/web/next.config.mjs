@@ -3,9 +3,11 @@ import { fileURLToPath } from 'node:url';
 
 const appDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(appDir, '../..');
+const useNextStandaloneOutput = process.env.LDPASS_USE_NEXT_STANDALONE === 'true';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  ...(useNextStandaloneOutput ? { output: 'standalone' } : {}),
   outputFileTracingRoot: repoRoot,
   outputFileTracingIncludes: {
     '/api/*': [

@@ -5,6 +5,7 @@
   "packageManager": "pnpm@10.14.0",
   "scripts": {
     "build": "pnpm db:generate && pnpm -r build",
+    "package:standalone": "pnpm build && node scripts/package-standalone.mjs",
     "check": "pnpm -r check",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm db:generate && pnpm -r typecheck",

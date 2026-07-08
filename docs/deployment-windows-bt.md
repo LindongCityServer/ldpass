@@ -85,6 +85,76 @@ ACTION_LINK_EXPIRY_SWEEP_BATCH_SIZE=100
 
 ## 5. 构建流程
 
+### 5.1 推荐脚本部署
+
+仓库提供了 Windows + 宝塔环境的部署脚本：
+
+```text
+scripts\deploy-windows-bt.ps1
+```
+
+推荐服务器目录仍保持：
+
+```text
+D:\wwwroot\ldpass\
+  .env
+  data\
+  scripts\deploy-windows-bt.ps1
+  releases\
+  backups\
+```
+
+执行示例：
+
+```powershell
+Set-Location D:\wwwroot\ldpass\scripts
+powershell.exe -ExecutionPolicy Bypass -File .\deploy-windows-bt.ps1
+```
+
+脚本默认做这些事：
+
+1. 从 GitHub 下载指定仓库和分支的源码压缩包。
+2. 在 `releases\<时间>-<ref>-<commit>` 新目录中安装依赖并构建。
+3. 校验 `.next\BUILD_ID`、`.next\static` 和 App Router manifest 是否存在。
+4. 备份 `.env` 与 `data`。
+5. 执行 `db:push`，除非传入 `-SkipDbPush`。
+6. 切换 PM2 进程到新 release。
+7. 用本机地址检查 `/api/health`、几个公开页面，以及这些页面引用的 `/_next/static/*` 是否能返回 200。
+8. 重载 Nginx，除非传入 `-SkipNginxReload`。
+9. 做公网烟雾检查。
+
+默认不要让 Nginx 单独接管 `/_next/static/*`。脚本会停用它曾经生成过的：
+
+```text
+C:\BtSoft\nginx\conf\proxy\<域名>\000-next-static.conf
+```
+
+这样可以让页面 HTML 和静态资源都由同一个 Next.js 进程处理，避免“HTML 是新版，但静态目录是旧版或半复制状态”的 404。只有在明确需要保留旧 chunk 缓存时，才传入：
+
+```powershell
+-EnableSharedNextStatic
+```
+
+公网检查失败时要注意区分状态：
+
+- 如果失败发生在 PM2 切换前，线上仍是旧版。
+- 如果失败发生在 PM2 切换后，脚本会保留新 release，并提示“PM2 可能正在运行此 release”。此时应先看 `pm2 jlist` 或访问 `http://127.0.0.1:3200/api/health`，不要仅凭脚本退出码判断线上仍是旧版。
+
+常用参数：
+
+```powershell
+# 指定分支或 commit
+powershell.exe -ExecutionPolicy Bypass -File .\deploy-windows-bt.ps1 -Ref main
+
+# 公网域名暂时未配好时允许本机部署成功
+powershell.exe -ExecutionPolicy Bypass -File .\deploy-windows-bt.ps1 -AllowPublicCheckFailure
+
+# 临时跳过公网检查，只验证本机 Next 和 PM2
+powershell.exe -ExecutionPolicy Bypass -File .\deploy-windows-bt.ps1 -SkipPublicCheck
+```
+
+### 5.2 手工部署命令
+
 ```powershell
 npx --yes pnpm@10.14.0 install --frozen-lockfile
 npx --yes pnpm@10.14.0 db:generate
@@ -208,6 +278,16 @@ Test-Path .\data
 ### 11.3 页面能打开，但搜索、主题、分类等按钮都没反应
 
 如果页面 HTML 能返回 200，但浏览器控制台或请求面板里出现 `/_next/static/chunks/app-pages-internals.js`、`./543.js` 等 Next.js chunk 404，通常是开发服务运行时又执行了 `next build` 或 `pnpm build`，导致 `.next` 目录里的开发产物和生产产物混在一起。
+
+生产环境还需要检查 Nginx 是否单独接管了 `/_next/static/*`。如果存在类似下面的配置：
+
+```nginx
+location ^~ /_next/static/ {
+    alias D:/wwwroot/ldpass/shared-next-static/;
+}
+```
+
+则页面 HTML 由 Next.js 当前进程生成，但 JS/CSS 由另一个共享静态目录提供。共享目录复制不完整、没有包含当前 release 的 `.next/static`，或者 Nginx 没有 reload，都可能出现“部分 chunk 200、部分 chunk 404”。当前推荐默认让 `/_next/static/*` 也反代给 Next.js；`scripts\deploy-windows-bt.ps1` 在未传入 `-EnableSharedNextStatic` 时会停用它曾经生成的 `000-next-static.conf`。
 
 生产环境如果只有旧 hash 的 chunk 404，例如浏览器还在请求上一版的 `/_next/static/chunks/app/admin/page-*.js`，而直接访问当前 `/admin` 或 `/provider/*` 页面看到的新 chunk 都是 200，通常是旧页面、旧 Service Worker 缓存或仍打开的旧标签页和新部署静态资源不一致。当前前端已做两层兜底：Service Worker 不再缓存 `/admin/*`、`/provider/*` 和 `/_next/static/*`，并且页面检测到 Next 静态资源加载失败时会自动刷新一次。
 
