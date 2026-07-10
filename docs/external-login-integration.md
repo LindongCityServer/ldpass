@@ -34,7 +34,44 @@ GET /api/auth/login/redirect?client_id=<client_id>&redirect_uri=<redirect_uri>&s
 
 服务端确认 `client_id` 和 `redirect_uri` 有效后，用户登录成功会回跳到登记的 `redirect_uri`，并原样带回 `state`。
 
-### 3. 校验当前登录态
+如果用户打开登录页时当前设备已经存在临东通 Active 会话，页面会显示“使用当前账号”按钮。用户点击后不需要重新输入密码，系统会直接使用当前账号回跳到已登记的 `redirect_uri`。
+
+### 3. 跳转到账号验证页
+
+外部系统如果需要用户对当前账号做一次二次确认，可以将用户跳转到：
+
+```text
+/verify-account?client_id=<client_id>&redirect_uri=<redirect_uri>&state=<state>&purpose=<purpose>
+```
+
+参数规则和登录页一致：
+
+| 参数           | 必填 | 说明                                                                                                 |
+| -------------- | ---- | ---------------------------------------------------------------------------------------------------- |
+| `client_id`    | 是   | 管理员登记的客户端应用标识。                                                                         |
+| `redirect_uri` | 是   | 必须精确命中该客户端应用的允许回跳地址。                                                             |
+| `state`        | 建议 | 外部系统生成的不可预测随机值，回跳后必须校验。                                                       |
+| `purpose`      | 否   | 外部系统自定义业务用途，例如 `checkout-confirm` 或订单号摘要。仅用于审计和回跳提示，不应放敏感数据。 |
+
+页面会要求用户先处于已登录且 Active 状态。未登录时会引导用户登录并回到本页继续验证。
+
+用户可选择两种方式：
+
+- `pin`：输入临东通账户 PIN。
+- `server_account`：获取验证码，并使用已绑定且已验证的服务器账号在服务器聊天中发送验证码。
+
+验证成功后，临东通会回跳到已登记的 `redirect_uri`，并追加：
+
+| 回跳参数              | 说明                                             |
+| --------------------- | ------------------------------------------------ |
+| `state`               | 原样带回外部系统传入的 `state`。                 |
+| `ldpass_verification` | 固定为 `ok`。                                    |
+| `ldpass_method`       | 本次验证方式，取值为 `pin` 或 `server_account`。 |
+| `ldpass_purpose`      | 传入 `purpose` 时带回。                          |
+
+外部系统必须校验 `state`，并在需要读取当前用户时继续调用会话校验接口，不要只凭回跳参数识别用户身份。
+
+### 4. 校验当前登录态
 
 外部系统前端从已登记 Origin 携带 Cookie 调用：
 
@@ -110,6 +147,7 @@ await fetch('/api/auth/client-session?client_id=<client_id>', {
 - 生产环境必须使用 HTTPS。
 - 会话校验请求必须使用已登记 Origin，并开启 Cookie credentials。
 - 外部系统必须只把 `authenticated=true` 且用户状态有效的响应视为登录成功。
+- 外部账号验证回跳必须同时校验 `state` 和当前会话，不要把 `ldpass_verification=ok` 当作长期授权凭据。
 - 登录、回跳校验、会话校验接口应持续保留限流和审计。
 - 不要把当前轻量方案返回的用户信息当作长期授权 token 使用。
 

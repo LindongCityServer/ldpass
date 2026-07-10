@@ -2,6 +2,8 @@ import { Body, Controller, Get, Options, Param, Post, Query, Req, Res } from '..
 import { SessionAuthService } from '../../shared/auth/session-auth.service.js';
 import type { ApiRequestLike, ApiResponseLike } from '../../shared/auth/request-context.js';
 import {
+  AccountVerificationContextDto,
+  AccountVerificationPinDto,
   AdminLoginDto,
   ChangePasswordDto,
   ClientSessionQueryDto,
@@ -36,7 +38,10 @@ export class IdentityController {
   }
 
   @Post('register/server/start')
-  async startServerRegistration(@Body() dto: RegisterServerStartDto, @Req() request: ApiRequestLike) {
+  async startServerRegistration(
+    @Body() dto: RegisterServerStartDto,
+    @Req() request: ApiRequestLike,
+  ) {
     const result = await this.identityService.startServerRegistration(dto, request);
 
     return {
@@ -98,7 +103,11 @@ export class IdentityController {
     @Req() request: ApiRequestLike,
     @Res({ passthrough: true }) response: ApiResponseLike,
   ) {
-    const result = await this.identityService.checkDeviceLoginVerification(challengeId, dto, request);
+    const result = await this.identityService.checkDeviceLoginVerification(
+      challengeId,
+      dto,
+      request,
+    );
     if (result.nextAction === 'authenticated' || result.nextAction === 'account_status') {
       await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id);
     }
@@ -155,7 +164,10 @@ export class IdentityController {
   }
 
   @Post('logout')
-  async logout(@Req() request: ApiRequestLike, @Res({ passthrough: true }) response: ApiResponseLike) {
+  async logout(
+    @Req() request: ApiRequestLike,
+    @Res({ passthrough: true }) response: ApiResponseLike,
+  ) {
     await this.sessionAuth.clearSession(request, response);
 
     return {
@@ -188,6 +200,34 @@ export class IdentityController {
     return this.identityService.setPin(user, dto.password, dto.pin);
   }
 
+  @Post('account/verification/pin')
+  async verifyAccountWithPin(
+    @Body() dto: AccountVerificationPinDto,
+    @Req() request: ApiRequestLike,
+  ) {
+    const user = await this.sessionAuth.requireActiveUser(request);
+    return this.identityService.verifyAccountWithPin(user, dto);
+  }
+
+  @Post('account/verification/server/start')
+  async startAccountServerVerification(
+    @Body() dto: AccountVerificationContextDto,
+    @Req() request: ApiRequestLike,
+  ) {
+    const user = await this.sessionAuth.requireActiveUser(request);
+    return this.identityService.startAccountServerVerification(user, dto);
+  }
+
+  @Post('account/verification/server/:challengeId/check')
+  async checkAccountServerVerification(
+    @Param('challengeId') challengeId: string,
+    @Body() dto: AccountVerificationContextDto,
+    @Req() request: ApiRequestLike,
+  ) {
+    const user = await this.sessionAuth.requireActiveUser(request);
+    return this.identityService.checkAccountServerVerification(user, challengeId, dto);
+  }
+
   @Post('account/password')
   async changePassword(@Body() dto: ChangePasswordDto, @Req() request: ApiRequestLike) {
     const user = await this.sessionAuth.requireActiveUser(request);
@@ -195,7 +235,10 @@ export class IdentityController {
   }
 
   @Post('account/server-account/rebind/start')
-  async startServerAccountRebind(@Body() dto: StartServerAccountRebindDto, @Req() request: ApiRequestLike) {
+  async startServerAccountRebind(
+    @Body() dto: StartServerAccountRebindDto,
+    @Req() request: ApiRequestLike,
+  ) {
     const user = await this.sessionAuth.requireActiveUser(request);
     const result = await this.identityService.startServerAccountRebind(user, dto);
 
@@ -206,7 +249,10 @@ export class IdentityController {
   }
 
   @Post('account/server-account/rebind/:challengeId/check')
-  async checkServerAccountRebind(@Param('challengeId') challengeId: string, @Req() request: ApiRequestLike) {
+  async checkServerAccountRebind(
+    @Param('challengeId') challengeId: string,
+    @Req() request: ApiRequestLike,
+  ) {
     const session = await this.sessionAuth.requireActiveSession(request);
     return this.identityService.checkServerAccountRebind(
       session.user,
@@ -217,7 +263,10 @@ export class IdentityController {
   }
 
   @Post('account/preferences')
-  async updateAccountPreferences(@Body() dto: UpdateAccountPreferencesDto, @Req() request: ApiRequestLike) {
+  async updateAccountPreferences(
+    @Body() dto: UpdateAccountPreferencesDto,
+    @Req() request: ApiRequestLike,
+  ) {
     const user = await this.sessionAuth.requireActiveUser(request);
     return this.identityService.updateAccountPreferences(user, dto);
   }
@@ -241,13 +290,19 @@ export class IdentityController {
   }
 
   @Post('account/device-login-approvals/:approvalId/approve')
-  async approveDeviceLoginApproval(@Param('approvalId') approvalId: string, @Req() request: ApiRequestLike) {
+  async approveDeviceLoginApproval(
+    @Param('approvalId') approvalId: string,
+    @Req() request: ApiRequestLike,
+  ) {
     const user = await this.sessionAuth.requireActiveUser(request);
     return this.identityService.approveDeviceLoginApproval(user, approvalId);
   }
 
   @Post('account/device-login-approvals/:approvalId/reject')
-  async rejectDeviceLoginApproval(@Param('approvalId') approvalId: string, @Req() request: ApiRequestLike) {
+  async rejectDeviceLoginApproval(
+    @Param('approvalId') approvalId: string,
+    @Req() request: ApiRequestLike,
+  ) {
     const user = await this.sessionAuth.requireActiveUser(request);
     return this.identityService.rejectDeviceLoginApproval(user, approvalId);
   }
@@ -258,7 +313,10 @@ export class IdentityController {
     return this.identityService.revokeDevice(user, deviceId);
   }
 
-  private writeClientSessionCorsHeaders(response: ApiResponseLike, allowedOrigin: string | null): void {
+  private writeClientSessionCorsHeaders(
+    response: ApiResponseLike,
+    allowedOrigin: string | null,
+  ): void {
     response.setHeader('Vary', 'Origin');
 
     if (!allowedOrigin) {

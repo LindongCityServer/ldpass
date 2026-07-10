@@ -580,6 +580,16 @@ function createArchive() {
     return;
   }
 
+  const explicitArchiveRequested =
+    process.env.LDPASS_CREATE_TAR === 'true' || process.env.LDPASS_CREATE_TGZ === 'true';
+  if (process.platform === 'win32' && !explicitArchiveRequested) {
+    console.log('[ldpass] Windows 默认跳过 tar 归档创建，可直接部署 dist/ldpass-node24。');
+    console.log(
+      '[ldpass] 如确实需要归档，请设置 LDPASS_CREATE_TAR=true 或 LDPASS_CREATE_TGZ=true。',
+    );
+    return;
+  }
+
   removePath(archivePath);
   removePath(gzipArchivePath);
 

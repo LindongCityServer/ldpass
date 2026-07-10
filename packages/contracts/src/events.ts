@@ -197,6 +197,29 @@ export interface PinVerificationSucceeded extends BaseEvent {
   };
 }
 
+export interface ExternalAccountVerificationRequested extends BaseEvent {
+  type: 'ExternalAccountVerificationRequested';
+  payload: {
+    userId: string;
+    method: VerificationMethod;
+    clientId?: string;
+    purpose?: string;
+    verificationId?: string;
+    expiresAt?: string;
+  };
+}
+
+export interface ExternalAccountVerificationSucceeded extends BaseEvent {
+  type: 'ExternalAccountVerificationSucceeded';
+  payload: {
+    userId: string;
+    method: VerificationMethod;
+    clientId?: string;
+    purpose?: string;
+    verificationId?: string;
+  };
+}
+
 export interface UserRegistered extends BaseEvent {
   type: 'UserRegistered';
   payload: {
@@ -1278,6 +1301,8 @@ export type DomainEvent =
   | LoginDeviceRecorded
   | LoginDeviceSignedOut
   | PinVerificationSucceeded
+  | ExternalAccountVerificationRequested
+  | ExternalAccountVerificationSucceeded
   | UserRegistered
   | UserLoggedIn
   | UserAccountDeleted

@@ -21,6 +21,8 @@ const auditedEventTypes: DomainEventType[] = [
   'LoginDeviceRecorded',
   'LoginDeviceSignedOut',
   'PinVerificationSucceeded',
+  'ExternalAccountVerificationRequested',
+  'ExternalAccountVerificationSucceeded',
   'UserRegistered',
   'UserLoggedIn',
   'UserAccountDeleted',

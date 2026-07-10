@@ -45,6 +45,15 @@ interface LoginRedirectValidation {
   state: string | null;
 }
 
+interface SessionResponse {
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    status: string;
+  } | null;
+}
+
 interface LoginFormProps {
   initialClientId?: string;
   initialRedirectUri?: string;
@@ -52,10 +61,19 @@ interface LoginFormProps {
   initialNext?: string;
 }
 
-export function LoginForm({ initialClientId, initialRedirectUri, initialState, initialNext }: LoginFormProps) {
+export function LoginForm({
+  initialClientId,
+  initialRedirectUri,
+  initialState,
+  initialNext,
+}: LoginFormProps) {
   const [message, setMessage] = useState<string | null>(null);
-  const [redirectValidation, setRedirectValidation] = useState<LoginRedirectValidation | null>(null);
+  const [redirectValidation, setRedirectValidation] = useState<LoginRedirectValidation | null>(
+    null,
+  );
+  const [currentSession, setCurrentSession] = useState<SessionResponse['user']>(null);
   const [isValidatingRedirect, setIsValidatingRedirect] = useState(false);
+  const [isReadingSession, setIsReadingSession] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingDevice, setIsCheckingDevice] = useState(false);
   const [isCheckingApproval, setIsCheckingApproval] = useState(false);
@@ -93,11 +111,35 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
 
         setRedirectValidation(result);
         setMessage(`登录后将返回 ${result.clientApplication.name}。`);
+        setIsReadingSession(true);
+        getJson<SessionResponse>('/api/auth/session')
+          .then((sessionResult) => {
+            if (!isMounted) {
+              return;
+            }
+
+            setCurrentSession(sessionResult.user?.status === 'Active' ? sessionResult.user : null);
+          })
+          .catch(() => {
+            if (isMounted) {
+              setCurrentSession(null);
+            }
+          })
+          .finally(() => {
+            if (isMounted) {
+              setIsReadingSession(false);
+            }
+          });
       })
       .catch((error) => {
         if (isMounted) {
           setRedirectValidation(null);
-          setMessage(error instanceof Error ? `${error.message} 登录后将返回钱包。` : '外部登录回跳无效，登录后将返回钱包。');
+          setCurrentSession(null);
+          setMessage(
+            error instanceof Error
+              ? `${error.message} 登录后将返回钱包。`
+              : '外部登录回跳无效，登录后将返回钱包。',
+          );
         }
       })
       .finally(() => {
@@ -116,7 +158,9 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
       return;
     }
 
-    setMessage(safeInternalNext ? '登录后将继续之前的操作。' : '站内回跳地址无效，登录后将返回钱包。');
+    setMessage(
+      safeInternalNext ? '登录后将继续之前的操作。' : '站内回跳地址无效，登录后将返回钱包。',
+    );
   }, [initialClientId, initialRedirectUri, initialNext, safeInternalNext]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -156,10 +200,15 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
     }
 
     setIsCheckingDevice(true);
-    setMessage(`正在检查服务器聊天中是否由 ${loginChallenge.serverId} 发送了验证码 ${loginChallenge.code}。`);
+    setMessage(
+      `正在检查服务器聊天中是否由 ${loginChallenge.serverId} 发送了验证码 ${loginChallenge.code}。`,
+    );
 
     try {
-      const result = await postJson<LoginResponse>(`/api/auth/login/device/${loginChallenge.id}/check`, pendingLogin);
+      const result = await postJson<LoginResponse>(
+        `/api/auth/login/device/${loginChallenge.id}/check`,
+        pendingLogin,
+      );
 
       if (result.nextAction === 'authenticated') {
         finishLogin(result.user.username, false);
@@ -195,7 +244,10 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
     setMessage('正在检查已登录设备是否批准这次新设备登录。');
 
     try {
-      const result = await postJson<LoginResponse>(`/api/auth/login/device-approvals/${loginApproval.id}/check`, pendingLogin);
+      const result = await postJson<LoginResponse>(
+        `/api/auth/login/device-approvals/${loginApproval.id}/check`,
+        pendingLogin,
+      );
 
       if (result.nextAction === 'authenticated') {
         finishLogin(result.user.username, false);
@@ -226,6 +278,18 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
     window.location.href = internalTarget ?? redirectTarget ?? '/';
   };
 
+  const continueWithCurrentSession = () => {
+    if (!currentSession || !redirectValidation) {
+      return;
+    }
+
+    const redirectTarget = readRedirectTarget(redirectValidation);
+    setMessage(
+      `将使用当前账号 ${currentSession.username} 返回 ${redirectValidation.clientApplication.name}。`,
+    );
+    window.location.href = redirectTarget ?? '/';
+  };
+
   return (
     <form className="stacked-form" onSubmit={handleSubmit} noValidate>
       <label>
@@ -239,6 +303,24 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
       {redirectValidation ? (
         <div className="flow-notice" role="status" aria-live="polite">
           <span>登录后返回：{redirectValidation.clientApplication.name}</span>
+          {currentSession ? (
+            <>
+              <span>当前设备已登录：{currentSession.username}</span>
+              <div className="form-actions compact-actions">
+                <button
+                  className="primary-action"
+                  type="button"
+                  disabled={isReadingSession}
+                  onClick={continueWithCurrentSession}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    account_circle
+                  </span>
+                  <span>使用当前账号</span>
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
       {message ? (
@@ -251,7 +333,12 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
           <strong>{loginChallenge.code}</strong>
           <span>请在服务器聊天中用 {loginChallenge.serverId} 发送上面的验证码。</span>
           <div className="form-actions">
-            <button className="secondary-action" type="button" disabled={isCheckingDevice} onClick={() => void checkDeviceVerification()}>
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={isCheckingDevice}
+              onClick={() => void checkDeviceVerification()}
+            >
               {isCheckingDevice ? '检查中' : '我已发送，检查'}
             </button>
           </div>
@@ -259,10 +346,20 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
       ) : null}
       {loginApproval ? (
         <div className="flow-notice" role="status" aria-live="polite">
-          <strong>{loginApproval.deviceLabel ?? formatDeviceSystem(loginApproval.deviceSystem)}</strong>
-          <span>也可以在已登录设备的账户页批准这次新设备登录，有效期至 {new Date(loginApproval.expiresAt).toLocaleString('zh-CN')}。</span>
+          <strong>
+            {loginApproval.deviceLabel ?? formatDeviceSystem(loginApproval.deviceSystem)}
+          </strong>
+          <span>
+            也可以在已登录设备的账户页批准这次新设备登录，有效期至{' '}
+            {new Date(loginApproval.expiresAt).toLocaleString('zh-CN')}。
+          </span>
           <div className="form-actions">
-            <button className="secondary-action" type="button" disabled={isCheckingApproval} onClick={() => void checkDeviceApproval()}>
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={isCheckingApproval}
+              onClick={() => void checkDeviceApproval()}
+            >
               {isCheckingApproval ? '检查中' : '已批准，检查'}
             </button>
           </div>
@@ -272,7 +369,11 @@ export function LoginForm({ initialClientId, initialRedirectUri, initialState, i
         <a className="secondary-action" href="/">
           取消
         </a>
-        <button className="primary-action" type="submit" disabled={isSubmitting || isValidatingRedirect}>
+        <button
+          className="primary-action"
+          type="submit"
+          disabled={isSubmitting || isValidatingRedirect}
+        >
           <span className="material-symbols-rounded" aria-hidden="true">
             login
           </span>
@@ -299,7 +400,12 @@ function readRedirectTarget(validation: LoginRedirectValidation | null): string 
 function readSafeInternalNext(value?: string): string | null {
   const trimmedValue = value?.trim();
 
-  if (!trimmedValue || !trimmedValue.startsWith('/') || trimmedValue.startsWith('//') || trimmedValue.includes('\\')) {
+  if (
+    !trimmedValue ||
+    !trimmedValue.startsWith('/') ||
+    trimmedValue.startsWith('//') ||
+    trimmedValue.includes('\\')
+  ) {
     return null;
   }
 

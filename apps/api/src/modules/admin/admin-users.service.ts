@@ -928,7 +928,7 @@ export class AdminUsersService {
   }): string | null {
     return (
       user.avatarUrl ??
-      this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'mc-heads')
+      this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'minotar-helm')
     );
   }
 
@@ -936,13 +936,13 @@ export class AdminUsersService {
     serverAccountName?: string | null;
     serverAccountVerified: boolean;
   }): string | null {
-    return this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'minotar');
+    return this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'minotar-avatar');
   }
 
   private buildMinecraftAvatarUrl(
     serverAccountName: string | null | undefined,
     verified: boolean,
-    provider: 'mc-heads' | 'minotar',
+    provider: 'minotar-helm' | 'minotar-avatar',
   ): string | null {
     const normalizedName = serverAccountName?.trim();
     if (!verified || !normalizedName) {
@@ -950,8 +950,8 @@ export class AdminUsersService {
     }
 
     const encodedName = encodeURIComponent(normalizedName);
-    return provider === 'mc-heads'
-      ? `https://mc-heads.net/avatar/${encodedName}/64.png`
+    return provider === 'minotar-helm'
+      ? `https://minotar.net/helm/${encodedName}`
       : `https://minotar.net/avatar/${encodedName}/64.png`;
   }
 }

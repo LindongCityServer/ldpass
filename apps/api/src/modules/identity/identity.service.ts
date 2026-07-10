@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
 } from '../../framework.js';
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
-import type { DeviceSystem, IpRegion } from '@ldpass/contracts';
+import type { DeviceSystem, IpRegion, VerificationMethod } from '@ldpass/contracts';
 import { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
@@ -32,6 +32,8 @@ import {
   createDeletedUserIdentity,
 } from '../../shared/auth/user-anonymization.js';
 import type {
+  AccountVerificationContextDto,
+  AccountVerificationPinDto,
   AdminLoginDto,
   LoginDto,
   RegisterReviewDto,
@@ -102,6 +104,48 @@ export interface ClientSessionValidationResult {
     name: string;
   };
   user: PublicUser | null;
+}
+
+export interface AccountVerificationRedirectResult {
+  clientApplication: {
+    clientId: string;
+    name: string;
+  };
+  redirectUri: string;
+  state: string | null;
+}
+
+export interface AccountVerificationSuccessResult {
+  verified: true;
+  method: VerificationMethod;
+  user: PublicUser;
+  redirect: AccountVerificationRedirectResult | null;
+  callbackUrl: string | null;
+}
+
+export interface AccountServerVerificationStartResult {
+  user: PublicUser;
+  redirect: AccountVerificationRedirectResult | null;
+  challenge: {
+    id: string;
+    serverId: string;
+    code: string;
+    expiresAt: string;
+  };
+}
+
+export interface AccountServerVerificationCheckResult {
+  status: 'waiting' | 'verified' | 'rotated' | 'expired';
+  method: Extract<VerificationMethod, 'server_account'>;
+  user: PublicUser;
+  redirect: AccountVerificationRedirectResult | null;
+  callbackUrl: string | null;
+  challenge?: {
+    id: string;
+    serverId: string;
+    code: string;
+    expiresAt: string;
+  };
 }
 
 export interface ServerAccountRebindCheckResult {
@@ -805,6 +849,277 @@ export class IdentityService {
 
     return {
       ok: true,
+    };
+  }
+
+  async verifyAccountWithPin(
+    user: AuthenticatedUser,
+    dto: AccountVerificationPinDto,
+  ): Promise<AccountVerificationSuccessResult> {
+    const redirect = await this.validateOptionalAccountVerificationRedirect(dto);
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        id: user.id,
+      },
+    });
+
+    if (!existingUser) {
+      throw new UnauthorizedException('账户不存在或已经被删除。');
+    }
+
+    if (existingUser.status !== 'Active') {
+      throw new BadRequestException('只有已激活账户可以完成账号验证。');
+    }
+
+    if (!existingUser.pinHash) {
+      throw new BadRequestException('当前账户尚未设置 PIN，请先到账户页设置。');
+    }
+
+    if (!(await this.secretHash.verifySecret(dto.pin, existingUser.pinHash, 'pin'))) {
+      throw new UnauthorizedException('PIN 不正确。');
+    }
+
+    const verificationId = randomUUID();
+    const purpose = this.normalizeAccountVerificationPurpose(dto.purpose);
+
+    await this.eventBus.publish({
+      type: 'PinVerificationSucceeded',
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actorType: 'user',
+      actorId: user.id,
+      payload: {
+        userId: user.id,
+        challengeId: verificationId,
+        purpose: 'sensitive_action',
+      },
+    });
+
+    await this.publishExternalAccountVerificationSucceeded({
+      userId: user.id,
+      method: 'pin',
+      verificationId,
+      redirect,
+      purpose,
+    });
+
+    return {
+      verified: true,
+      method: 'pin',
+      user: this.toPublicUser(existingUser),
+      redirect,
+      callbackUrl: this.createAccountVerificationCallbackUrl(redirect, 'pin', purpose),
+    };
+  }
+
+  async startAccountServerVerification(
+    user: AuthenticatedUser,
+    dto: AccountVerificationContextDto,
+  ): Promise<AccountServerVerificationStartResult> {
+    const redirect = await this.validateOptionalAccountVerificationRedirect(dto);
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        id: user.id,
+      },
+    });
+
+    if (!existingUser) {
+      throw new UnauthorizedException('账户不存在或已经被删除。');
+    }
+
+    if (existingUser.status !== 'Active') {
+      throw new BadRequestException('只有已激活账户可以完成账号验证。');
+    }
+
+    if (!existingUser.serverAccountVerified || !existingUser.serverAccountName) {
+      throw new BadRequestException('当前账户尚未绑定已验证的服务器账号。');
+    }
+
+    const purpose = this.normalizeAccountVerificationPurpose(dto.purpose);
+    const challenge = await this.createServerVerificationChallenge(
+      user.id,
+      existingUser.serverAccountName,
+      'pass_use',
+      {
+        referenceType: 'external_account_verification',
+        referenceId: redirect?.clientApplication.clientId ?? purpose ?? null,
+      },
+    );
+
+    await this.eventBus.publish({
+      type: 'ExternalAccountVerificationRequested',
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actorType: 'user',
+      actorId: user.id,
+      payload: {
+        userId: user.id,
+        method: 'server_account',
+        ...(redirect ? { clientId: redirect.clientApplication.clientId } : {}),
+        ...(purpose ? { purpose } : {}),
+        verificationId: challenge.id,
+        expiresAt: challenge.expiresAt,
+      },
+    });
+
+    return {
+      user: this.toPublicUser(existingUser),
+      redirect,
+      challenge,
+    };
+  }
+
+  async checkAccountServerVerification(
+    user: AuthenticatedUser,
+    challengeId: string,
+    dto: AccountVerificationContextDto,
+  ): Promise<AccountServerVerificationCheckResult> {
+    const redirect = await this.validateOptionalAccountVerificationRedirect(dto);
+    const purpose = this.normalizeAccountVerificationPurpose(dto.purpose);
+    const challenge = await this.prisma.serverVerificationChallenge.findUnique({
+      where: {
+        id: challengeId,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!challenge) {
+      throw new BadRequestException('账号验证请求不存在。');
+    }
+
+    if (challenge.userId !== user.id) {
+      throw new UnauthorizedException('账号验证请求不属于当前账户。');
+    }
+
+    if (
+      challenge.purpose !== 'pass_use' ||
+      challenge.referenceType !== 'external_account_verification'
+    ) {
+      throw new BadRequestException('服务器验证请求类型不匹配。');
+    }
+
+    if (challenge.status === 'verified') {
+      return {
+        status: 'verified',
+        method: 'server_account',
+        user: this.toPublicUser(challenge.user),
+        redirect,
+        callbackUrl: this.createAccountVerificationCallbackUrl(redirect, 'server_account', purpose),
+      };
+    }
+
+    if (challenge.status !== 'active') {
+      return {
+        status: challenge.status === 'expired' ? 'expired' : 'waiting',
+        method: 'server_account',
+        user: this.toPublicUser(challenge.user),
+        redirect,
+        callbackUrl: null,
+      };
+    }
+
+    if (challenge.expiresAt <= new Date()) {
+      await this.prisma.serverVerificationChallenge.update({
+        where: {
+          id: challenge.id,
+        },
+        data: {
+          status: 'expired',
+        },
+      });
+
+      return {
+        status: 'expired',
+        method: 'server_account',
+        user: this.toPublicUser(challenge.user),
+        redirect,
+        callbackUrl: null,
+      };
+    }
+
+    const messages = await this.fetchChatMessagesOrThrow(challenge.lastCheckedChatId + 1);
+    const nextLastCheckedChatId = messages.reduce(
+      (latest, message) => Math.max(latest, readBdslmChatMessageId(message)),
+      challenge.lastCheckedChatId,
+    );
+    const matchingMessages = messages.filter(
+      (message) => readBdslmChatSender(message) === challenge.serverId,
+    );
+
+    for (const message of matchingMessages) {
+      if (
+        await this.secretHash.verifySecret(
+          readBdslmChatContent(message),
+          challenge.codeHash,
+          'server-verification-code',
+        )
+      ) {
+        await this.prisma.serverVerificationChallenge.update({
+          where: {
+            id: challenge.id,
+          },
+          data: {
+            status: 'verified',
+            lastCheckedChatId: nextLastCheckedChatId,
+          },
+        });
+
+        await this.publishExternalAccountVerificationSucceeded({
+          userId: user.id,
+          method: 'server_account',
+          verificationId: challenge.id,
+          redirect,
+          purpose,
+        });
+
+        return {
+          status: 'verified',
+          method: 'server_account',
+          user: this.toPublicUser(challenge.user),
+          redirect,
+          callbackUrl: this.createAccountVerificationCallbackUrl(
+            redirect,
+            'server_account',
+            purpose,
+          ),
+        };
+      }
+    }
+
+    if (matchingMessages.length > 0) {
+      const rotated = await this.rotateServerVerificationCode(
+        challenge,
+        nextLastCheckedChatId,
+        'chat_mismatch',
+      );
+
+      return {
+        status: 'rotated',
+        method: 'server_account',
+        user: this.toPublicUser(challenge.user),
+        redirect,
+        callbackUrl: null,
+        challenge: rotated,
+      };
+    }
+
+    await this.prisma.serverVerificationChallenge.update({
+      where: {
+        id: challenge.id,
+      },
+      data: {
+        lastCheckedChatId: nextLastCheckedChatId,
+      },
+    });
+
+    return {
+      status: 'waiting',
+      method: 'server_account',
+      user: this.toPublicUser(challenge.user),
+      redirect,
+      callbackUrl: null,
     };
   }
 
@@ -2239,10 +2554,77 @@ export class IdentityService {
     };
   }
 
+  private async validateOptionalAccountVerificationRedirect(
+    dto: AccountVerificationContextDto,
+  ): Promise<AccountVerificationRedirectResult | null> {
+    const hasExternalRedirect = Boolean(dto.client_id?.trim() || dto.redirect_uri?.trim());
+    if (!hasExternalRedirect) {
+      return null;
+    }
+
+    return this.validateLoginRedirect(dto);
+  }
+
+  private normalizeAccountVerificationPurpose(value: string | undefined): string | undefined {
+    const trimmedValue = value?.trim();
+
+    return trimmedValue || undefined;
+  }
+
+  private createAccountVerificationCallbackUrl(
+    redirect: AccountVerificationRedirectResult | null,
+    method: VerificationMethod,
+    purpose: string | undefined,
+  ): string | null {
+    if (!redirect) {
+      return null;
+    }
+
+    const url = new URL(redirect.redirectUri);
+    if (redirect.state) {
+      url.searchParams.set('state', redirect.state);
+    }
+
+    url.searchParams.set('ldpass_verification', 'ok');
+    url.searchParams.set('ldpass_method', method);
+    if (purpose) {
+      url.searchParams.set('ldpass_purpose', purpose);
+    }
+
+    return url.toString();
+  }
+
+  private async publishExternalAccountVerificationSucceeded(input: {
+    userId: string;
+    method: VerificationMethod;
+    redirect: AccountVerificationRedirectResult | null;
+    purpose: string | undefined;
+    verificationId: string;
+  }): Promise<void> {
+    await this.eventBus.publish({
+      type: 'ExternalAccountVerificationSucceeded',
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actorType: 'user',
+      actorId: input.userId,
+      payload: {
+        userId: input.userId,
+        method: input.method,
+        ...(input.redirect ? { clientId: input.redirect.clientApplication.clientId } : {}),
+        ...(input.purpose ? { purpose: input.purpose } : {}),
+        verificationId: input.verificationId,
+      },
+    });
+  }
+
   private async createServerVerificationChallenge(
     userId: string,
     serverId: string,
     purpose: ServerVerificationPurpose,
+    reference?: {
+      referenceType?: string | null;
+      referenceId?: string | null;
+    },
   ): Promise<{
     id: string;
     code: string;
@@ -2260,6 +2642,8 @@ export class IdentityService {
         codeHash: await this.secretHash.hashSecret(code, 'server-verification-code'),
         lastCheckedChatId,
         expiresAt,
+        referenceType: reference?.referenceType ?? null,
+        referenceId: reference?.referenceId ?? null,
       },
     });
 
@@ -2642,6 +3026,8 @@ export class IdentityService {
       serverId: string;
       purpose: ServerVerificationPurpose;
       expiresAt: Date;
+      referenceType?: string | null;
+      referenceId?: string | null;
     },
     lastCheckedChatId: number,
     reason: 'chat_mismatch' | 'manual_refresh' | 'expired' | 'rate_limit_retry',
@@ -2673,6 +3059,8 @@ export class IdentityService {
           codeHash: await this.secretHash.hashSecret(code, 'server-verification-code'),
           lastCheckedChatId,
           expiresAt,
+          referenceType: challenge.referenceType ?? null,
+          referenceId: challenge.referenceId ?? null,
           rotatedFromId: challenge.id,
         },
       });
@@ -2777,7 +3165,11 @@ export class IdentityService {
   }): string | null {
     return (
       user.avatarUrl ??
-      this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'mc-heads')
+      this.buildMinecraftAvatarUrl(
+        user.serverAccountName,
+        user.serverAccountVerified,
+        'minotar-helm',
+      )
     );
   }
 
@@ -2785,13 +3177,17 @@ export class IdentityService {
     serverAccountName?: string | null;
     serverAccountVerified: boolean;
   }): string | null {
-    return this.buildMinecraftAvatarUrl(user.serverAccountName, user.serverAccountVerified, 'minotar');
+    return this.buildMinecraftAvatarUrl(
+      user.serverAccountName,
+      user.serverAccountVerified,
+      'minotar-avatar',
+    );
   }
 
   private buildMinecraftAvatarUrl(
     serverAccountName: string | null | undefined,
     verified: boolean,
-    provider: 'mc-heads' | 'minotar',
+    provider: 'minotar-helm' | 'minotar-avatar',
   ): string | null {
     const normalizedName = serverAccountName?.trim();
     if (!verified || !normalizedName) {
@@ -2799,8 +3195,8 @@ export class IdentityService {
     }
 
     const encodedName = encodeURIComponent(normalizedName);
-    return provider === 'mc-heads'
-      ? `https://mc-heads.net/avatar/${encodedName}/64.png`
+    return provider === 'minotar-helm'
+      ? `https://minotar.net/helm/${encodedName}`
       : `https://minotar.net/avatar/${encodedName}/64.png`;
   }
 }

@@ -491,7 +491,7 @@ textarea {
   width: 28px;
   height: 28px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: 8px;
   object-fit: cover;
   background: linear-gradient(135deg, #d7d9dc, #bfc8c4);
 }
@@ -2352,6 +2352,10 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.account-verification-methods {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .legal-document-tabs {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -3146,7 +3150,7 @@ textarea {
   width: 38px;
   height: 38px;
   place-items: center;
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--surface-muted);
   color: var(--muted);
   font-size: 16px;

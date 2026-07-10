@@ -1,4 +1,15 @@
-import { IsEmail, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterReviewDto {
   @IsString()
@@ -97,6 +108,19 @@ export class ClientSessionQueryDto {
   @IsString()
   @MaxLength(80)
   client_id!: string;
+}
+
+export class AccountVerificationContextDto extends LoginRedirectQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  purpose?: string;
+}
+
+export class AccountVerificationPinDto extends AccountVerificationContextDto {
+  @IsString()
+  @Matches(/^\d{4,12}$/)
+  pin!: string;
 }
 
 export class AdminLoginDto extends LoginDto {

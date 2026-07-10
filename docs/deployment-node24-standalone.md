@@ -14,7 +14,14 @@ pnpm package:standalone
 产物位置：
 
 - `dist/ldpass-node24/`：可直接上传的独立目录。
-- `dist/ldpass-node24.tar`：如果本机有 `tar`，脚本会自动生成未压缩归档，上传和解压速度更稳定。
+- `dist/ldpass-node24.tar`：Linux/macOS 默认生成未压缩归档。Windows 默认跳过 tar 归档，避免压缩 `node_modules` 时间过长或卡住。
+
+Windows 上推荐直接上传 `dist/ldpass-node24/` 目录。如果确实需要归档，可以显式开启：
+
+```powershell
+$env:LDPASS_CREATE_TAR="true"
+pnpm package:standalone
+```
 
 如果确实需要 gzip 压缩包，可以执行：
 
