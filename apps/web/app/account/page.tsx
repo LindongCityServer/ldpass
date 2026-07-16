@@ -2,7 +2,17 @@ import { brandAssets } from '@ldpass/ui';
 import { ThemeSettings } from '../theme-provider';
 import { AccountPanel } from './account-panel';
 
-export default function AccountPage() {
+interface AccountPageProps {
+  searchParams?: Promise<{
+    dialog?: string;
+  }>;
+}
+
+export default async function AccountPage({ searchParams }: AccountPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const initialDialog =
+    resolvedSearchParams?.dialog === 'deviceApprovals' ? 'deviceApprovals' : null;
+
   return (
     <main className="wallet-shell account-shell">
       <header className="topbar">
@@ -20,7 +30,7 @@ export default function AccountPage() {
         </nav>
       </header>
 
-      <AccountPanel />
+      <AccountPanel initialDialog={initialDialog} />
     </main>
   );
 }

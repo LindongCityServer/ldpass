@@ -34,6 +34,9 @@ interface LoginPayload {
   clientDeviceId: string;
   deviceSystem: string;
   deviceLabel: string;
+  client_id?: string;
+  redirect_uri?: string;
+  state?: string;
 }
 
 interface LoginRedirectValidation {
@@ -75,6 +78,7 @@ export function LoginForm({
   const [isValidatingRedirect, setIsValidatingRedirect] = useState(false);
   const [isReadingSession, setIsReadingSession] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isContinuingCurrentSession, setIsContinuingCurrentSession] = useState(false);
   const [isCheckingDevice, setIsCheckingDevice] = useState(false);
   const [isCheckingApproval, setIsCheckingApproval] = useState(false);
   const [loginChallenge, setLoginChallenge] = useState<LoginChallenge | null>(null);
@@ -171,10 +175,17 @@ export function LoginForm({
     const form = new FormData(event.currentTarget);
 
     try {
-      const payload = {
+      const payload: LoginPayload = {
         identifier: String(form.get('identifier') ?? ''),
         password: String(form.get('password') ?? ''),
         ...readClientDevice(),
+        ...(redirectValidation
+          ? {
+              client_id: redirectValidation.clientApplication.clientId,
+              redirect_uri: redirectValidation.redirectUri,
+              ...(redirectValidation.state ? { state: redirectValidation.state } : {}),
+            }
+          : {}),
       };
       const result = await postJson<LoginResponse>('/api/auth/login', payload);
 
@@ -183,6 +194,18 @@ export function LoginForm({
         setLoginChallenge(result.challenge ?? null);
         setLoginApproval(result.approval ?? null);
         setMessage(createNewDeviceMessage(result.challenge, result.approval));
+        return;
+      }
+
+      if (
+        result.nextAction === 'account_status' &&
+        redirectValidation &&
+        currentSession &&
+        currentSession.username !== result.user.username
+      ) {
+        setMessage(
+          `账号 ${result.user.username} 尚未激活，不能用于外部登录；临东通仍保持账号 ${currentSession.username}。`,
+        );
         return;
       }
 
@@ -278,16 +301,29 @@ export function LoginForm({
     window.location.href = internalTarget ?? redirectTarget ?? '/';
   };
 
-  const continueWithCurrentSession = () => {
+  const continueWithCurrentSession = async () => {
     if (!currentSession || !redirectValidation) {
       return;
     }
 
-    const redirectTarget = readRedirectTarget(redirectValidation);
-    setMessage(
-      `将使用当前账号 ${currentSession.username} 返回 ${redirectValidation.clientApplication.name}。`,
-    );
-    window.location.href = redirectTarget ?? '/';
+    setIsContinuingCurrentSession(true);
+    setMessage(`正在使用当前账号 ${currentSession.username} 完成外部登录。`);
+
+    try {
+      await postJson('/api/auth/login/client-session/current', {
+        client_id: redirectValidation.clientApplication.clientId,
+        redirect_uri: redirectValidation.redirectUri,
+        ...(redirectValidation.state ? { state: redirectValidation.state } : {}),
+      });
+      const redirectTarget = readRedirectTarget(redirectValidation);
+      setMessage(
+        `将使用当前账号 ${currentSession.username} 返回 ${redirectValidation.clientApplication.name}。`,
+      );
+      window.location.href = redirectTarget ?? '/';
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '使用当前账号完成外部登录失败。');
+      setIsContinuingCurrentSession(false);
+    }
   };
 
   return (
@@ -306,17 +342,18 @@ export function LoginForm({
           {currentSession ? (
             <>
               <span>当前设备已登录：{currentSession.username}</span>
+              <span>输入其他账号时，仅用于本次外部验证，不会切换当前临东通账号。</span>
               <div className="form-actions compact-actions">
                 <button
                   className="primary-action"
                   type="button"
-                  disabled={isReadingSession}
-                  onClick={continueWithCurrentSession}
+                  disabled={isReadingSession || isContinuingCurrentSession}
+                  onClick={() => void continueWithCurrentSession()}
                 >
                   <span className="material-symbols-rounded" aria-hidden="true">
                     account_circle
                   </span>
-                  <span>使用当前账号</span>
+                  <span>{isContinuingCurrentSession ? '处理中' : '使用当前账号'}</span>
                 </button>
               </div>
             </>

@@ -14,6 +14,7 @@ export interface ApiRequestLike {
 
 export interface ApiResponseLike {
   setHeader(name: string, value: string | string[]): void;
+  getHeader?(name: string): number | string | string[] | undefined;
 }
 
 export function readHeader(request: ApiRequestLike, name: string): string | undefined {

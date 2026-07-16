@@ -142,7 +142,7 @@ function UserAvatar({
   );
 }
 
-export function AccountPanel() {
+export function AccountPanel({ initialDialog = null }: { initialDialog?: AccountDialog | null }) {
   const [session, setSession] = useState<SessionResponse['user']>(null);
   const [providerAccount, setProviderAccount] =
     useState<ProviderSessionResponse['providerAccount']>(null);
@@ -165,7 +165,7 @@ export function AccountPanel() {
   const [serverRebindChallenge, setServerRebindChallenge] = useState<ServerAccountChallenge | null>(
     null,
   );
-  const [activeDialog, setActiveDialog] = useState<AccountDialog | null>(null);
+  const [activeDialog, setActiveDialog] = useState<AccountDialog | null>(initialDialog);
 
   useEffect(() => {
     let isMounted = true;

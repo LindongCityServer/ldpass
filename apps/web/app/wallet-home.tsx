@@ -59,6 +59,19 @@ interface SessionResponse {
   } | null;
 }
 
+interface DeviceLoginApprovalSummary {
+  id: string;
+  deviceSystem: string;
+  deviceLabel: string | null;
+  ipAddress: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
+interface DeviceLoginApprovalsResponse {
+  approvals: DeviceLoginApprovalSummary[];
+}
+
 interface WalletPass {
   id: string;
   providerName: string;
@@ -787,8 +800,8 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
     : false;
   const canTopUpSelectedPass = Boolean(
     selectedPass &&
-      selectedPassStatus === 'Active' &&
-      (passDetail?.pass.allowTopUpIn ?? selectedPass.allowTopUpIn) === true,
+    selectedPassStatus === 'Active' &&
+    (passDetail?.pass.allowTopUpIn ?? selectedPass.allowTopUpIn) === true,
   );
   const topUpSourcePasses = useMemo(
     () =>
@@ -804,9 +817,7 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
     [passes, selectedPass],
   );
   const selectedTopUpSourcePass =
-    topUpSourcePasses.find((pass) => pass.id === topUpSourcePassId) ??
-    topUpSourcePasses[0] ??
-    null;
+    topUpSourcePasses.find((pass) => pass.id === topUpSourcePassId) ?? topUpSourcePasses[0] ?? null;
   const disputableTopUpOptions = useMemo(() => {
     if (!selectedPass) {
       return [];
@@ -867,20 +878,20 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
         ...topUpHistory.map((request) => ({
           kind: 'topUp' as const,
           id: `topUp:${request.id}`,
-          sortAt: request.completedAt ?? request.cancelledAt ?? request.updatedAt ?? request.createdAt,
+          sortAt:
+            request.completedAt ?? request.cancelledAt ?? request.updatedAt ?? request.createdAt,
           request,
         })),
       ].sort(
-        (first, second) =>
-          new Date(second.sortAt).getTime() - new Date(first.sortAt).getTime(),
+        (first, second) => new Date(second.sortAt).getTime() - new Date(first.sortAt).getTime(),
       ),
     [ledgerEntries, topUpHistory],
   );
   const locationVerificationRequired = Boolean(passDetail?.pass.locationVerification?.required);
   const canVerifySelectedLocation = Boolean(
     sessionUser?.serverAccountVerified &&
-      sessionUser.serverAccountName &&
-      locationVerificationRequired,
+    sessionUser.serverAccountName &&
+    locationVerificationRequired,
   );
   const emptyTitle = isEditing ? '没有可编辑的卡券' : `${selectedCategory.label}暂无卡券`;
   const footerText = isEditing
@@ -889,7 +900,9 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
       ? '没有找到匹配的卡券。'
       : '通过链接或二维码添加到钱包。';
   const canReorder = isEditing && !searchKeyword.trim() && !isUsingOfflineSnapshot;
-  const activeDetailModuleLabel = activeDetailModule ? detailModuleLabels[activeDetailModule] : null;
+  const activeDetailModuleLabel = activeDetailModule
+    ? detailModuleLabels[activeDetailModule]
+    : null;
   const isDetailModuleDialog = activeDetailModule
     ? isDialogDetailModule(activeDetailModule)
     : false;
@@ -1446,9 +1459,7 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
           );
           setTopUpServerChallenge(result.challenge);
           setTopUpRequest(result.topUpRequest);
-          setTopUpMessage(
-            `请在服务器聊天内发送 ${result.challenge.code}，然后再次点击确认。`,
-          );
+          setTopUpMessage(`请在服务器聊天内发送 ${result.challenge.code}，然后再次点击确认。`);
           return;
         }
 
@@ -2098,7 +2109,10 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
                 </span>
               </button>
               <a className="account-entry" href="/account" aria-label="账户">
-                <UserAvatar avatarUrl={sessionUser.avatarUrl} fallbackUrl={sessionUser.avatarFallbackUrl} />
+                <UserAvatar
+                  avatarUrl={sessionUser.avatarUrl}
+                  fallbackUrl={sessionUser.avatarFallbackUrl}
+                />
                 <span>{sessionUser.username}</span>
               </a>
             </>
@@ -2136,1181 +2150,1376 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
       {isGuestLanding ? (
         <UnauthenticatedHome message={walletMessage} />
       ) : (
-      <section
-        className={`wallet-layout ${selectedPass ? 'wallet-layout-has-detail' : 'wallet-layout-empty'}`}
-        aria-label="卡包"
-      >
-        <aside className="category-rail" aria-label="分类">
-          {categoryCounts.map((category) => (
-            <a
-              className={`category-item${category.key === selectedCategory.key ? ' is-active' : ''}`}
-              href={getCategoryHref(category.key)}
-              aria-current={category.key === selectedCategory.key ? 'page' : undefined}
-              key={category.key}
-              onClick={(event) => switchCategory(event, category.key)}
-            >
-              <span className="material-symbols-rounded" aria-hidden="true">
-                {category.icon}
-              </span>
-              <span>{category.label}</span>
-              <strong>{category.count}</strong>
-            </a>
-          ))}
-        </aside>
+        <section
+          className={`wallet-layout ${selectedPass ? 'wallet-layout-has-detail' : 'wallet-layout-empty'}`}
+          aria-label="卡包"
+        >
+          <aside className="category-rail" aria-label="分类">
+            {categoryCounts.map((category) => (
+              <a
+                className={`category-item${category.key === selectedCategory.key ? ' is-active' : ''}`}
+                href={getCategoryHref(category.key)}
+                aria-current={category.key === selectedCategory.key ? 'page' : undefined}
+                key={category.key}
+                onClick={(event) => switchCategory(event, category.key)}
+              >
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  {category.icon}
+                </span>
+                <span>{category.label}</span>
+                <strong>{category.count}</strong>
+              </a>
+            ))}
+          </aside>
 
-        <section className="pass-stack-panel" aria-label="卡券列表">
-          {walletMessage ? (
-            <div className="flow-notice" role="status" aria-live="polite">
-              <span>{walletMessage}</span>
-            </div>
-          ) : null}
-          {!walletMessage && offlineSnapshotAt ? (
-            <div className="flow-notice flow-notice-muted" role="status" aria-live="polite">
-              <span>离线卡券已同步：{formatDate(offlineSnapshotAt, '未知')}</span>
-            </div>
-          ) : null}
-          {isEditing ? (
-            <div className="edit-toolbar" role="status">
-              <span className="material-symbols-rounded" aria-hidden="true">
-                drag_indicator
-              </span>
-              <span>编辑模式</span>
-              <small>
-                {editMessage ??
-                  (searchKeyword.trim()
-                    ? '清空搜索后可调整顺序。'
-                    : '使用上下按钮调整顺序，删除会归档卡券。')}
-              </small>
-            </div>
-          ) : null}
-          {isNotificationsLoading || notificationMessage || unreadNotifications.length > 0 ? (
-            <section className="notification-inbox" aria-label="提醒">
-              <div className="detail-section-heading">
-                <h3>提醒</h3>
-                <span>{unreadNotifications.length}</span>
+          <section className="pass-stack-panel" aria-label="卡券列表">
+            {isActiveSessionUser(sessionUser) ? <DeviceLoginApprovalBanner /> : null}
+            {walletMessage ? (
+              <div className="flow-notice" role="status" aria-live="polite">
+                <span>{walletMessage}</span>
               </div>
-              {isNotificationsLoading ? <p className="detail-status">正在读取提醒...</p> : null}
-              {notificationMessage ? <p className="detail-status">{notificationMessage}</p> : null}
-              {unreadNotifications.map((notification) => (
-                <article className="notification-inbox-item" key={notification.id}>
-                  <div>
-                    <strong>{notification.title}</strong>
-                    <span>{notification.body}</span>
-                    <small>
-                      {notification.providerName ?? '系统'} ·{' '}
-                      {formatDate(notification.createdAt, '')}
-                    </small>
-                  </div>
-                  <div className="admin-list-actions">
-                    {notification.passId ? (
+            ) : null}
+            {!walletMessage && offlineSnapshotAt ? (
+              <div className="flow-notice flow-notice-muted" role="status" aria-live="polite">
+                <span>离线卡券已同步：{formatDate(offlineSnapshotAt, '未知')}</span>
+              </div>
+            ) : null}
+            {isEditing ? (
+              <div className="edit-toolbar" role="status">
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  drag_indicator
+                </span>
+                <span>编辑模式</span>
+                <small>
+                  {editMessage ??
+                    (searchKeyword.trim()
+                      ? '清空搜索后可调整顺序。'
+                      : '使用上下按钮调整顺序，删除会归档卡券。')}
+                </small>
+              </div>
+            ) : null}
+            {isNotificationsLoading || notificationMessage || unreadNotifications.length > 0 ? (
+              <section className="notification-inbox" aria-label="提醒">
+                <div className="detail-section-heading">
+                  <h3>提醒</h3>
+                  <span>{unreadNotifications.length}</span>
+                </div>
+                {isNotificationsLoading ? <p className="detail-status">正在读取提醒...</p> : null}
+                {notificationMessage ? (
+                  <p className="detail-status">{notificationMessage}</p>
+                ) : null}
+                {unreadNotifications.map((notification) => (
+                  <article className="notification-inbox-item" key={notification.id}>
+                    <div>
+                      <strong>{notification.title}</strong>
+                      <span>{notification.body}</span>
+                      <small>
+                        {notification.providerName ?? '系统'} ·{' '}
+                        {formatDate(notification.createdAt, '')}
+                      </small>
+                    </div>
+                    <div className="admin-list-actions">
+                      {notification.passId ? (
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          onClick={() => openNotificationPass(notification)}
+                        >
+                          查看
+                        </button>
+                      ) : null}
                       <button
                         className="secondary-action"
                         type="button"
-                        onClick={() => openNotificationPass(notification)}
+                        disabled={readingNotificationId === notification.id}
+                        onClick={() => void markNotificationRead(notification)}
                       >
-                        查看
+                        {readingNotificationId === notification.id ? '处理中' : '已读'}
                       </button>
-                    ) : null}
-                    <button
-                      className="secondary-action"
-                      type="button"
-                      disabled={readingNotificationId === notification.id}
-                      onClick={() => void markNotificationRead(notification)}
-                    >
-                      {readingNotificationId === notification.id ? '处理中' : '已读'}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </section>
-          ) : null}
-          {isTransfersLoading || transferMessage || pendingReceivedTransfers.length > 0 ? (
-            <section className="transfer-inbox" aria-label="转赠请求">
-              <div className="detail-section-heading">
-                <h3>转赠请求</h3>
-                <span>{pendingReceivedTransfers.length}</span>
-              </div>
-              {isTransfersLoading ? <p className="detail-status">正在读取转赠请求...</p> : null}
-              {transferMessage ? <p className="detail-status">{transferMessage}</p> : null}
-              {pendingReceivedTransfers.map((transfer) => (
-                <article className="transfer-inbox-item" key={transfer.id}>
-                  <div>
-                    <strong>{transfer.pass.displayName}</strong>
-                    <span>
-                      {transfer.fromUser.username} 转赠 · 到期：{formatDate(transfer.expiresAt, '')}
-                    </span>
-                    {transfer.note ? <small>{transfer.note}</small> : null}
-                  </div>
-                  <div className="admin-list-actions">
-                    <button
-                      className="secondary-action"
-                      type="button"
-                      disabled={resolvingTransferId === transfer.id}
-                      onClick={() => void rejectTransfer(transfer)}
-                    >
-                      拒绝
-                    </button>
-                    <button
-                      className="primary-action"
-                      type="button"
-                      disabled={resolvingTransferId === transfer.id}
-                      onClick={() => void acceptTransfer(transfer)}
-                    >
-                      接收
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </section>
-          ) : null}
-          {filteredPasses.length > 0 ? (
-            <div className={`pass-card-list${!isEditing ? ' pass-card-list-stacked' : ''}`}>
-              {filteredPasses.map((pass, visibleIndex) => {
-                const categoryIndex = selectedCategoryPasses.findIndex(
-                  (item) => item.id === pass.id,
-                );
-                const isFirst = categoryIndex <= 0;
-                const isLast = categoryIndex >= selectedCategoryPasses.length - 1;
-                const isSelected = selectedPass?.id === pass.id;
-                const isAfterSelected =
-                  visibleIndex > 0 && filteredPasses[visibleIndex - 1]?.id === selectedPass?.id;
-                const cardClassName = `wallet-pass-card wallet-pass-card-${pass.category}${pass.backgroundImageUrl ? ' wallet-pass-card-has-image' : ''}${pass.hideTitle === true ? ' wallet-pass-card-title-hidden' : ''}${isSelected ? ' is-selected' : ''}`;
-                const slotClassName = `pass-card-stack-slot${isSelected ? ' is-expanded' : ''}${isAfterSelected ? ' is-after-expanded' : ''}${isEditing ? ' is-editing' : ''}`;
-                const slotStyle = {
-                  '--stack-z': String(visibleIndex + 1),
-                } as CSSProperties;
+                    </div>
+                  </article>
+                ))}
+              </section>
+            ) : null}
+            {isTransfersLoading || transferMessage || pendingReceivedTransfers.length > 0 ? (
+              <section className="transfer-inbox" aria-label="转赠请求">
+                <div className="detail-section-heading">
+                  <h3>转赠请求</h3>
+                  <span>{pendingReceivedTransfers.length}</span>
+                </div>
+                {isTransfersLoading ? <p className="detail-status">正在读取转赠请求...</p> : null}
+                {transferMessage ? <p className="detail-status">{transferMessage}</p> : null}
+                {pendingReceivedTransfers.map((transfer) => (
+                  <article className="transfer-inbox-item" key={transfer.id}>
+                    <div>
+                      <strong>{transfer.pass.displayName}</strong>
+                      <span>
+                        {transfer.fromUser.username} 转赠 · 到期：
+                        {formatDate(transfer.expiresAt, '')}
+                      </span>
+                      {transfer.note ? <small>{transfer.note}</small> : null}
+                    </div>
+                    <div className="admin-list-actions">
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        disabled={resolvingTransferId === transfer.id}
+                        onClick={() => void rejectTransfer(transfer)}
+                      >
+                        拒绝
+                      </button>
+                      <button
+                        className="primary-action"
+                        type="button"
+                        disabled={resolvingTransferId === transfer.id}
+                        onClick={() => void acceptTransfer(transfer)}
+                      >
+                        接收
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </section>
+            ) : null}
+            {filteredPasses.length > 0 ? (
+              <div className={`pass-card-list${!isEditing ? ' pass-card-list-stacked' : ''}`}>
+                {filteredPasses.map((pass, visibleIndex) => {
+                  const categoryIndex = selectedCategoryPasses.findIndex(
+                    (item) => item.id === pass.id,
+                  );
+                  const isFirst = categoryIndex <= 0;
+                  const isLast = categoryIndex >= selectedCategoryPasses.length - 1;
+                  const isSelected = selectedPass?.id === pass.id;
+                  const isAfterSelected =
+                    visibleIndex > 0 && filteredPasses[visibleIndex - 1]?.id === selectedPass?.id;
+                  const cardClassName = `wallet-pass-card wallet-pass-card-${pass.category}${pass.backgroundImageUrl ? ' wallet-pass-card-has-image' : ''}${pass.hideTitle === true ? ' wallet-pass-card-title-hidden' : ''}${isSelected ? ' is-selected' : ''}`;
+                  const slotClassName = `pass-card-stack-slot${isSelected ? ' is-expanded' : ''}${isAfterSelected ? ' is-after-expanded' : ''}${isEditing ? ' is-editing' : ''}`;
+                  const slotStyle = {
+                    '--stack-z': String(visibleIndex + 1),
+                  } as CSSProperties;
 
-                return (
-                  <div className={slotClassName} key={pass.id} style={slotStyle}>
-                    {isEditing ? (
-                      <article className={`${cardClassName} wallet-pass-card-editable`}>
+                  return (
+                    <div className={slotClassName} key={pass.id} style={slotStyle}>
+                      {isEditing ? (
+                        <article className={`${cardClassName} wallet-pass-card-editable`}>
+                          <button
+                            className="wallet-pass-card-main"
+                            type="button"
+                            onClick={() => selectPass(pass.id)}
+                          >
+                            <PassCardContent pass={pass} />
+                          </button>
+                          <div
+                            className="pass-edit-actions"
+                            aria-label={`${pass.displayName} 编辑操作`}
+                          >
+                            <button
+                              className="mini-icon-button"
+                              type="button"
+                              aria-label="上移"
+                              title="上移"
+                              disabled={!canReorder || isFirst || isSavingEdit}
+                              onClick={() => void movePass(pass.id, 'up')}
+                            >
+                              <span className="material-symbols-rounded" aria-hidden="true">
+                                keyboard_arrow_up
+                              </span>
+                            </button>
+                            <button
+                              className="mini-icon-button"
+                              type="button"
+                              aria-label="下移"
+                              title="下移"
+                              disabled={!canReorder || isLast || isSavingEdit}
+                              onClick={() => void movePass(pass.id, 'down')}
+                            >
+                              <span className="material-symbols-rounded" aria-hidden="true">
+                                keyboard_arrow_down
+                              </span>
+                            </button>
+                            <button
+                              className="mini-icon-button mini-icon-button-danger"
+                              type="button"
+                              aria-label="移除"
+                              title="移除"
+                              disabled={isSavingEdit}
+                              onClick={() => void archivePass(pass)}
+                            >
+                              <span className="material-symbols-rounded" aria-hidden="true">
+                                delete
+                              </span>
+                            </button>
+                          </div>
+                        </article>
+                      ) : (
                         <button
-                          className="wallet-pass-card-main"
+                          className={cardClassName}
                           type="button"
                           onClick={() => selectPass(pass.id)}
                         >
                           <PassCardContent pass={pass} />
                         </button>
-                        <div className="pass-edit-actions" aria-label={`${pass.displayName} 编辑操作`}>
-                          <button
-                            className="mini-icon-button"
-                            type="button"
-                            aria-label="上移"
-                            title="上移"
-                            disabled={!canReorder || isFirst || isSavingEdit}
-                            onClick={() => void movePass(pass.id, 'up')}
-                          >
-                            <span className="material-symbols-rounded" aria-hidden="true">
-                              keyboard_arrow_up
-                            </span>
-                          </button>
-                          <button
-                            className="mini-icon-button"
-                            type="button"
-                            aria-label="下移"
-                            title="下移"
-                            disabled={!canReorder || isLast || isSavingEdit}
-                            onClick={() => void movePass(pass.id, 'down')}
-                          >
-                            <span className="material-symbols-rounded" aria-hidden="true">
-                              keyboard_arrow_down
-                            </span>
-                          </button>
-                          <button
-                            className="mini-icon-button mini-icon-button-danger"
-                            type="button"
-                            aria-label="移除"
-                            title="移除"
-                            disabled={isSavingEdit}
-                            onClick={() => void archivePass(pass)}
-                          >
-                            <span className="material-symbols-rounded" aria-hidden="true">
-                              delete
-                            </span>
-                          </button>
-                        </div>
-                      </article>
-                    ) : (
-                      <button
-                        className={cardClassName}
-                        type="button"
-                        onClick={() => selectPass(pass.id)}
-                      >
-                        <PassCardContent pass={pass} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className={`pass-stack-empty pass-stack-empty-${selectedCategory.key}`}>
-              <div className="empty-card-body">
-                <h1>{emptyTitle}</h1>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div className="empty-card-footer">
-                <span>{footerText}</span>
-                <a className="pill-action" href="/add">
-                  添加
-                </a>
+            ) : (
+              <div className={`pass-stack-empty pass-stack-empty-${selectedCategory.key}`}>
+                <div className="empty-card-body">
+                  <h1>{emptyTitle}</h1>
+                </div>
+                <div className="empty-card-footer">
+                  <span>{footerText}</span>
+                  <a className="pill-action" href="/add">
+                    添加
+                  </a>
+                </div>
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
 
-        {selectedPass ? (
-          <button
-            className="detail-panel-scrim"
-            type="button"
-            tabIndex={-1}
-            aria-label="关闭卡券详情背景"
-            onClick={closeSelectedPass}
-          />
-        ) : null}
+          {selectedPass ? (
+            <button
+              className="detail-panel-scrim"
+              type="button"
+              tabIndex={-1}
+              aria-label="关闭卡券详情背景"
+              onClick={closeSelectedPass}
+            />
+          ) : null}
 
-        {selectedPass ? (
-          <aside className={`detail-panel${isDetailClosing ? ' is-closing' : ''}`} aria-label="卡券详情">
-            <div className="detail-panel-heading">
-              <h2>{passDetail?.pass.displayName ?? selectedPass.displayName}</h2>
-              <button
-                className="detail-close-button"
-                type="button"
-                aria-label="关闭卡券详情"
-                onClick={closeSelectedPass}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  close
-                </span>
-              </button>
-            </div>
-            <div className="detail-selected-card-face" aria-hidden="true">
-              <div
-                className={`wallet-pass-card wallet-pass-card-${selectedPass.category}${selectedPass.backgroundImageUrl ? ' wallet-pass-card-has-image' : ''}${selectedPass.hideTitle === true ? ' wallet-pass-card-title-hidden' : ''}`}
-              >
-                <PassCardContent pass={selectedPass} />
-              </div>
-            </div>
-            <div className="detail-balance">
-              <span>当前余额</span>
-              <strong>
-                {formatBenefitValue(
-                  passDetail?.pass.balanceValue ?? selectedPass.balanceValue,
-                  selectedPass.benefitType,
-                )}
-              </strong>
-            </div>
-            {isPassDetailLoading ? <p className="detail-status">正在读取详情...</p> : null}
-            {passDetailMessage ? (
-              <p className="detail-status detail-status-error">{passDetailMessage}</p>
-            ) : null}
-            <div className="detail-action-grid" aria-label="卡券详情模块">
-              <button
-                className={activeDetailModule === 'passInfo' ? 'is-active' : ''}
-                type="button"
-                onClick={() => openDetailModule('passInfo')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  badge
-                </span>
-                <strong>卡片详情</strong>
-                <small>{passDetail?.pass.publicNumber ?? selectedPass.maskedNumber ?? '查看'}</small>
-              </button>
-              <button
-                className={activeDetailModule === 'provider' ? 'is-active' : ''}
-                type="button"
-                onClick={() => openDetailModule('provider')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  storefront
-                </span>
-                <strong>发卡方</strong>
-                <small>{passDetail?.pass.providerName ?? selectedPass.providerName}</small>
-              </button>
-              {selectedPass.category === 'ticket' ? (
+          {selectedPass ? (
+            <aside
+              className={`detail-panel${isDetailClosing ? ' is-closing' : ''}`}
+              aria-label="卡券详情"
+            >
+              <div className="detail-panel-heading">
+                <h2>{passDetail?.pass.displayName ?? selectedPass.displayName}</h2>
                 <button
-                  className={activeDetailModule === 'ticket' ? 'is-active' : ''}
+                  className="detail-close-button"
                   type="button"
-                  onClick={() => openDetailModule('ticket')}
+                  aria-label="关闭卡券详情"
+                  onClick={closeSelectedPass}
                 >
                   <span className="material-symbols-rounded" aria-hidden="true">
-                    confirmation_number
+                    close
                   </span>
-                  <strong>票券</strong>
-                  <small>{formatTicketStatus(passDetail?.pass.ticketInfo ?? null)}</small>
                 </button>
+              </div>
+              <div className="detail-selected-card-face" aria-hidden="true">
+                <div
+                  className={`wallet-pass-card wallet-pass-card-${selectedPass.category}${selectedPass.backgroundImageUrl ? ' wallet-pass-card-has-image' : ''}${selectedPass.hideTitle === true ? ' wallet-pass-card-title-hidden' : ''}`}
+                >
+                  <PassCardContent pass={selectedPass} />
+                </div>
+              </div>
+              <div className="detail-balance">
+                <span>当前余额</span>
+                <strong>
+                  {formatBenefitValue(
+                    passDetail?.pass.balanceValue ?? selectedPass.balanceValue,
+                    selectedPass.benefitType,
+                  )}
+                </strong>
+              </div>
+              {isPassDetailLoading ? <p className="detail-status">正在读取详情...</p> : null}
+              {passDetailMessage ? (
+                <p className="detail-status detail-status-error">{passDetailMessage}</p>
               ) : null}
-              {selectedPass.category === 'identity_key' ? (
+              <div className="detail-action-grid" aria-label="卡券详情模块">
                 <button
-                  className={activeDetailModule === 'location' ? 'is-active' : ''}
+                  className={activeDetailModule === 'passInfo' ? 'is-active' : ''}
                   type="button"
-                  onClick={() => openDetailModule('location')}
+                  onClick={() => openDetailModule('passInfo')}
                 >
                   <span className="material-symbols-rounded" aria-hidden="true">
-                    my_location
+                    badge
                   </span>
-                  <strong>位置核验</strong>
-                  <small>{locationVerificationRequired ? '已配置' : '未配置'}</small>
+                  <strong>卡片详情</strong>
+                  <small>
+                    {passDetail?.pass.publicNumber ?? selectedPass.maskedNumber ?? '查看'}
+                  </small>
                 </button>
-              ) : null}
-              <button
-                className={activeDetailModule === 'topUp' ? 'is-active' : ''}
-                type="button"
-                onClick={() => openDetailModule('topUp')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  add_card
-                </span>
-                <strong>充值</strong>
-                <small>{canTopUpSelectedPass ? '开放' : '关闭'}</small>
-              </button>
-              <button
-                className={activeDetailModule === 'use' ? 'is-active' : ''}
-                type="button"
-                onClick={() => openDetailModule('use')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  swipe_down
-                </span>
-                <strong>核销</strong>
-                <small>{canUseSelectedPass ? '可用' : '不可用'}</small>
-              </button>
-              <button
-                className={activeDetailModule === 'redemptions' ? 'is-active' : ''}
-                type="button"
-                onClick={() => openDetailModule('redemptions')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  pending_actions
-                </span>
-                <strong>待确认</strong>
-                <small>{redemptionRequests.length}</small>
-              </button>
-              <button
-                className={activeDetailModule === 'transfer' ? 'is-active' : ''}
-                type="button"
-                onClick={() => openDetailModule('transfer')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  move_up
-                </span>
-                <strong>转赠</strong>
-                <small>{canTransferSelectedPass ? '开放' : '关闭'}</small>
-              </button>
-              <button
-                className={activeDetailModule === 'disputes' ? 'is-active' : ''}
-                type="button"
-                onClick={() => openDetailModule('disputes')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  report
-                </span>
-                <strong>争议</strong>
-                <small>{disputes.length}</small>
-              </button>
-              <button
-                className={activeDetailModule === 'ledger' ? 'is-active' : ''}
-                type="button"
-                onClick={() => openDetailModule('ledger')}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  receipt_long
-                </span>
-                <strong>记录</strong>
-                <small>{activeDetailModule === 'ledger' ? transactionRecords.length : '查看'}</small>
-              </button>
-              <button
-                className="detail-action-danger"
-                type="button"
-                disabled={isUsingOfflineSnapshot || isSavingEdit}
-                onClick={() => void archivePass(selectedPass)}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  delete
-                </span>
-                <strong>删除</strong>
-                <small>{isUsingOfflineSnapshot ? '离线不可用' : '移除'}</small>
-              </button>
-            </div>
-            {activeDetailModuleLabel ? (
-              <div
-                className={`detail-module-slot ${isDetailModuleDialog ? 'is-dialog' : 'is-inline'}`}
-                role={isDetailModuleDialog ? 'dialog' : undefined}
-                aria-modal={isDetailModuleDialog ? true : undefined}
-                aria-label={activeDetailModuleLabel}
-              >
-                {isDetailModuleDialog ? (
-                  <button
-                    className="detail-module-backdrop"
-                    type="button"
-                    aria-label="关闭弹窗"
-                    onClick={() => setActiveDetailModule(null)}
-                  />
-                ) : null}
-                <div className="detail-module-panel">
-                  <div className="detail-module-toolbar">
-                    <strong>{activeDetailModuleLabel}</strong>
-                    <button
-                      className="detail-close-button"
-                      type="button"
-                      aria-label="关闭"
-                      onClick={() => setActiveDetailModule(null)}
-                    >
-                      <span className="material-symbols-rounded" aria-hidden="true">
-                        close
-                      </span>
-                    </button>
-                  </div>
-                  {activeDetailModule === 'passInfo' ? (
-                    <section className="detail-pass-info" aria-label="卡片详情">
-                      <dl className="detail-list">
-                        <div>
-                          <dt>卡面标题</dt>
-                          <dd>{passDetail?.pass.title ?? selectedPass.title}</dd>
-                        </div>
-                        <div>
-                          <dt>编号</dt>
-                          <dd>{passDetail?.pass.publicNumber ?? selectedPass.maskedNumber ?? '未设置'}</dd>
-                        </div>
-                        <div>
-                          <dt>状态</dt>
-                          <dd>{passDetail?.pass.status ?? selectedPass.status}</dd>
-                        </div>
-                        <div>
-                          <dt>冻结值</dt>
-                          <dd>{passDetail?.pass.frozenValue ?? selectedPass.frozenValue}</dd>
-                        </div>
-                        <div>
-                          <dt>透支额度</dt>
-                          <dd>{passDetail?.pass.overdraftLimit ?? selectedPass.overdraftLimit}</dd>
-                        </div>
-                        <div>
-                          <dt>有效期</dt>
-                          <dd>
-                            {formatDate(passDetail?.pass.expiresAt ?? selectedPass.expiresAt, '长期有效')}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>添加时间</dt>
-                          <dd>{formatDate(passDetail?.pass.addedAt ?? null, '尚未记录')}</dd>
-                        </div>
-                      </dl>
-                      <p className="detail-status">
-                        临东通提供技术支持，权益、注销和条款等均为虚构。
-                      </p>
-                    </section>
-                  ) : null}
-                  {activeDetailModule === 'provider' ? (
-                    <section className="detail-provider" aria-label="发卡方信息">
-                      <div className="detail-provider-card">
-                        <div>
-                          <strong>{passDetail?.pass.providerName ?? selectedPass.providerName}</strong>
-                          <span>这张卡由该发卡方提供和维护。</span>
-                        </div>
-                        {passDetail?.pass.providerIntroductionUrl ? (
-                          <a
-                            className="secondary-action"
-                            href={passDetail.pass.providerIntroductionUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            查看介绍
-                          </a>
-                        ) : (
-                          <p className="detail-status">发卡方暂未设置介绍链接。</p>
-                        )}
-                      </div>
-                    </section>
-                  ) : null}
-            {activeDetailModule === 'ticket' && (passDetail?.pass.ticketInfo || selectedPass.category === 'ticket') ? (
-              <section className="detail-ticket" aria-label="票券信息">
-                <dl className="detail-list">
-                  <div>
-                    <dt>活动</dt>
-                    <dd>
-                      {passDetail?.pass.ticketInfo?.eventName ??
-                        passDetail?.pass.title ??
-                        selectedPass.title}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>场地</dt>
-                    <dd>{passDetail?.pass.ticketInfo?.venue ?? '未设置'}</dd>
-                  </div>
-                  <div>
-                    <dt>场次</dt>
-                    <dd>{formatDate(passDetail?.pass.ticketInfo?.startsAt ?? null, '未设置')}</dd>
-                  </div>
-                  <div>
-                    <dt>座位</dt>
-                    <dd>{passDetail?.pass.ticketInfo?.seatLabel ?? '未设置'}</dd>
-                  </div>
-                </dl>
-              </section>
-            ) : null}
-            {activeDetailModule === 'location' && selectedPass.category === 'identity_key' ? (
-              <section className="detail-location" aria-label="位置核验">
-                {passDetail?.pass.locationVerification?.rules?.rules.length ? (
-                  <dl className="detail-list">
-                    {passDetail.pass.locationVerification.rules.rules.map((rule) => (
-                      <div key={rule.id}>
-                        <dt>{rule.label}</dt>
-                        <dd>{formatLocationRule(rule)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                ) : (
-                  <p className="detail-status">此卡券暂未配置位置范围。</p>
-                )}
-                {passDetail?.pass.locationVerification?.required &&
-                !sessionUser?.serverAccountVerified ? (
-                  <p className="detail-status">
-                    位置核验需要先完成服务器账号验证。<a href="/account">前往账户页</a>
-                  </p>
-                ) : null}
-                {passDetail?.pass.locationVerification?.required &&
-                sessionUser?.serverAccountVerified &&
-                sessionUser.serverAccountName ? (
-                  <p className="detail-status">
-                    将使用服务器 ID「{sessionUser.serverAccountName}」核验当前位置。
-                  </p>
-                ) : null}
-                {locationVerificationMessage ? (
-                  <p className="detail-status">{locationVerificationMessage}</p>
-                ) : null}
                 <button
-                  className="secondary-action"
+                  className={activeDetailModule === 'provider' ? 'is-active' : ''}
                   type="button"
-                  disabled={
-                    isUsingOfflineSnapshot ||
-                    isPassDetailLoading ||
-                    isVerifyingLocation ||
-                    !canVerifySelectedLocation
-                  }
-                  onClick={() => void verifyLocation()}
+                  onClick={() => openDetailModule('provider')}
                 >
-                  {isVerifyingLocation ? '核验中' : '验证当前位置'}
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    storefront
+                  </span>
+                  <strong>发卡方</strong>
+                  <small>{passDetail?.pass.providerName ?? selectedPass.providerName}</small>
                 </button>
-              </section>
-            ) : null}
-            {activeDetailModule === 'topUp' ? (
-            <section className="detail-top-up" aria-label="额度补充">
-              {!passDetail && isPassDetailLoading ? (
-                <p className="detail-status">正在读取额度补充规则...</p>
-              ) : null}
-              {topUpMessage ? <p className="detail-status">{topUpMessage}</p> : null}
-              {currentDisputableTopUp ? (
-                <button className="secondary-action" type="button" onClick={openCurrentTopUpDispute}>
-                  提交最近补充争议
-                </button>
-              ) : null}
-              {canTopUpSelectedPass && topUpSourcePasses.length === 0 ? (
-                <p className="detail-status">当前没有同类且开放作为补充来源的卡券。</p>
-              ) : null}
-              <form className="detail-top-up-form" onSubmit={(event) => void submitTopUp(event)}>
-                <label>
-                  <span>来源卡</span>
+                {selectedPass.category === 'ticket' ? (
                   <button
-                    className="top-up-source-trigger"
+                    className={activeDetailModule === 'ticket' ? 'is-active' : ''}
                     type="button"
-                    onClick={() => openDetailModule('topUpSource')}
-                    disabled={
-                      !canTopUpSelectedPass ||
-                      isUsingOfflineSnapshot ||
-                      isSubmittingTopUp ||
-                      topUpSourcePasses.length === 0
-                    }
+                    onClick={() => openDetailModule('ticket')}
                   >
-                    <span>
-                      {selectedTopUpSourcePass
-                        ? `${selectedTopUpSourcePass.displayName} · ${formatBenefitValue(selectedTopUpSourcePass.balanceValue, selectedTopUpSourcePass.benefitType)}`
-                        : '暂无可用来源卡'}
-                    </span>
                     <span className="material-symbols-rounded" aria-hidden="true">
-                      chevron_right
+                      confirmation_number
                     </span>
+                    <strong>票券</strong>
+                    <small>{formatTicketStatus(passDetail?.pass.ticketInfo ?? null)}</small>
                   </button>
-                </label>
-                <label>
-                  <span>补充值</span>
-                  <input
-                    value={topUpValue}
-                    onChange={(event) => {
-                      setTopUpValue(event.target.value);
-                      setTopUpServerChallenge(null);
-                      setTopUpRequest(null);
-                    }}
-                    placeholder={formatBenefitPlaceholder(selectedPass.benefitType)}
-                    inputMode="decimal"
-                    pattern={decimalInputPattern}
-                    disabled={
-                      !canTopUpSelectedPass ||
-                      isUsingOfflineSnapshot ||
-                      isSubmittingTopUp ||
-                      topUpSourcePasses.length === 0
-                    }
-                    required
-                  />
-                </label>
-                <label>
-                  <span>确认方式</span>
-                  <select
-                    value={topUpVerificationMethod}
-                    onChange={(event) => {
-                      setTopUpVerificationMethod(
-                        event.target.value === 'server_account' ? 'server_account' : 'pin',
-                      );
-                      setTopUpServerChallenge(null);
-                      setTopUpRequest(null);
-                      setTopUpMessage(null);
-                    }}
-                    disabled={
-                      !canTopUpSelectedPass ||
-                      isUsingOfflineSnapshot ||
-                      isSubmittingTopUp ||
-                      topUpSourcePasses.length === 0
-                    }
-                  >
-                    <option value="pin">PIN</option>
-                    <option value="server_account">服务器账号确认</option>
-                  </select>
-                </label>
-                <label>
-                  <span>备注</span>
-                  <textarea
-                    value={topUpNote}
-                    onChange={(event) => {
-                      setTopUpNote(event.target.value);
-                      setTopUpServerChallenge(null);
-                      setTopUpRequest(null);
-                    }}
-                    placeholder="可选"
-                    rows={2}
-                    disabled={
-                      !canTopUpSelectedPass ||
-                      isUsingOfflineSnapshot ||
-                      isSubmittingTopUp ||
-                      topUpSourcePasses.length === 0
-                    }
-                    maxLength={500}
-                  />
-                </label>
-                {topUpVerificationMethod === 'pin' ? (
-                  <label>
-                    <span>PIN</span>
-                    <input
-                      type="password"
-                      value={topUpPin}
-                      onChange={(event) => setTopUpPin(event.target.value)}
-                      placeholder="用于确认本次额度补充"
-                      inputMode="numeric"
-                      pattern="[0-9]{4,12}"
-                      autoComplete="one-time-code"
-                      disabled={
-                        !canTopUpSelectedPass ||
-                        isUsingOfflineSnapshot ||
-                        isSubmittingTopUp ||
-                        topUpSourcePasses.length === 0
-                      }
-                      required
-                    />
-                  </label>
-                ) : (
-                  <div className="top-up-server-challenge">
-                    <span>服务器账号</span>
-                    {sessionUser?.serverAccountVerified && sessionUser.serverAccountName ? (
-                      topUpServerChallenge ? (
-                        <>
-                          <strong>{topUpServerChallenge.code}</strong>
-                          {topUpRequest ? (
-                            <small>
-                              请求 {topUpRequest.id.slice(0, 8)} ·{' '}
-                              {formatTopUpRequestStatus(topUpRequest.status)}
-                            </small>
-                          ) : null}
-                        </>
-                      ) : (
-                        <>
-                          <p>点击后生成本次验证码。</p>
-                          {topUpRequest ? (
-                            <small>
-                              请求 {topUpRequest.id.slice(0, 8)} ·{' '}
-                              {formatTopUpRequestStatus(topUpRequest.status)}
-                            </small>
-                          ) : null}
-                        </>
-                      )
-                    ) : (
-                      <p>需要先在账户页完成服务器账号验证。</p>
-                    )}
-                  </div>
-                )}
-                {topUpVerificationMethod === 'server_account' &&
-                topUpRequest?.status === 'WaitingVerification' ? (
+                ) : null}
+                {selectedPass.category === 'identity_key' ? (
                   <button
-                    className="secondary-action"
+                    className={activeDetailModule === 'location' ? 'is-active' : ''}
                     type="button"
-                    disabled={isSubmittingTopUp}
-                    onClick={() => void cancelTopUpRequest()}
+                    onClick={() => openDetailModule('location')}
                   >
-                    取消本次补充
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      my_location
+                    </span>
+                    <strong>位置核验</strong>
+                    <small>{locationVerificationRequired ? '已配置' : '未配置'}</small>
                   </button>
                 ) : null}
                 <button
-                  className="secondary-action"
-                  type="submit"
-                  disabled={
-                    !canTopUpSelectedPass ||
-                    isUsingOfflineSnapshot ||
-                    isSubmittingTopUp ||
-                    topUpSourcePasses.length === 0
-                  }
+                  className={activeDetailModule === 'topUp' ? 'is-active' : ''}
+                  type="button"
+                  onClick={() => openDetailModule('topUp')}
                 >
-                  {isSubmittingTopUp
-                    ? '处理中'
-                    : topUpVerificationMethod === 'server_account' && !topUpServerChallenge
-                      ? '获取验证码'
-                      : '确认补充'}
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    add_card
+                  </span>
+                  <strong>充值</strong>
+                  <small>{canTopUpSelectedPass ? '开放' : '关闭'}</small>
                 </button>
-              </form>
-            </section>
-            ) : null}
-            {activeDetailModule === 'topUpSource' ? (
-            <section className="detail-top-up-source" aria-label="选择来源卡">
-              {topUpSourcePasses.length ? (
-                <div className="top-up-source-list">
-                  {topUpSourcePasses.map((pass) => (
+                <button
+                  className={activeDetailModule === 'use' ? 'is-active' : ''}
+                  type="button"
+                  onClick={() => openDetailModule('use')}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    swipe_down
+                  </span>
+                  <strong>核销</strong>
+                  <small>{canUseSelectedPass ? '可用' : '不可用'}</small>
+                </button>
+                <button
+                  className={activeDetailModule === 'redemptions' ? 'is-active' : ''}
+                  type="button"
+                  onClick={() => openDetailModule('redemptions')}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    pending_actions
+                  </span>
+                  <strong>待确认</strong>
+                  <small>{redemptionRequests.length}</small>
+                </button>
+                <button
+                  className={activeDetailModule === 'transfer' ? 'is-active' : ''}
+                  type="button"
+                  onClick={() => openDetailModule('transfer')}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    move_up
+                  </span>
+                  <strong>转赠</strong>
+                  <small>{canTransferSelectedPass ? '开放' : '关闭'}</small>
+                </button>
+                <button
+                  className={activeDetailModule === 'disputes' ? 'is-active' : ''}
+                  type="button"
+                  onClick={() => openDetailModule('disputes')}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    report
+                  </span>
+                  <strong>争议</strong>
+                  <small>{disputes.length}</small>
+                </button>
+                <button
+                  className={activeDetailModule === 'ledger' ? 'is-active' : ''}
+                  type="button"
+                  onClick={() => openDetailModule('ledger')}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    receipt_long
+                  </span>
+                  <strong>记录</strong>
+                  <small>
+                    {activeDetailModule === 'ledger' ? transactionRecords.length : '查看'}
+                  </small>
+                </button>
+                <button
+                  className="detail-action-danger"
+                  type="button"
+                  disabled={isUsingOfflineSnapshot || isSavingEdit}
+                  onClick={() => void archivePass(selectedPass)}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    delete
+                  </span>
+                  <strong>删除</strong>
+                  <small>{isUsingOfflineSnapshot ? '离线不可用' : '移除'}</small>
+                </button>
+              </div>
+              {activeDetailModuleLabel ? (
+                <div
+                  className={`detail-module-slot ${isDetailModuleDialog ? 'is-dialog' : 'is-inline'}`}
+                  role={isDetailModuleDialog ? 'dialog' : undefined}
+                  aria-modal={isDetailModuleDialog ? true : undefined}
+                  aria-label={activeDetailModuleLabel}
+                >
+                  {isDetailModuleDialog ? (
                     <button
-                      className={`top-up-source-option${pass.id === topUpSourcePassId ? ' is-selected' : ''}`}
+                      className="detail-module-backdrop"
                       type="button"
-                      key={pass.id}
-                      onClick={() => {
-                        setTopUpSourcePassId(pass.id);
-                        setTopUpServerChallenge(null);
-                        setTopUpRequest(null);
-                        setActiveDetailModule('topUp');
-                      }}
-                    >
-                      <span>{pass.providerName}</span>
-                      <strong>{pass.displayName}</strong>
-                      <b>{formatBenefitValue(pass.balanceValue, pass.benefitType)}</b>
-                      <small>{pass.maskedNumber ?? pass.status}</small>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="detail-status">当前没有同类且开放作为补充来源的卡券。</p>
-              )}
-              <div className="form-actions compact-actions">
-                <button
-                  className="secondary-action"
-                  type="button"
-                  onClick={() => setActiveDetailModule('topUp')}
-                >
-                  返回充值
-                </button>
-              </div>
-            </section>
-            ) : null}
-            {activeDetailModule === 'transfer' ? (
-            <section className="detail-transfers" aria-label="卡券转赠">
-              {!passDetail && isPassDetailLoading ? (
-                <p className="detail-status">正在读取转赠规则...</p>
-              ) : null}
-              {selectedPassSentTransfers.length ? (
-                <ol>
-                  {selectedPassSentTransfers.map((transfer) => (
-                    <li key={transfer.id}>
-                      <div>
-                        <strong>等待 {transfer.toUser.username} 确认</strong>
-                        <span>到期：{formatDate(transfer.expiresAt, '')}</span>
-                      </div>
+                      aria-label="关闭弹窗"
+                      onClick={() => setActiveDetailModule(null)}
+                    />
+                  ) : null}
+                  <div className="detail-module-panel">
+                    <div className="detail-module-toolbar">
+                      <strong>{activeDetailModuleLabel}</strong>
                       <button
-                        className="secondary-action"
+                        className="detail-close-button"
                         type="button"
-                        disabled={resolvingTransferId === transfer.id}
-                        onClick={() => void cancelTransfer(transfer)}
+                        aria-label="关闭"
+                        onClick={() => setActiveDetailModule(null)}
                       >
-                        取消
+                        <span className="material-symbols-rounded" aria-hidden="true">
+                          close
+                        </span>
                       </button>
-                    </li>
-                  ))}
-                </ol>
-              ) : null}
-              <form
-                className="detail-transfer-form"
-                onSubmit={(event) => void submitTransfer(event)}
-              >
-                <label>
-                  <span>接收方</span>
-                  <input
-                    value={transferRecipient}
-                    onChange={(event) => setTransferRecipient(event.target.value)}
-                    placeholder="用户名或邮箱"
-                    disabled={
-                      !canTransferSelectedPass || isUsingOfflineSnapshot || isSubmittingTransfer
-                    }
-                    maxLength={120}
-                  />
-                </label>
-                <label>
-                  <span>备注</span>
-                  <textarea
-                    value={transferNote}
-                    onChange={(event) => setTransferNote(event.target.value)}
-                    placeholder="可选"
-                    rows={2}
-                    disabled={
-                      !canTransferSelectedPass || isUsingOfflineSnapshot || isSubmittingTransfer
-                    }
-                    maxLength={500}
-                  />
-                </label>
-                <button
-                  className="secondary-action"
-                  type="submit"
-                  disabled={
-                    !canTransferSelectedPass ||
-                    isUsingOfflineSnapshot ||
-                    isSubmittingTransfer ||
-                    Boolean(selectedPassSentTransfers.length)
-                  }
-                >
-                  {isSubmittingTransfer ? '发起中' : '发起转赠'}
-                </button>
-              </form>
-            </section>
-            ) : null}
-            {activeDetailModule === 'use' ? (
-            <section className="detail-use" aria-label="发起消耗">
-              {redemptionMessage ? <p className="detail-status">{redemptionMessage}</p> : null}
-              <form
-                className="detail-use-form"
-                onSubmit={(event) => void submitSelfRedemption(event)}
-              >
-                <label>
-                  <span>消耗值</span>
-                  <input
-                    value={selfRedemptionValue}
-                    onChange={(event) => setSelfRedemptionValue(event.target.value)}
-                    placeholder={formatBenefitPlaceholder(selectedPass.benefitType)}
-                    inputMode="decimal"
-                    pattern={decimalInputPattern}
-                    disabled={
-                      !canUseSelectedPass ||
-                      isUsingOfflineSnapshot ||
-                      isCreatingSelfRedemption ||
-                      Boolean(redemptionRequests.length)
-                    }
-                    required
-                  />
-                </label>
-                <label>
-                  <span>验证方式</span>
-                  <select
-                    value={selfRedemptionMethod}
-                    onChange={(event) =>
-                      setSelfRedemptionMethod(
-                        event.target.value as WalletRedemptionRequest['verificationMethod'],
-                      )
-                    }
-                    disabled={
-                      !canUseSelectedPass ||
-                      isUsingOfflineSnapshot ||
-                      isCreatingSelfRedemption ||
-                      Boolean(redemptionRequests.length)
-                    }
-                  >
-                    <option value="pin">PIN</option>
-                    <option value="server_account">服务器账号</option>
-                  </select>
-                </label>
-                <button
-                  className="secondary-action"
-                  type="submit"
-                  disabled={
-                    !canUseSelectedPass ||
-                    isUsingOfflineSnapshot ||
-                    isCreatingSelfRedemption ||
-                    Boolean(redemptionRequests.length)
-                  }
-                >
-                  {isCreatingSelfRedemption ? '发起中' : '发起使用'}
-                </button>
-              </form>
-            </section>
-            ) : null}
-            {activeDetailModule === 'redemptions' ? (
-            <section className="detail-redemptions" aria-label="待确认核销请求">
-              {isRedemptionsLoading ? <p className="detail-status">正在读取待确认请求...</p> : null}
-              {redemptionMessage ? <p className="detail-status">{redemptionMessage}</p> : null}
-              {redemptionRequests.length ? (
-                <ol>
-                  {redemptionRequests.map((request) => {
-                    const serverChallenge = serverRedemptionChallenges[request.id];
-
-                    return (
-                      <li key={request.id}>
-                        <div>
-                          <strong>
-                            {formatBenefitValue(request.requestedValue, request.pass.benefitType)}
-                          </strong>
-                          <span>
-                            {request.providerName} ·{' '}
-                            {formatVerificationMethod(request.verificationMethod)} · 到期：
-                            {formatDate(request.expiresAt, '')}
-                          </span>
-                          <span>
-                            尝试：{request.verificationFailureCount}/
-                            {request.maxVerificationAttempts}
-                            {request.failureMessage ? ` · ${request.failureMessage}` : ''}
-                          </span>
-                        </div>
-                        {request.verificationMethod === 'server_account' ? (
-                          <div className="server-confirm-panel">
-                            {serverChallenge ? (
-                              <p>
-                                用服务器 ID「{serverChallenge.serverId}」发送：
-                                <strong>{serverChallenge.code}</strong>
-                              </p>
-                            ) : (
-                              <p>需要为本次消耗重新获取服务器聊天验证码。</p>
-                            )}
-                            <div className="inline-actions">
-                              <button
-                                className="secondary-action"
-                                type="button"
-                                disabled={confirmingRedemptionId === request.id}
-                                onClick={() => void startRedemptionServerChallenge(request)}
-                              >
-                                {serverRedemptionChallenges[request.id]
-                                  ? '重新获取验证码'
-                                  : '获取验证码'}
-                              </button>
-                              <button
-                                className="secondary-action"
-                                type="button"
-                                disabled={confirmingRedemptionId === request.id || !serverChallenge}
-                                onClick={() => void confirmRedemptionWithServer(request)}
-                              >
-                                {confirmingRedemptionId === request.id
-                                  ? '检查中'
-                                  : '我已发送，检查确认'}
-                              </button>
-                            </div>
+                    </div>
+                    {activeDetailModule === 'passInfo' ? (
+                      <section className="detail-pass-info" aria-label="卡片详情">
+                        <dl className="detail-list">
+                          <div>
+                            <dt>卡面标题</dt>
+                            <dd>{passDetail?.pass.title ?? selectedPass.title}</dd>
                           </div>
-                        ) : (
-                          <form
-                            className="inline-pin-form"
-                            onSubmit={(event) => void confirmRedemptionWithPin(event, request)}
-                          >
-                            <input
-                              type="password"
-                              inputMode="numeric"
-                              pattern="[0-9]{4,12}"
-                              placeholder="PIN"
-                              value={pinInputs[request.id] ?? ''}
-                              onChange={(event) =>
-                                setPinInputs((currentInputs) => ({
-                                  ...currentInputs,
-                                  [request.id]: event.target.value,
-                                }))
-                              }
-                              required
-                            />
-                            <button
-                              className="secondary-action"
-                              type="submit"
-                              disabled={confirmingRedemptionId === request.id}
-                            >
-                              {confirmingRedemptionId === request.id ? '确认中' : '确认'}
-                            </button>
-                          </form>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-              ) : !isRedemptionsLoading ? (
-                <p className="detail-status">暂无待确认消耗。</p>
-              ) : null}
-            </section>
-            ) : null}
-            {activeDetailModule === 'createDispute' ? (
-            <section className="detail-disputes" aria-label="提交新的争议">
-              {disputeMessage ? <p className="detail-status">{disputeMessage}</p> : null}
-              <form className="detail-dispute-form" onSubmit={(event) => void submitDispute(event)}>
-                <label>
-                  <span>争议对象</span>
-                  <select
-                    value={disputeSubjectType}
-                    onChange={(event) => {
-                      const nextSubjectType =
-                        event.target.value === 'pass_top_up' && currentDisputableTopUp
-                          ? 'pass_top_up'
-                          : 'pass';
-                      setDisputeSubjectType(nextSubjectType);
-                      setDisputeTopUpId(
-                        nextSubjectType === 'pass_top_up' ? currentDisputableTopUp?.id ?? '' : '',
-                      );
-                    }}
-                    disabled={isUsingOfflineSnapshot || isSubmittingDispute}
-                  >
-                    <option value="pass">当前卡券</option>
-                    {currentDisputableTopUp ? (
-                      <option value="pass_top_up">额度补充请求</option>
+                          <div>
+                            <dt>编号</dt>
+                            <dd>
+                              {passDetail?.pass.publicNumber ??
+                                selectedPass.maskedNumber ??
+                                '未设置'}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>状态</dt>
+                            <dd>{passDetail?.pass.status ?? selectedPass.status}</dd>
+                          </div>
+                          <div>
+                            <dt>冻结值</dt>
+                            <dd>{passDetail?.pass.frozenValue ?? selectedPass.frozenValue}</dd>
+                          </div>
+                          <div>
+                            <dt>透支额度</dt>
+                            <dd>
+                              {passDetail?.pass.overdraftLimit ?? selectedPass.overdraftLimit}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>有效期</dt>
+                            <dd>
+                              {formatDate(
+                                passDetail?.pass.expiresAt ?? selectedPass.expiresAt,
+                                '长期有效',
+                              )}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>添加时间</dt>
+                            <dd>{formatDate(passDetail?.pass.addedAt ?? null, '尚未记录')}</dd>
+                          </div>
+                        </dl>
+                        <p className="detail-status">
+                          临东通提供技术支持，权益、注销和条款等均为虚构。
+                        </p>
+                      </section>
                     ) : null}
-                  </select>
-                </label>
-                {disputeSubjectType === 'pass_top_up' && currentDisputableTopUp ? (
-                  <label>
-                    <span>补充请求</span>
-                    <select
-                      value={currentDisputableTopUp.id}
-                      onChange={(event) => setDisputeTopUpId(event.target.value)}
-                      disabled={isUsingOfflineSnapshot || isSubmittingDispute}
-                    >
-                      {disputableTopUpOptions.map((request) => (
-                        <option value={request.id} key={request.id}>
-                          {formatTopUpRequestStatus(request.status)} · {request.id.slice(0, 8)} ·{' '}
-                          {formatBenefitValue(request.value, selectedPass.benefitType)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : null}
-                <label>
-                  <span>争议原因</span>
-                  <textarea
-                    value={disputeReason}
-                    onChange={(event) => setDisputeReason(event.target.value)}
-                    placeholder={
-                      disputeSubjectType === 'pass_top_up'
-                        ? '例如：来源卡扣减或目标卡增加的额度不符合预期'
-                        : '例如：余额扣减有误、票券信息不一致'
-                    }
-                    rows={5}
-                    disabled={isUsingOfflineSnapshot || isSubmittingDispute}
-                  />
-                </label>
-                <div className="form-actions compact-actions">
-                  <button
-                    className="secondary-action"
-                    type="button"
-                    onClick={() => setActiveDetailModule('disputes')}
-                  >
-                    返回记录
-                  </button>
-                  <button
-                    className="primary-action"
-                    type="submit"
-                    disabled={isUsingOfflineSnapshot || isSubmittingDispute}
-                  >
-                    {isSubmittingDispute ? '提交中' : '提交'}
-                  </button>
-                </div>
-              </form>
-            </section>
-            ) : null}
-            {activeDetailModule === 'disputes' ? (
-            <section className="detail-disputes" aria-label="争议记录">
-              {isDisputesLoading ? <p className="detail-status">正在读取争议记录...</p> : null}
-              {disputeMessage ? <p className="detail-status">{disputeMessage}</p> : null}
-              <div className="form-actions compact-actions">
-                <button
-                  className="primary-action"
-                  type="button"
-                  disabled={isUsingOfflineSnapshot}
-                  onClick={() => {
-                    setDisputeSubjectType('pass');
-                    setDisputeTopUpId('');
-                    setDisputeMessage(null);
-                    setActiveDetailModule('createDispute');
-                  }}
-                >
-                  提交新的争议
-                </button>
-              </div>
-              {disputes.length ? (
-                <ol>
-                  {disputes.map((dispute) => (
-                    <li key={dispute.id}>
-                      <div>
-                        <strong>{formatDisputeStatus(dispute.status)}</strong>
-                        <small>{formatDisputeSubject(dispute)}</small>
-                        <span>{dispute.reason}</span>
-                      </div>
-                      <small>{formatDate(dispute.updatedAt, '')}</small>
-                    </li>
-                  ))}
-                </ol>
-              ) : !isDisputesLoading ? (
-                <p className="detail-status">暂无争议记录。</p>
-              ) : null}
-            </section>
-            ) : null}
-            {activeDetailModule === 'ledger' ? (
-            <section className="detail-ledger" aria-label="交易记录">
-              {isLedgerLoading ? <p className="detail-status">正在读取交易记录...</p> : null}
-              {isTopUpHistoryLoading ? <p className="detail-status">正在读取额度补充记录...</p> : null}
-              {ledgerMessage ? <p className="detail-status detail-status-error">{ledgerMessage}</p> : null}
-              {topUpHistoryMessage ? <p className="detail-status detail-status-error">{topUpHistoryMessage}</p> : null}
-              {transactionRecords.length ? (
-                <ol>
-                  {transactionRecords.map((record) =>
-                    record.kind === 'ledger' ? (
-                      <li key={record.id}>
-                        <div>
-                          <strong>{formatLedgerReason(record.entry.reason)}</strong>
-                          <span>{record.entry.note ?? formatLedgerActor(record.entry.createdByType)}</span>
+                    {activeDetailModule === 'provider' ? (
+                      <section className="detail-provider" aria-label="发卡方信息">
+                        <div className="detail-provider-card">
+                          <div>
+                            <strong>
+                              {passDetail?.pass.providerName ?? selectedPass.providerName}
+                            </strong>
+                            <span>这张卡由该发卡方提供和维护。</span>
+                          </div>
+                          {passDetail?.pass.providerIntroductionUrl ? (
+                            <a
+                              className="secondary-action"
+                              href={passDetail.pass.providerIntroductionUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              查看介绍
+                            </a>
+                          ) : (
+                            <p className="detail-status">发卡方暂未设置介绍链接。</p>
+                          )}
                         </div>
-                        <div>
-                          <b>{formatSignedValue(record.entry.changeValue, record.entry.benefitType)}</b>
-                          <small>{formatDate(record.entry.createdAt, '')}</small>
-                        </div>
-                      </li>
-                    ) : (
-                      <li key={record.id}>
-                        <div>
-                          <strong>{formatTopUpHistorySummary(record.request, selectedPass.id)}</strong>
-                          <span>
-                            {formatTopUpHistoryCounterparty(record.request, selectedPass.id)} ·{' '}
-                            {formatVerificationMethod(record.request.verificationMethod)}
-                          </span>
-                          <span>
-                            {formatTopUpRequestStatus(record.request.status)} ·{' '}
-                            {formatDate(record.request.completedAt ?? record.request.cancelledAt ?? record.request.updatedAt, '')}
-                            {record.request.failureMessage ? ` · ${record.request.failureMessage}` : ''}
-                          </span>
-                        </div>
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'ticket' &&
+                    (passDetail?.pass.ticketInfo || selectedPass.category === 'ticket') ? (
+                      <section className="detail-ticket" aria-label="票券信息">
+                        <dl className="detail-list">
+                          <div>
+                            <dt>活动</dt>
+                            <dd>
+                              {passDetail?.pass.ticketInfo?.eventName ??
+                                passDetail?.pass.title ??
+                                selectedPass.title}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>场地</dt>
+                            <dd>{passDetail?.pass.ticketInfo?.venue ?? '未设置'}</dd>
+                          </div>
+                          <div>
+                            <dt>场次</dt>
+                            <dd>
+                              {formatDate(passDetail?.pass.ticketInfo?.startsAt ?? null, '未设置')}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>座位</dt>
+                            <dd>{passDetail?.pass.ticketInfo?.seatLabel ?? '未设置'}</dd>
+                          </div>
+                        </dl>
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'location' &&
+                    selectedPass.category === 'identity_key' ? (
+                      <section className="detail-location" aria-label="位置核验">
+                        {passDetail?.pass.locationVerification?.rules?.rules.length ? (
+                          <dl className="detail-list">
+                            {passDetail.pass.locationVerification.rules.rules.map((rule) => (
+                              <div key={rule.id}>
+                                <dt>{rule.label}</dt>
+                                <dd>{formatLocationRule(rule)}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        ) : (
+                          <p className="detail-status">此卡券暂未配置位置范围。</p>
+                        )}
+                        {passDetail?.pass.locationVerification?.required &&
+                        !sessionUser?.serverAccountVerified ? (
+                          <p className="detail-status">
+                            位置核验需要先完成服务器账号验证。<a href="/account">前往账户页</a>
+                          </p>
+                        ) : null}
+                        {passDetail?.pass.locationVerification?.required &&
+                        sessionUser?.serverAccountVerified &&
+                        sessionUser.serverAccountName ? (
+                          <p className="detail-status">
+                            将使用服务器 ID「{sessionUser.serverAccountName}」核验当前位置。
+                          </p>
+                        ) : null}
+                        {locationVerificationMessage ? (
+                          <p className="detail-status">{locationVerificationMessage}</p>
+                        ) : null}
                         <button
                           className="secondary-action"
                           type="button"
-                          onClick={() => {
-                            setDisputeSubjectType('pass_top_up');
-                            setDisputeTopUpId(record.request.id);
-                            setDisputeMessage(null);
-                            setActiveDetailModule('createDispute');
-                          }}
+                          disabled={
+                            isUsingOfflineSnapshot ||
+                            isPassDetailLoading ||
+                            isVerifyingLocation ||
+                            !canVerifySelectedLocation
+                          }
+                          onClick={() => void verifyLocation()}
                         >
-                          提交争议
+                          {isVerifyingLocation ? '核验中' : '验证当前位置'}
                         </button>
-                      </li>
-                    ),
-                  )}
-                </ol>
-              ) : !isLedgerLoading && !isTopUpHistoryLoading ? (
-                <p className="detail-status">暂无交易记录。</p>
-              ) : null}
-            </section>
-            ) : null}
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'topUp' ? (
+                      <section className="detail-top-up" aria-label="额度补充">
+                        {!passDetail && isPassDetailLoading ? (
+                          <p className="detail-status">正在读取额度补充规则...</p>
+                        ) : null}
+                        {topUpMessage ? <p className="detail-status">{topUpMessage}</p> : null}
+                        {currentDisputableTopUp ? (
+                          <button
+                            className="secondary-action"
+                            type="button"
+                            onClick={openCurrentTopUpDispute}
+                          >
+                            提交最近补充争议
+                          </button>
+                        ) : null}
+                        {canTopUpSelectedPass && topUpSourcePasses.length === 0 ? (
+                          <p className="detail-status">当前没有同类且开放作为补充来源的卡券。</p>
+                        ) : null}
+                        <form
+                          className="detail-top-up-form"
+                          onSubmit={(event) => void submitTopUp(event)}
+                        >
+                          <label>
+                            <span>来源卡</span>
+                            <button
+                              className="top-up-source-trigger"
+                              type="button"
+                              onClick={() => openDetailModule('topUpSource')}
+                              disabled={
+                                !canTopUpSelectedPass ||
+                                isUsingOfflineSnapshot ||
+                                isSubmittingTopUp ||
+                                topUpSourcePasses.length === 0
+                              }
+                            >
+                              <span>
+                                {selectedTopUpSourcePass
+                                  ? `${selectedTopUpSourcePass.displayName} · ${formatBenefitValue(selectedTopUpSourcePass.balanceValue, selectedTopUpSourcePass.benefitType)}`
+                                  : '暂无可用来源卡'}
+                              </span>
+                              <span className="material-symbols-rounded" aria-hidden="true">
+                                chevron_right
+                              </span>
+                            </button>
+                          </label>
+                          <label>
+                            <span>补充值</span>
+                            <input
+                              value={topUpValue}
+                              onChange={(event) => {
+                                setTopUpValue(event.target.value);
+                                setTopUpServerChallenge(null);
+                                setTopUpRequest(null);
+                              }}
+                              placeholder={formatBenefitPlaceholder(selectedPass.benefitType)}
+                              inputMode="decimal"
+                              pattern={decimalInputPattern}
+                              disabled={
+                                !canTopUpSelectedPass ||
+                                isUsingOfflineSnapshot ||
+                                isSubmittingTopUp ||
+                                topUpSourcePasses.length === 0
+                              }
+                              required
+                            />
+                          </label>
+                          <label>
+                            <span>确认方式</span>
+                            <select
+                              value={topUpVerificationMethod}
+                              onChange={(event) => {
+                                setTopUpVerificationMethod(
+                                  event.target.value === 'server_account'
+                                    ? 'server_account'
+                                    : 'pin',
+                                );
+                                setTopUpServerChallenge(null);
+                                setTopUpRequest(null);
+                                setTopUpMessage(null);
+                              }}
+                              disabled={
+                                !canTopUpSelectedPass ||
+                                isUsingOfflineSnapshot ||
+                                isSubmittingTopUp ||
+                                topUpSourcePasses.length === 0
+                              }
+                            >
+                              <option value="pin">PIN</option>
+                              <option value="server_account">服务器账号确认</option>
+                            </select>
+                          </label>
+                          <label>
+                            <span>备注</span>
+                            <textarea
+                              value={topUpNote}
+                              onChange={(event) => {
+                                setTopUpNote(event.target.value);
+                                setTopUpServerChallenge(null);
+                                setTopUpRequest(null);
+                              }}
+                              placeholder="可选"
+                              rows={2}
+                              disabled={
+                                !canTopUpSelectedPass ||
+                                isUsingOfflineSnapshot ||
+                                isSubmittingTopUp ||
+                                topUpSourcePasses.length === 0
+                              }
+                              maxLength={500}
+                            />
+                          </label>
+                          {topUpVerificationMethod === 'pin' ? (
+                            <label>
+                              <span>PIN</span>
+                              <input
+                                type="password"
+                                value={topUpPin}
+                                onChange={(event) => setTopUpPin(event.target.value)}
+                                placeholder="用于确认本次额度补充"
+                                inputMode="numeric"
+                                pattern="[0-9]{4,12}"
+                                autoComplete="one-time-code"
+                                disabled={
+                                  !canTopUpSelectedPass ||
+                                  isUsingOfflineSnapshot ||
+                                  isSubmittingTopUp ||
+                                  topUpSourcePasses.length === 0
+                                }
+                                required
+                              />
+                            </label>
+                          ) : (
+                            <div className="top-up-server-challenge">
+                              <span>服务器账号</span>
+                              {sessionUser?.serverAccountVerified &&
+                              sessionUser.serverAccountName ? (
+                                topUpServerChallenge ? (
+                                  <>
+                                    <strong>{topUpServerChallenge.code}</strong>
+                                    {topUpRequest ? (
+                                      <small>
+                                        请求 {topUpRequest.id.slice(0, 8)} ·{' '}
+                                        {formatTopUpRequestStatus(topUpRequest.status)}
+                                      </small>
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  <>
+                                    <p>点击后生成本次验证码。</p>
+                                    {topUpRequest ? (
+                                      <small>
+                                        请求 {topUpRequest.id.slice(0, 8)} ·{' '}
+                                        {formatTopUpRequestStatus(topUpRequest.status)}
+                                      </small>
+                                    ) : null}
+                                  </>
+                                )
+                              ) : (
+                                <p>需要先在账户页完成服务器账号验证。</p>
+                              )}
+                            </div>
+                          )}
+                          {topUpVerificationMethod === 'server_account' &&
+                          topUpRequest?.status === 'WaitingVerification' ? (
+                            <button
+                              className="secondary-action"
+                              type="button"
+                              disabled={isSubmittingTopUp}
+                              onClick={() => void cancelTopUpRequest()}
+                            >
+                              取消本次补充
+                            </button>
+                          ) : null}
+                          <button
+                            className="secondary-action"
+                            type="submit"
+                            disabled={
+                              !canTopUpSelectedPass ||
+                              isUsingOfflineSnapshot ||
+                              isSubmittingTopUp ||
+                              topUpSourcePasses.length === 0
+                            }
+                          >
+                            {isSubmittingTopUp
+                              ? '处理中'
+                              : topUpVerificationMethod === 'server_account' &&
+                                  !topUpServerChallenge
+                                ? '获取验证码'
+                                : '确认补充'}
+                          </button>
+                        </form>
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'topUpSource' ? (
+                      <section className="detail-top-up-source" aria-label="选择来源卡">
+                        {topUpSourcePasses.length ? (
+                          <div className="top-up-source-list">
+                            {topUpSourcePasses.map((pass) => (
+                              <button
+                                className={`top-up-source-option${pass.id === topUpSourcePassId ? ' is-selected' : ''}`}
+                                type="button"
+                                key={pass.id}
+                                onClick={() => {
+                                  setTopUpSourcePassId(pass.id);
+                                  setTopUpServerChallenge(null);
+                                  setTopUpRequest(null);
+                                  setActiveDetailModule('topUp');
+                                }}
+                              >
+                                <span>{pass.providerName}</span>
+                                <strong>{pass.displayName}</strong>
+                                <b>{formatBenefitValue(pass.balanceValue, pass.benefitType)}</b>
+                                <small>{pass.maskedNumber ?? pass.status}</small>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="detail-status">当前没有同类且开放作为补充来源的卡券。</p>
+                        )}
+                        <div className="form-actions compact-actions">
+                          <button
+                            className="secondary-action"
+                            type="button"
+                            onClick={() => setActiveDetailModule('topUp')}
+                          >
+                            返回充值
+                          </button>
+                        </div>
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'transfer' ? (
+                      <section className="detail-transfers" aria-label="卡券转赠">
+                        {!passDetail && isPassDetailLoading ? (
+                          <p className="detail-status">正在读取转赠规则...</p>
+                        ) : null}
+                        {selectedPassSentTransfers.length ? (
+                          <ol>
+                            {selectedPassSentTransfers.map((transfer) => (
+                              <li key={transfer.id}>
+                                <div>
+                                  <strong>等待 {transfer.toUser.username} 确认</strong>
+                                  <span>到期：{formatDate(transfer.expiresAt, '')}</span>
+                                </div>
+                                <button
+                                  className="secondary-action"
+                                  type="button"
+                                  disabled={resolvingTransferId === transfer.id}
+                                  onClick={() => void cancelTransfer(transfer)}
+                                >
+                                  取消
+                                </button>
+                              </li>
+                            ))}
+                          </ol>
+                        ) : null}
+                        <form
+                          className="detail-transfer-form"
+                          onSubmit={(event) => void submitTransfer(event)}
+                        >
+                          <label>
+                            <span>接收方</span>
+                            <input
+                              value={transferRecipient}
+                              onChange={(event) => setTransferRecipient(event.target.value)}
+                              placeholder="用户名或邮箱"
+                              disabled={
+                                !canTransferSelectedPass ||
+                                isUsingOfflineSnapshot ||
+                                isSubmittingTransfer
+                              }
+                              maxLength={120}
+                            />
+                          </label>
+                          <label>
+                            <span>备注</span>
+                            <textarea
+                              value={transferNote}
+                              onChange={(event) => setTransferNote(event.target.value)}
+                              placeholder="可选"
+                              rows={2}
+                              disabled={
+                                !canTransferSelectedPass ||
+                                isUsingOfflineSnapshot ||
+                                isSubmittingTransfer
+                              }
+                              maxLength={500}
+                            />
+                          </label>
+                          <button
+                            className="secondary-action"
+                            type="submit"
+                            disabled={
+                              !canTransferSelectedPass ||
+                              isUsingOfflineSnapshot ||
+                              isSubmittingTransfer ||
+                              Boolean(selectedPassSentTransfers.length)
+                            }
+                          >
+                            {isSubmittingTransfer ? '发起中' : '发起转赠'}
+                          </button>
+                        </form>
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'use' ? (
+                      <section className="detail-use" aria-label="发起消耗">
+                        {redemptionMessage ? (
+                          <p className="detail-status">{redemptionMessage}</p>
+                        ) : null}
+                        <form
+                          className="detail-use-form"
+                          onSubmit={(event) => void submitSelfRedemption(event)}
+                        >
+                          <label>
+                            <span>消耗值</span>
+                            <input
+                              value={selfRedemptionValue}
+                              onChange={(event) => setSelfRedemptionValue(event.target.value)}
+                              placeholder={formatBenefitPlaceholder(selectedPass.benefitType)}
+                              inputMode="decimal"
+                              pattern={decimalInputPattern}
+                              disabled={
+                                !canUseSelectedPass ||
+                                isUsingOfflineSnapshot ||
+                                isCreatingSelfRedemption ||
+                                Boolean(redemptionRequests.length)
+                              }
+                              required
+                            />
+                          </label>
+                          <label>
+                            <span>验证方式</span>
+                            <select
+                              value={selfRedemptionMethod}
+                              onChange={(event) =>
+                                setSelfRedemptionMethod(
+                                  event.target
+                                    .value as WalletRedemptionRequest['verificationMethod'],
+                                )
+                              }
+                              disabled={
+                                !canUseSelectedPass ||
+                                isUsingOfflineSnapshot ||
+                                isCreatingSelfRedemption ||
+                                Boolean(redemptionRequests.length)
+                              }
+                            >
+                              <option value="pin">PIN</option>
+                              <option value="server_account">服务器账号</option>
+                            </select>
+                          </label>
+                          <button
+                            className="secondary-action"
+                            type="submit"
+                            disabled={
+                              !canUseSelectedPass ||
+                              isUsingOfflineSnapshot ||
+                              isCreatingSelfRedemption ||
+                              Boolean(redemptionRequests.length)
+                            }
+                          >
+                            {isCreatingSelfRedemption ? '发起中' : '发起使用'}
+                          </button>
+                        </form>
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'redemptions' ? (
+                      <section className="detail-redemptions" aria-label="待确认核销请求">
+                        {isRedemptionsLoading ? (
+                          <p className="detail-status">正在读取待确认请求...</p>
+                        ) : null}
+                        {redemptionMessage ? (
+                          <p className="detail-status">{redemptionMessage}</p>
+                        ) : null}
+                        {redemptionRequests.length ? (
+                          <ol>
+                            {redemptionRequests.map((request) => {
+                              const serverChallenge = serverRedemptionChallenges[request.id];
+
+                              return (
+                                <li key={request.id}>
+                                  <div>
+                                    <strong>
+                                      {formatBenefitValue(
+                                        request.requestedValue,
+                                        request.pass.benefitType,
+                                      )}
+                                    </strong>
+                                    <span>
+                                      {request.providerName} ·{' '}
+                                      {formatVerificationMethod(request.verificationMethod)} ·
+                                      到期：
+                                      {formatDate(request.expiresAt, '')}
+                                    </span>
+                                    <span>
+                                      尝试：{request.verificationFailureCount}/
+                                      {request.maxVerificationAttempts}
+                                      {request.failureMessage ? ` · ${request.failureMessage}` : ''}
+                                    </span>
+                                  </div>
+                                  {request.verificationMethod === 'server_account' ? (
+                                    <div className="server-confirm-panel">
+                                      {serverChallenge ? (
+                                        <p>
+                                          用服务器 ID「{serverChallenge.serverId}」发送：
+                                          <strong>{serverChallenge.code}</strong>
+                                        </p>
+                                      ) : (
+                                        <p>需要为本次消耗重新获取服务器聊天验证码。</p>
+                                      )}
+                                      <div className="inline-actions">
+                                        <button
+                                          className="secondary-action"
+                                          type="button"
+                                          disabled={confirmingRedemptionId === request.id}
+                                          onClick={() =>
+                                            void startRedemptionServerChallenge(request)
+                                          }
+                                        >
+                                          {serverRedemptionChallenges[request.id]
+                                            ? '重新获取验证码'
+                                            : '获取验证码'}
+                                        </button>
+                                        <button
+                                          className="secondary-action"
+                                          type="button"
+                                          disabled={
+                                            confirmingRedemptionId === request.id ||
+                                            !serverChallenge
+                                          }
+                                          onClick={() => void confirmRedemptionWithServer(request)}
+                                        >
+                                          {confirmingRedemptionId === request.id
+                                            ? '检查中'
+                                            : '我已发送，检查确认'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <form
+                                      className="inline-pin-form"
+                                      onSubmit={(event) =>
+                                        void confirmRedemptionWithPin(event, request)
+                                      }
+                                    >
+                                      <input
+                                        type="password"
+                                        inputMode="numeric"
+                                        pattern="[0-9]{4,12}"
+                                        placeholder="PIN"
+                                        value={pinInputs[request.id] ?? ''}
+                                        onChange={(event) =>
+                                          setPinInputs((currentInputs) => ({
+                                            ...currentInputs,
+                                            [request.id]: event.target.value,
+                                          }))
+                                        }
+                                        required
+                                      />
+                                      <button
+                                        className="secondary-action"
+                                        type="submit"
+                                        disabled={confirmingRedemptionId === request.id}
+                                      >
+                                        {confirmingRedemptionId === request.id ? '确认中' : '确认'}
+                                      </button>
+                                    </form>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ol>
+                        ) : !isRedemptionsLoading ? (
+                          <p className="detail-status">暂无待确认消耗。</p>
+                        ) : null}
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'createDispute' ? (
+                      <section className="detail-disputes" aria-label="提交新的争议">
+                        {disputeMessage ? <p className="detail-status">{disputeMessage}</p> : null}
+                        <form
+                          className="detail-dispute-form"
+                          onSubmit={(event) => void submitDispute(event)}
+                        >
+                          <label>
+                            <span>争议对象</span>
+                            <select
+                              value={disputeSubjectType}
+                              onChange={(event) => {
+                                const nextSubjectType =
+                                  event.target.value === 'pass_top_up' && currentDisputableTopUp
+                                    ? 'pass_top_up'
+                                    : 'pass';
+                                setDisputeSubjectType(nextSubjectType);
+                                setDisputeTopUpId(
+                                  nextSubjectType === 'pass_top_up'
+                                    ? (currentDisputableTopUp?.id ?? '')
+                                    : '',
+                                );
+                              }}
+                              disabled={isUsingOfflineSnapshot || isSubmittingDispute}
+                            >
+                              <option value="pass">当前卡券</option>
+                              {currentDisputableTopUp ? (
+                                <option value="pass_top_up">额度补充请求</option>
+                              ) : null}
+                            </select>
+                          </label>
+                          {disputeSubjectType === 'pass_top_up' && currentDisputableTopUp ? (
+                            <label>
+                              <span>补充请求</span>
+                              <select
+                                value={currentDisputableTopUp.id}
+                                onChange={(event) => setDisputeTopUpId(event.target.value)}
+                                disabled={isUsingOfflineSnapshot || isSubmittingDispute}
+                              >
+                                {disputableTopUpOptions.map((request) => (
+                                  <option value={request.id} key={request.id}>
+                                    {formatTopUpRequestStatus(request.status)} ·{' '}
+                                    {request.id.slice(0, 8)} ·{' '}
+                                    {formatBenefitValue(request.value, selectedPass.benefitType)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          ) : null}
+                          <label>
+                            <span>争议原因</span>
+                            <textarea
+                              value={disputeReason}
+                              onChange={(event) => setDisputeReason(event.target.value)}
+                              placeholder={
+                                disputeSubjectType === 'pass_top_up'
+                                  ? '例如：来源卡扣减或目标卡增加的额度不符合预期'
+                                  : '例如：余额扣减有误、票券信息不一致'
+                              }
+                              rows={5}
+                              disabled={isUsingOfflineSnapshot || isSubmittingDispute}
+                            />
+                          </label>
+                          <div className="form-actions compact-actions">
+                            <button
+                              className="secondary-action"
+                              type="button"
+                              onClick={() => setActiveDetailModule('disputes')}
+                            >
+                              返回记录
+                            </button>
+                            <button
+                              className="primary-action"
+                              type="submit"
+                              disabled={isUsingOfflineSnapshot || isSubmittingDispute}
+                            >
+                              {isSubmittingDispute ? '提交中' : '提交'}
+                            </button>
+                          </div>
+                        </form>
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'disputes' ? (
+                      <section className="detail-disputes" aria-label="争议记录">
+                        {isDisputesLoading ? (
+                          <p className="detail-status">正在读取争议记录...</p>
+                        ) : null}
+                        {disputeMessage ? <p className="detail-status">{disputeMessage}</p> : null}
+                        <div className="form-actions compact-actions">
+                          <button
+                            className="primary-action"
+                            type="button"
+                            disabled={isUsingOfflineSnapshot}
+                            onClick={() => {
+                              setDisputeSubjectType('pass');
+                              setDisputeTopUpId('');
+                              setDisputeMessage(null);
+                              setActiveDetailModule('createDispute');
+                            }}
+                          >
+                            提交新的争议
+                          </button>
+                        </div>
+                        {disputes.length ? (
+                          <ol>
+                            {disputes.map((dispute) => (
+                              <li key={dispute.id}>
+                                <div>
+                                  <strong>{formatDisputeStatus(dispute.status)}</strong>
+                                  <small>{formatDisputeSubject(dispute)}</small>
+                                  <span>{dispute.reason}</span>
+                                </div>
+                                <small>{formatDate(dispute.updatedAt, '')}</small>
+                              </li>
+                            ))}
+                          </ol>
+                        ) : !isDisputesLoading ? (
+                          <p className="detail-status">暂无争议记录。</p>
+                        ) : null}
+                      </section>
+                    ) : null}
+                    {activeDetailModule === 'ledger' ? (
+                      <section className="detail-ledger" aria-label="交易记录">
+                        {isLedgerLoading ? (
+                          <p className="detail-status">正在读取交易记录...</p>
+                        ) : null}
+                        {isTopUpHistoryLoading ? (
+                          <p className="detail-status">正在读取额度补充记录...</p>
+                        ) : null}
+                        {ledgerMessage ? (
+                          <p className="detail-status detail-status-error">{ledgerMessage}</p>
+                        ) : null}
+                        {topUpHistoryMessage ? (
+                          <p className="detail-status detail-status-error">{topUpHistoryMessage}</p>
+                        ) : null}
+                        {transactionRecords.length ? (
+                          <ol>
+                            {transactionRecords.map((record) =>
+                              record.kind === 'ledger' ? (
+                                <li key={record.id}>
+                                  <div>
+                                    <strong>{formatLedgerReason(record.entry.reason)}</strong>
+                                    <span>
+                                      {record.entry.note ??
+                                        formatLedgerActor(record.entry.createdByType)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <b>
+                                      {formatSignedValue(
+                                        record.entry.changeValue,
+                                        record.entry.benefitType,
+                                      )}
+                                    </b>
+                                    <small>{formatDate(record.entry.createdAt, '')}</small>
+                                  </div>
+                                </li>
+                              ) : (
+                                <li key={record.id}>
+                                  <div>
+                                    <strong>
+                                      {formatTopUpHistorySummary(record.request, selectedPass.id)}
+                                    </strong>
+                                    <span>
+                                      {formatTopUpHistoryCounterparty(
+                                        record.request,
+                                        selectedPass.id,
+                                      )}{' '}
+                                      ·{' '}
+                                      {formatVerificationMethod(record.request.verificationMethod)}
+                                    </span>
+                                    <span>
+                                      {formatTopUpRequestStatus(record.request.status)} ·{' '}
+                                      {formatDate(
+                                        record.request.completedAt ??
+                                          record.request.cancelledAt ??
+                                          record.request.updatedAt,
+                                        '',
+                                      )}
+                                      {record.request.failureMessage
+                                        ? ` · ${record.request.failureMessage}`
+                                        : ''}
+                                    </span>
+                                  </div>
+                                  <button
+                                    className="secondary-action"
+                                    type="button"
+                                    onClick={() => {
+                                      setDisputeSubjectType('pass_top_up');
+                                      setDisputeTopUpId(record.request.id);
+                                      setDisputeMessage(null);
+                                      setActiveDetailModule('createDispute');
+                                    }}
+                                  >
+                                    提交争议
+                                  </button>
+                                </li>
+                              ),
+                            )}
+                          </ol>
+                        ) : !isLedgerLoading && !isTopUpHistoryLoading ? (
+                          <p className="detail-status">暂无交易记录。</p>
+                        ) : null}
+                      </section>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ) : null}
-          </aside>
-        ) : null}
-      </section>
+              ) : null}
+            </aside>
+          ) : null}
+        </section>
       )}
     </main>
+  );
+}
+
+function DeviceLoginApprovalBanner() {
+  const [approvals, setApprovals] = useState<DeviceLoginApprovalSummary[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const refreshApprovals = async () => {
+      try {
+        const result = await getJson<DeviceLoginApprovalsResponse>(
+          '/api/auth/account/device-login-approvals',
+        );
+        if (isMounted) {
+          setApprovals(result.approvals);
+        }
+      } catch {
+        if (isMounted) {
+          setApprovals((currentApprovals) =>
+            currentApprovals.filter(
+              (approval) => new Date(approval.expiresAt).getTime() > Date.now(),
+            ),
+          );
+        }
+      }
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshApprovals();
+      }
+    };
+
+    void refreshApprovals();
+    const intervalId = window.setInterval(() => void refreshApprovals(), 10_000);
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, []);
+
+  useEffect(() => {
+    const nearestExpiry = Math.min(
+      ...approvals.map((approval) => new Date(approval.expiresAt).getTime()),
+    );
+    if (!Number.isFinite(nearestExpiry)) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(
+      () => {
+        const now = Date.now();
+        setApprovals((currentApprovals) =>
+          currentApprovals.filter((approval) => new Date(approval.expiresAt).getTime() > now),
+        );
+      },
+      Math.max(0, nearestExpiry - Date.now() + 100),
+    );
+
+    return () => window.clearTimeout(timeoutId);
+  }, [approvals]);
+
+  if (approvals.length === 0) {
+    return null;
+  }
+
+  const latestApproval = approvals[0]!;
+
+  return (
+    <section className="device-login-approval-banner" role="alert" aria-live="polite">
+      <span className="material-symbols-rounded" aria-hidden="true">
+        mobile_lock
+      </span>
+      <div>
+        <strong>
+          {approvals.length > 1 ? `${approvals.length} 个新设备等待确认` : '新设备登录等待确认'}
+        </strong>
+        <span>
+          {latestApproval.deviceLabel ?? formatDeviceSystem(latestApproval.deviceSystem)}
+          {latestApproval.ipAddress ? ` · IP ${latestApproval.ipAddress}` : ''} · 到期：
+          {formatDate(latestApproval.expiresAt, '未知')}
+        </span>
+      </div>
+      <a className="secondary-action" href="/account?dialog=deviceApprovals">
+        <span className="material-symbols-rounded" aria-hidden="true">
+          arrow_forward
+        </span>
+        <span>前往确认</span>
+      </a>
+    </section>
   );
 }
 
@@ -3320,6 +3529,19 @@ function getCategoryHref(categoryKey: CategoryKey): string {
 
 function isActiveSessionUser(user: SessionResponse['user']): boolean {
   return user?.status === 'Active';
+}
+
+function formatDeviceSystem(system: string): string {
+  const labels: Record<string, string> = {
+    android: 'Android 设备',
+    ios: 'iOS 设备',
+    windows: 'Windows 设备',
+    macos: 'macOS 设备',
+    linux: 'Linux 设备',
+    other: '其他设备',
+  };
+
+  return labels[system] ?? '新设备';
 }
 
 function isDialogDetailModule(module: DetailModule): boolean {
@@ -3368,7 +3590,10 @@ function formatTopUpRequestStatus(status: TopUpRequestStatus): string {
   return labels[status];
 }
 
-function formatTopUpHistorySummary(request: WalletTopUpHistoryItem, selectedPassId: string): string {
+function formatTopUpHistorySummary(
+  request: WalletTopUpHistoryItem,
+  selectedPassId: string,
+): string {
   const benefitType =
     request.targetPass.id === selectedPassId
       ? request.targetPass.benefitType
@@ -3453,7 +3678,9 @@ function PassCardContent({ pass }: { pass: WalletPass }) {
         />
       ) : null}
       {shouldShowFallbackInfo ? <strong>{pass.title}</strong> : null}
-      {shouldShowFallbackInfo ? <b>{formatBenefitValue(pass.balanceValue, pass.benefitType)}</b> : null}
+      {shouldShowFallbackInfo ? (
+        <b>{formatBenefitValue(pass.balanceValue, pass.benefitType)}</b>
+      ) : null}
       <small>{formatPassTailNumber(pass.maskedNumber) ?? '****'}</small>
     </>
   );
@@ -3524,7 +3751,13 @@ function formatPassTailNumber(maskedNumber: string | null): string | null {
   return tail ? '**** ' + tail : maskedNumber;
 }
 
-function UserAvatar({ avatarUrl, fallbackUrl }: { avatarUrl: string | null; fallbackUrl: string | null }) {
+function UserAvatar({
+  avatarUrl,
+  fallbackUrl,
+}: {
+  avatarUrl: string | null;
+  fallbackUrl: string | null;
+}) {
   const [currentUrl, setCurrentUrl] = useState(avatarUrl);
 
   useEffect(() => {

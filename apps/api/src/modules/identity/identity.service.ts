@@ -2034,7 +2034,13 @@ export class IdentityService {
 
         const deviceState = await this.readLoginDeviceState(user.id, dto, request);
         const device = await this.recordLoginDevice(user.id, dto, request);
-        await this.completePendingDeviceLoginApprovals(user.id, deviceState.fingerprintHash);
+        if (device) {
+          await this.completePendingDeviceLoginApprovals(
+            user.id,
+            deviceState.fingerprintHash,
+            device.id,
+          );
+        }
 
         if (device) {
           await this.eventBus.publish({
@@ -2154,15 +2160,7 @@ export class IdentityService {
     const now = new Date();
     if (approval.status === 'pending') {
       if (approval.expiresAt <= now) {
-        await this.prisma.deviceLoginApproval.update({
-          where: {
-            id: approval.id,
-          },
-          data: {
-            status: 'expired',
-            respondedAt: now,
-          },
-        });
+        await this.expirePendingDeviceLoginApprovals(user.id);
         throw new UnauthorizedException('新设备确认请求已过期，请重新登录。');
       }
 
@@ -2210,6 +2208,21 @@ export class IdentityService {
         respondedAt: now,
       },
     });
+
+    if (device) {
+      await this.eventBus.publish({
+        type: 'DeviceLoginApprovalCompleted',
+        eventId: randomUUID(),
+        occurredAt: now.toISOString(),
+        actorType: 'user',
+        actorId: user.id,
+        payload: {
+          approvalId: approval.id,
+          userId: user.id,
+          deviceId: device.id,
+        },
+      });
+    }
 
     await this.eventBus.publish({
       type: 'UserLoggedIn',
@@ -2492,15 +2505,7 @@ export class IdentityService {
     }
 
     if (approval.expiresAt <= new Date()) {
-      await this.prisma.deviceLoginApproval.update({
-        where: {
-          id: approval.id,
-        },
-        data: {
-          status: 'expired',
-          respondedAt: new Date(),
-        },
-      });
+      await this.expirePendingDeviceLoginApprovals(userId);
       throw new BadRequestException('新设备确认请求已过期，请让新设备重新登录。');
     }
 
@@ -2508,36 +2513,113 @@ export class IdentityService {
   }
 
   private async expirePendingDeviceLoginApprovals(userId?: string): Promise<void> {
-    await this.prisma.deviceLoginApproval.updateMany({
+    const now = new Date();
+    const expiringApprovals = await this.prisma.deviceLoginApproval.findMany({
       where: {
         ...(userId ? { userId } : {}),
         status: 'pending',
         expiresAt: {
-          lte: new Date(),
+          lte: now,
         },
       },
-      data: {
-        status: 'expired',
-        respondedAt: new Date(),
+      select: {
+        id: true,
+        userId: true,
       },
     });
+
+    if (expiringApprovals.length === 0) {
+      return;
+    }
+
+    await Promise.all(
+      expiringApprovals.map(async (approval) => {
+        const transition = await this.prisma.deviceLoginApproval.updateMany({
+          where: {
+            id: approval.id,
+            status: 'pending',
+            expiresAt: {
+              lte: now,
+            },
+          },
+          data: {
+            status: 'expired',
+            respondedAt: now,
+          },
+        });
+
+        if (transition.count === 0) {
+          return;
+        }
+
+        await this.eventBus.publish({
+          type: 'DeviceLoginApprovalExpired',
+          eventId: randomUUID(),
+          occurredAt: now.toISOString(),
+          actorType: 'system',
+          actorId: 'system',
+          payload: {
+            approvalId: approval.id,
+            userId: approval.userId,
+            expiredAt: now.toISOString(),
+          },
+        });
+      }),
+    );
   }
 
   private async completePendingDeviceLoginApprovals(
     userId: string,
     fingerprintHash: string,
+    deviceId: string,
   ): Promise<void> {
-    await this.prisma.deviceLoginApproval.updateMany({
+    const approvals = await this.prisma.deviceLoginApproval.findMany({
       where: {
         userId,
         fingerprintHash,
         status: 'pending',
       },
-      data: {
-        status: 'completed',
-        respondedAt: new Date(),
+      select: {
+        id: true,
       },
     });
+
+    if (approvals.length === 0) {
+      return;
+    }
+
+    const now = new Date();
+    await Promise.all(
+      approvals.map(async (approval) => {
+        const transition = await this.prisma.deviceLoginApproval.updateMany({
+          where: {
+            id: approval.id,
+            status: 'pending',
+          },
+          data: {
+            status: 'completed',
+            respondedAt: now,
+          },
+        });
+
+        if (transition.count === 0) {
+          return;
+        }
+
+        await this.eventBus.publish({
+          type: 'DeviceLoginApprovalCompleted',
+          eventId: randomUUID(),
+          occurredAt: now.toISOString(),
+          actorType: 'user',
+          actorId: userId,
+          payload: {
+            approvalId: approval.id,
+            userId,
+            deviceId,
+          },
+        });
+      }),
+    );
   }
 
   private toLoginDeviceApproval(approval: {

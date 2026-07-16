@@ -85,6 +85,21 @@ export class LoginDto {
   @IsString()
   @MaxLength(80)
   deviceLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  client_id?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  redirect_uri?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  state?: string;
 }
 
 export class LoginRedirectQueryDto {

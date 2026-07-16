@@ -18,7 +18,11 @@ import {
   UpdateAccountAvatarDto,
   UpdateAccountPreferencesDto,
 } from './dto.js';
-import { IdentityService } from './identity.service.js';
+import {
+  IdentityService,
+  type LoginRedirectValidationResult,
+  type LoginResult,
+} from './identity.service.js';
 
 @Controller('auth')
 export class IdentityController {
@@ -69,6 +73,30 @@ export class IdentityController {
     return this.identityService.validateLoginRedirect(query);
   }
 
+  @Post('login/client-session/current')
+  async createCurrentClientSession(
+    @Body() dto: LoginRedirectQueryDto,
+    @Req() request: ApiRequestLike,
+    @Res({ passthrough: true }) response: ApiResponseLike,
+  ) {
+    const session = await this.sessionAuth.requireActiveSession(request);
+    const redirect = await this.identityService.validateLoginRedirect(dto);
+
+    await this.sessionAuth.createClientApplicationSession(
+      session.user.id,
+      redirect.clientApplication.clientId,
+      request,
+      response,
+      {
+        localSessionPreserved: true,
+      },
+    );
+
+    return {
+      ok: true,
+    };
+  }
+
   @Options('client-session')
   async clientSessionPreflight(
     @Query() query: ClientSessionQueryDto,
@@ -91,7 +119,10 @@ export class IdentityController {
   ) {
     const access = await this.identityService.validateClientApplicationAccess(query, request);
     this.writeClientSessionCorsHeaders(response, access.allowedOrigin);
-    const user = await this.sessionAuth.getCurrentUser(request);
+    const user = await this.sessionAuth.getClientApplicationUser(
+      request,
+      access.clientApplication.clientId,
+    );
 
     return this.identityService.createClientSessionValidationResult(access, user);
   }
@@ -103,14 +134,13 @@ export class IdentityController {
     @Req() request: ApiRequestLike,
     @Res({ passthrough: true }) response: ApiResponseLike,
   ) {
+    const redirect = await this.validateOptionalLoginRedirect(dto);
     const result = await this.identityService.checkDeviceLoginVerification(
       challengeId,
       dto,
       request,
     );
-    if (result.nextAction === 'authenticated' || result.nextAction === 'account_status') {
-      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id);
-    }
+    await this.completeLoginSession(result, redirect, request, response);
 
     return result;
   }
@@ -122,10 +152,9 @@ export class IdentityController {
     @Req() request: ApiRequestLike,
     @Res({ passthrough: true }) response: ApiResponseLike,
   ) {
+    const redirect = await this.validateOptionalLoginRedirect(dto);
     const result = await this.identityService.checkDeviceLoginApproval(approvalId, dto, request);
-    if (result.nextAction === 'authenticated') {
-      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id);
-    }
+    await this.completeLoginSession(result, redirect, request, response);
 
     return result;
   }
@@ -136,10 +165,9 @@ export class IdentityController {
     @Req() request: ApiRequestLike,
     @Res({ passthrough: true }) response: ApiResponseLike,
   ) {
+    const redirect = await this.validateOptionalLoginRedirect(dto);
     const result = await this.identityService.login(dto, request);
-    if (result.nextAction === 'authenticated' || result.nextAction === 'account_status') {
-      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id);
-    }
+    await this.completeLoginSession(result, redirect, request, response);
 
     return result;
   }
@@ -327,5 +355,44 @@ export class IdentityController {
     response.setHeader('Access-Control-Allow-Credentials', 'true');
     response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+
+  private async completeLoginSession(
+    result: LoginResult,
+    redirect: LoginRedirectValidationResult | null,
+    request: ApiRequestLike,
+    response: ApiResponseLike,
+  ): Promise<void> {
+    if (result.nextAction !== 'authenticated' && result.nextAction !== 'account_status') {
+      return;
+    }
+
+    if (!redirect) {
+      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id);
+      return;
+    }
+
+    const localSession = await this.sessionAuth.getCurrentSession(request);
+
+    if (!localSession) {
+      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id);
+    }
+
+    await this.sessionAuth.createClientApplicationSession(
+      result.user.id,
+      redirect.clientApplication.clientId,
+      request,
+      response,
+      {
+        localSessionPreserved: Boolean(localSession),
+      },
+    );
+  }
+
+  private async validateOptionalLoginRedirect(
+    dto: LoginDto,
+  ): Promise<LoginRedirectValidationResult | null> {
+    const hasExternalRedirect = Boolean(dto.client_id?.trim() || dto.redirect_uri?.trim());
+    return hasExternalRedirect ? this.identityService.validateLoginRedirect(dto) : null;
   }
 }
