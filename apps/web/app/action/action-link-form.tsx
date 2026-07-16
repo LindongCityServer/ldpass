@@ -6,6 +6,7 @@ import { ApiClientError, getJson, postJson } from '../api-client';
 type ActionKind = 'use' | 'top_up';
 type BenefitType = 'amount' | 'points' | 'times';
 type VerificationMethod = 'server_account' | 'pin';
+type SelectionScope = 'same_provider' | 'top_up_sources' | 'all_authorized';
 
 interface WalletPassPreview {
   id: string;
@@ -32,13 +33,15 @@ interface ActionLinkPreviewResponse {
     kind: ActionKind;
     status: string;
     providerName: string;
-    targetPassId: string;
+    targetPassId: string | null;
+    selectionScope: SelectionScope | null;
     requestedValue: string;
     verificationMethod: VerificationMethod;
     note: string | null;
     expiresAt: string;
   };
-  targetPass: WalletPassPreview;
+  targetPass: WalletPassPreview | null;
+  selectablePasses: WalletPassPreview[];
   sourcePasses: WalletPassPreview[];
 }
 
@@ -147,6 +150,7 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
   const [loginHref, setLoginHref] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pin, setPin] = useState('');
+  const [selectedTargetPassId, setSelectedTargetPassId] = useState('');
   const [selectedSourcePassId, setSelectedSourcePassId] = useState('');
   const [serverRedemption, setServerRedemption] = useState<NonNullable<
     ServerStartResponse['redemptionRequest']
@@ -183,6 +187,7 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
           `/api/wallet/action-links/preview?token=${encodeURIComponent(token)}`,
         );
         setPreview(result);
+        setSelectedTargetPassId(result.targetPass?.id ?? result.selectablePasses[0]?.id ?? '');
         setSelectedSourcePassId(result.sourcePasses[0]?.id ?? '');
         if (options.showReadyMessage) {
           setMessage('已读取链接信息，请确认后继续。');
@@ -231,6 +236,11 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
       return;
     }
 
+    if (preview.actionLink.kind === 'use' && !selectedTargetPassId) {
+      setMessage('当前没有可核销的卡券。');
+      return;
+    }
+
     setIsSubmittingPin(true);
     setMessage(null);
 
@@ -238,6 +248,7 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
       const result = await postJson<PinConfirmResponse>('/api/wallet/action-links/confirm-pin', {
         token: normalizedToken,
         pin,
+        targetPassId: selectedTargetPassId || undefined,
         sourcePassId: preview.actionLink.kind === 'top_up' ? selectedSourcePassId : undefined,
       });
       setPin('');
@@ -252,8 +263,8 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
       );
       setMessage(
         preview.actionLink.kind === 'top_up'
-          ? `额度补充成功：${formatBenefitValue(preview.actionLink.requestedValue, preview.targetPass.benefitType)}。`
-          : `确认使用成功：${formatBenefitValue(preview.actionLink.requestedValue, preview.targetPass.benefitType)}。`,
+          ? `额度补充成功：${formatBenefitValue(preview.actionLink.requestedValue, result.targetPass.benefitType)}。`
+          : `确认使用成功：${formatBenefitValue(preview.actionLink.requestedValue, result.targetPass.benefitType)}。`,
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '确认失败。');
@@ -273,6 +284,11 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
       return;
     }
 
+    if (preview.actionLink.kind === 'use' && !selectedTargetPassId) {
+      setMessage('当前没有可核销的卡券。');
+      return;
+    }
+
     setIsStartingServer(true);
     setMessage(null);
 
@@ -281,8 +297,18 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
         '/api/wallet/action-links/server-redemption/start',
         {
           token: normalizedToken,
+          targetPassId: selectedTargetPassId || undefined,
           sourcePassId: preview.actionLink.kind === 'top_up' ? selectedSourcePassId : undefined,
         },
+      );
+      setPreview((currentPreview) =>
+        currentPreview
+          ? {
+              ...currentPreview,
+              actionLink: startResult.actionLink,
+              targetPass: startResult.targetPass,
+            }
+          : currentPreview,
       );
 
       if (startResult.mode === 'top_up') {
@@ -396,7 +422,7 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
         setTopUpRequest(result.topUpRequest ?? null);
         setServerChallenge(null);
         setMessage(
-          `额度补充成功：${formatBenefitValue(preview.actionLink.requestedValue, preview.targetPass.benefitType)}。`,
+          `额度补充成功：${formatBenefitValue(preview.actionLink.requestedValue, result.targetPass?.benefitType ?? 'amount')}。`,
         );
         return;
       }
@@ -447,7 +473,7 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
           : currentPreview,
       );
       setMessage(
-        `确认使用成功：${formatBenefitValue(preview?.actionLink.requestedValue ?? '0', preview?.targetPass.benefitType ?? 'amount')}。`,
+        `确认使用成功：${formatBenefitValue(preview.actionLink.requestedValue, completeResult.targetPass.benefitType)}。`,
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '检查服务器确认失败。');
@@ -516,6 +542,12 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
       {preview ? (
         <ActionPreview
           preview={preview}
+          selectedTargetPassId={selectedTargetPassId}
+          onSelectTargetPass={(passId) => {
+            setSelectedTargetPassId(passId);
+            setServerRedemption(null);
+            setServerChallenge(null);
+          }}
           selectedSourcePassId={selectedSourcePassId}
           onSelectSourcePass={(passId) => {
             setSelectedSourcePassId(passId);
@@ -630,13 +662,21 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
 
 function ActionPreview({
   preview,
+  selectedTargetPassId,
+  onSelectTargetPass,
   selectedSourcePassId,
   onSelectSourcePass,
 }: {
   preview: ActionLinkPreviewResponse;
+  selectedTargetPassId: string;
+  onSelectTargetPass: (passId: string) => void;
   selectedSourcePassId: string;
   onSelectSourcePass: (passId: string) => void;
 }) {
+  const targetPass =
+    preview.targetPass ??
+    preview.selectablePasses.find((pass) => pass.id === selectedTargetPassId) ??
+    null;
   const requirements = [
     preview.actionLink.verificationMethod === 'pin'
       ? '需要输入 PIN 确认'
@@ -646,17 +686,44 @@ function ActionPreview({
       : '将从目标卡消耗额度或权益',
   ];
 
+  if (!targetPass) {
+    return (
+      <section className="add-pass-preview" aria-label="链接操作预览">
+        <div className="flow-notice" role="status">
+          <span>当前没有符合此链接范围且可核销的卡券。</span>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section className={`add-pass-preview add-pass-preview-${preview.targetPass.category}`} aria-label="链接操作预览">
-      <ActionPreviewCardFace pass={preview.targetPass} />
+    <section
+      className={`add-pass-preview add-pass-preview-${targetPass.category}`}
+      aria-label="链接操作预览"
+    >
+      {preview.selectablePasses.length ? (
+        <label className="action-source-select">
+          <span>核销卡券</span>
+          <select
+            value={selectedTargetPassId}
+            onChange={(event) => onSelectTargetPass(event.target.value)}
+          >
+            {preview.selectablePasses.map((pass) => (
+              <option key={pass.id} value={pass.id}>
+                {pass.providerName} · {pass.displayName} ·{' '}
+                {formatBenefitValue(pass.balanceValue, pass.benefitType)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      <ActionPreviewCardFace pass={targetPass} />
       <div className="add-pass-preview-heading">
-        {preview.targetPass.logoUrl ? (
-          <img src={preview.targetPass.logoUrl} alt="" width={36} height={36} />
-        ) : null}
+        {targetPass.logoUrl ? <img src={targetPass.logoUrl} alt="" width={36} height={36} /> : null}
         <div>
-          <span>{preview.targetPass.providerName}</span>
-          <strong>{preview.targetPass.displayName}</strong>
-          {preview.targetPass.hideTitle === true ? null : <small>{preview.targetPass.title}</small>}
+          <span>{targetPass.providerName}</span>
+          <strong>{targetPass.displayName}</strong>
+          {targetPass.hideTitle === true ? null : <small>{targetPass.title}</small>}
         </div>
       </div>
       <dl>
@@ -666,15 +733,11 @@ function ActionPreview({
         </div>
         <div>
           <dt>{preview.actionLink.kind === 'top_up' ? '补充值' : '消耗值'}</dt>
-          <dd>
-            {formatBenefitValue(preview.actionLink.requestedValue, preview.targetPass.benefitType)}
-          </dd>
+          <dd>{formatBenefitValue(preview.actionLink.requestedValue, targetPass.benefitType)}</dd>
         </div>
         <div>
           <dt>当前值</dt>
-          <dd>
-            {formatBenefitValue(preview.targetPass.balanceValue, preview.targetPass.benefitType)}
-          </dd>
+          <dd>{formatBenefitValue(targetPass.balanceValue, targetPass.benefitType)}</dd>
         </div>
         <div>
           <dt>链接有效期</dt>
@@ -714,7 +777,11 @@ function ActionPreviewCardFace({ pass }: { pass: WalletPassPreview }) {
   return (
     <div
       className={`add-pass-preview-card add-pass-preview-card-${pass.category}${pass.backgroundImageUrl ? ' has-image' : ''}`}
-      style={pass.backgroundImageUrl ? { backgroundImage: `url("${pass.backgroundImageUrl}")` } : undefined}
+      style={
+        pass.backgroundImageUrl
+          ? { backgroundImage: `url("${pass.backgroundImageUrl}")` }
+          : undefined
+      }
       aria-hidden="true"
     >
       <small>{formatPassTailNumber(pass.maskedNumber ?? pass.publicNumber) ?? '**** 5678'}</small>

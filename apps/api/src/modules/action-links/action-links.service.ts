@@ -10,7 +10,12 @@ import {
   UnauthorizedException,
 } from '../../framework.js';
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
-import type { BenefitType, PassTopUpStatus, VerificationMethod } from '@ldpass/contracts';
+import type {
+  BenefitType,
+  PassTopUpStatus,
+  VerificationMethod,
+  WalletActionLinkSelectionScope,
+} from '@ldpass/contracts';
 import type { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
@@ -42,6 +47,13 @@ const walletActionTopUpReferencePrefix = 'wallet-action-top-up:';
 const actionLinkPayload = {
   include: {
     provider: true,
+    clientApplication: {
+      select: {
+        id: true,
+        clientId: true,
+        name: true,
+      },
+    },
     targetPass: {
       include: {
         provider: true,
@@ -67,6 +79,13 @@ const actionLinkPayload = {
 } satisfies Prisma.WalletActionLinkDefaultArgs;
 
 type WalletActionLinkRecord = Prisma.WalletActionLinkGetPayload<typeof actionLinkPayload>;
+type ResolvedWalletActionLinkRecord = Omit<
+  WalletActionLinkRecord,
+  'targetPassId' | 'targetPass'
+> & {
+  targetPassId: string;
+  targetPass: NonNullable<WalletActionLinkRecord['targetPass']>;
+};
 
 interface ActionLinkTopUpRequestSnapshot {
   id: string;
@@ -97,11 +116,114 @@ export class ActionLinksService {
     providerAccount: AuthenticatedProviderAccount,
   ) {
     const value = normalizePositiveDecimal(dto.requestedValue, '链接数值必须大于 0。');
+    const clientApplication = await this.readBoundClientApplication(
+      dto.clientId,
+      providerAccount.providerId,
+    );
+    const targetPass = dto.targetPassId
+      ? await this.readActionLinkTargetPass(dto.targetPassId, providerAccount.providerId)
+      : null;
 
+    if (!targetPass && dto.kind !== 'use') {
+      throw new BadRequestException('额度补充链接必须指定目标卡券。');
+    }
+
+    if (!targetPass && !dto.selectionScope) {
+      throw new BadRequestException('未指定目标卡券时必须设置用户选卡范围。');
+    }
+
+    if (targetPass && dto.selectionScope) {
+      throw new BadRequestException('已指定目标卡券时不能同时设置用户选卡范围。');
+    }
+
+    if (targetPass) {
+      this.assertActionLinkTargetPass(targetPass, dto.kind, value);
+    }
+
+    const token = createActionToken();
+    const expiresAt = new Date(
+      Date.now() + 1000 * (dto.expiresInSeconds ?? defaultActionLinkExpiresInSeconds),
+    );
+    const actionLink = await this.prisma.walletActionLink.create({
+      data: {
+        tokenHash: hashActionToken(token),
+        kind: dto.kind,
+        providerId: providerAccount.providerId,
+        clientApplicationId: clientApplication?.id ?? null,
+        targetPassId: targetPass?.id ?? null,
+        selectionScope: targetPass ? null : dto.selectionScope!,
+        requestedValue: value,
+        verificationMethod: dto.verificationMethod,
+        note: dto.note?.trim() || null,
+        expiresAt,
+        createdByType: 'provider',
+        createdById: providerAccount.id,
+      },
+      include: this.actionLinkInclude(),
+    });
+
+    await this.eventBus.publish({
+      type: 'WalletActionLinkCreated',
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actorType: 'provider',
+      actorId: providerAccount.id,
+      payload: {
+        actionLinkId: actionLink.id,
+        providerId: actionLink.providerId,
+        ...(actionLink.targetPassId ? { targetPassId: actionLink.targetPassId } : {}),
+        ...(actionLink.selectionScope ? { selectionScope: actionLink.selectionScope } : {}),
+        ...(actionLink.clientApplicationId
+          ? { clientApplicationId: actionLink.clientApplicationId }
+          : {}),
+        kind: actionLink.kind,
+        value,
+        verificationMethod: actionLink.verificationMethod,
+        expiresAt: actionLink.expiresAt.toISOString(),
+      },
+    });
+
+    return {
+      actionLink: this.toProviderActionLink(actionLink, token),
+    };
+  }
+
+  private async readBoundClientApplication(clientId: string | undefined, providerId: string) {
+    const normalizedClientId = clientId?.trim();
+    if (!normalizedClientId) {
+      return null;
+    }
+
+    const application = await this.prisma.clientApplication.findUnique({
+      where: { clientId: normalizedClientId },
+      select: {
+        id: true,
+        clientId: true,
+        enabled: true,
+        providerId: true,
+      },
+    });
+
+    if (!application || !application.enabled) {
+      throw new BadRequestException('回调应用不存在、尚未启用或已停用。');
+    }
+
+    if (!application.providerId) {
+      throw new BadRequestException('回调应用尚未绑定发卡方。');
+    }
+
+    if (application.providerId !== providerId) {
+      throw new ForbiddenException('回调应用绑定的发卡方与当前 API 身份不一致。');
+    }
+
+    return application;
+  }
+
+  private async readActionLinkTargetPass(targetPassId: string, providerId: string) {
     const targetPass = await this.prisma.pass.findFirst({
       where: {
-        id: dto.targetPassId,
-        providerId: providerAccount.providerId,
+        id: targetPassId,
+        providerId,
         archivedAt: null,
       },
       include: {
@@ -122,11 +244,19 @@ export class ActionLinksService {
       throw new NotFoundException('目标卡券不存在或不属于当前发卡方。');
     }
 
+    return targetPass;
+  }
+
+  private assertActionLinkTargetPass(
+    targetPass: Awaited<ReturnType<ActionLinksService['readActionLinkTargetPass']>>,
+    kind: 'use' | 'top_up',
+    value: string,
+  ): void {
     if (!targetPass.userId || !targetPass.user) {
       throw new BadRequestException('目标卡券尚未被用户领取，不能生成操作链接。');
     }
 
-    if (dto.kind === 'use') {
+    if (kind === 'use') {
       if (targetPass.status !== 'Added' && targetPass.status !== 'Active') {
         throw new BadRequestException('当前卡券状态不能生成消耗链接。');
       }
@@ -141,58 +271,16 @@ export class ActionLinksService {
       ) {
         throw new BadRequestException('当前卡券可用额度不足，不能生成该消耗链接。');
       }
+      return;
     }
 
-    if (dto.kind === 'top_up') {
-      if (targetPass.status !== 'Active') {
-        throw new BadRequestException('只有正常可用的卡券可以作为额度补充目标。');
-      }
-
-      if (!readAllowTopUpIn(targetPass.templateVersion.rules)) {
-        throw new BadRequestException('目标卡的发行方未开放额度补充。');
-      }
+    if (targetPass.status !== 'Active') {
+      throw new BadRequestException('只有正常可用的卡券可以作为额度补充目标。');
     }
 
-    const token = createActionToken();
-    const expiresAt = new Date(
-      Date.now() + 1000 * (dto.expiresInSeconds ?? defaultActionLinkExpiresInSeconds),
-    );
-    const actionLink = await this.prisma.walletActionLink.create({
-      data: {
-        tokenHash: hashActionToken(token),
-        kind: dto.kind,
-        providerId: providerAccount.providerId,
-        targetPassId: targetPass.id,
-        requestedValue: value,
-        verificationMethod: dto.verificationMethod,
-        note: dto.note?.trim() || null,
-        expiresAt,
-        createdByType: 'provider',
-        createdById: providerAccount.id,
-      },
-      include: this.actionLinkInclude(),
-    });
-
-    await this.eventBus.publish({
-      type: 'WalletActionLinkCreated',
-      eventId: randomUUID(),
-      occurredAt: new Date().toISOString(),
-      actorType: 'provider',
-      actorId: providerAccount.id,
-      payload: {
-        actionLinkId: actionLink.id,
-        providerId: actionLink.providerId,
-        targetPassId: actionLink.targetPassId,
-        kind: actionLink.kind,
-        value,
-        verificationMethod: actionLink.verificationMethod,
-        expiresAt: actionLink.expiresAt.toISOString(),
-      },
-    });
-
-    return {
-      actionLink: this.toProviderActionLink(actionLink, token),
-    };
+    if (!readAllowTopUpIn(targetPass.templateVersion.rules)) {
+      throw new BadRequestException('目标卡的发行方未开放额度补充。');
+    }
   }
 
   async listProviderActionLinks(
@@ -383,16 +471,22 @@ export class ActionLinksService {
   }
 
   async previewWalletActionLink(token: string, user: AuthenticatedUser) {
-    const actionLink = await this.readActiveActionLinkForUser(token, user);
+    const storedActionLink = await this.readActiveActionLink(token);
+    const actionLink = storedActionLink.targetPassId
+      ? await this.resolveActionLinkTargetForUser(storedActionLink, user)
+      : storedActionLink;
+    const selectablePasses = storedActionLink.targetPassId
+      ? []
+      : await this.listSelectableTargetPasses(storedActionLink, user);
     const sourcePasses =
-      actionLink.kind === 'top_up'
+      actionLink.kind === 'top_up' && actionLink.targetPass
         ? await this.prisma.pass.findMany({
             where: {
               userId: user.id,
               archivedAt: null,
               status: 'Active',
               id: {
-                not: actionLink.targetPassId,
+                not: actionLink.targetPassId!,
               },
             },
             include: {
@@ -409,10 +503,12 @@ export class ActionLinksService {
 
     return {
       actionLink: this.toWalletActionLink(actionLink),
-      targetPass: this.toWalletPass(actionLink.targetPass),
+      targetPass: actionLink.targetPass ? this.toWalletPass(actionLink.targetPass) : null,
+      selectablePasses: selectablePasses.map((pass) => this.toWalletPass(pass)),
       sourcePasses: sourcePasses
         .filter(
           (pass) =>
+            actionLink.targetPass &&
             pass.template.benefitType === actionLink.targetPass.template.benefitType &&
             readAllowTopUpOut(pass.templateVersion.rules),
         )
@@ -424,7 +520,7 @@ export class ActionLinksService {
     dto: ConfirmWalletActionLinkWithPinDto,
     user: AuthenticatedUser,
   ) {
-    const actionLink = await this.readActiveActionLinkForUser(dto.token, user);
+    let actionLink = await this.readActiveActionLinkForUser(dto.token, user, dto.targetPassId);
 
     if (actionLink.verificationMethod !== 'pin') {
       throw new BadRequestException('该链接需要使用服务器账号确认。');
@@ -432,6 +528,7 @@ export class ActionLinksService {
 
     if (actionLink.kind === 'use') {
       await this.verifyUserPin(user, dto.pin, actionLink.id, 'pass_use');
+      actionLink = await this.lockSelectedActionLinkTarget(actionLink, user);
       return this.confirmUseActionLink(actionLink, user);
     }
 
@@ -463,7 +560,7 @@ export class ActionLinksService {
     dto: StartWalletActionLinkServerRedemptionDto,
     user: AuthenticatedUser,
   ) {
-    const actionLink = await this.readActiveActionLinkForUser(dto.token, user);
+    let actionLink = await this.readActiveActionLinkForUser(dto.token, user, dto.targetPassId);
 
     if (actionLink.verificationMethod !== 'server_account') {
       throw new BadRequestException('该链接不需要服务器账号确认。');
@@ -472,6 +569,7 @@ export class ActionLinksService {
     this.ensureUserCanUseServerConfirmation(user);
 
     if (actionLink.kind === 'use') {
+      actionLink = await this.lockSelectedActionLinkTarget(actionLink, user);
       const redemptionRequest = await this.createOrReadRedemptionRequestForActionLink(
         actionLink,
         user,
@@ -775,11 +873,7 @@ export class ActionLinksService {
     };
   }
 
-  async cancelTopUpActionLinkRequest(
-    user: AuthenticatedUser,
-    topUpId: string,
-    reason?: string,
-  ) {
+  async cancelTopUpActionLinkRequest(user: AuthenticatedUser, topUpId: string, reason?: string) {
     const topUpRequest = await this.prisma.passTopUpRequest.findFirst({
       where: {
         id: topUpId,
@@ -795,7 +889,9 @@ export class ActionLinksService {
     }
 
     if (topUpRequest.status === 'Succeeded' || topUpRequest.status === 'Reversed') {
-      throw new BadRequestException('已完成的额度补充不能取消，如需处理请提交争议或联系管理员冲正。');
+      throw new BadRequestException(
+        '已完成的额度补充不能取消，如需处理请提交争议或联系管理员冲正。',
+      );
     }
 
     if (topUpRequest.status === 'Cancelled') {
@@ -859,7 +955,10 @@ export class ActionLinksService {
     };
   }
 
-  private async confirmUseActionLink(actionLink: WalletActionLinkRecord, user: AuthenticatedUser) {
+  private async confirmUseActionLink(
+    actionLink: ResolvedWalletActionLinkRecord,
+    user: AuthenticatedUser,
+  ) {
     const redemptionRequest = await this.createOrReadRedemptionRequestForActionLink(
       actionLink,
       user,
@@ -1004,7 +1103,7 @@ export class ActionLinksService {
     });
 
     await this.publishUseSucceededEvents({
-      actionLink: result.consumedLink,
+      actionLink: result.consumedLink as ResolvedWalletActionLinkRecord,
       redemptionRequestId: result.redemptionRequest.id,
       ledgerEntryId: result.ledgerEntry.id,
       userId: user.id,
@@ -1032,7 +1131,7 @@ export class ActionLinksService {
   }
 
   private async confirmTopUpActionLink(
-    actionLink: WalletActionLinkRecord,
+    actionLink: ResolvedWalletActionLinkRecord,
     user: AuthenticatedUser,
     sourcePassId: string,
     topUpRequest: ActionLinkTopUpRequestSnapshot,
@@ -1234,7 +1333,7 @@ export class ActionLinksService {
     });
 
     await this.publishTopUpSucceededEvents({
-      actionLink: result.consumedLink,
+      actionLink: result.consumedLink as ResolvedWalletActionLinkRecord,
       topUpId: topUpRequest.id,
       userId: user.id,
       value,
@@ -1277,7 +1376,7 @@ export class ActionLinksService {
   }
 
   private async createActionLinkTopUpRequest(
-    actionLink: WalletActionLinkRecord,
+    actionLink: ResolvedWalletActionLinkRecord,
     user: AuthenticatedUser,
     sourcePassId: string,
     verificationMethod: VerificationMethod,
@@ -1348,7 +1447,7 @@ export class ActionLinksService {
   }
 
   private async readTopUpSourcePass(
-    actionLink: WalletActionLinkRecord,
+    actionLink: ResolvedWalletActionLinkRecord,
     user: AuthenticatedUser,
     sourcePassId: string,
   ) {
@@ -1409,7 +1508,7 @@ export class ActionLinksService {
       actionLinkId: string | null;
       requestedValue: { toString(): string };
     },
-    actionLink: WalletActionLinkRecord,
+    actionLink: ResolvedWalletActionLinkRecord,
     sourcePassId: string,
   ): void {
     if (
@@ -1856,7 +1955,7 @@ export class ActionLinksService {
   }
 
   private async createOrReadRedemptionRequestForActionLink(
-    actionLink: WalletActionLinkRecord,
+    actionLink: ResolvedWalletActionLinkRecord,
     user: AuthenticatedUser,
   ) {
     const idempotencyKey = this.useRedemptionIdempotencyKey(actionLink.id);
@@ -1934,8 +2033,17 @@ export class ActionLinksService {
     return redemptionRequest;
   }
 
-  private async readActiveActionLinkForUser(token: string, user: AuthenticatedUser) {
-    const actionLink = await this.readActionLinkForUser(token, user);
+  private async readActiveActionLinkForUser(
+    token: string,
+    user: AuthenticatedUser,
+    targetPassId?: string,
+  ): Promise<ResolvedWalletActionLinkRecord> {
+    const actionLink = await this.readActiveActionLink(token);
+    return this.resolveActionLinkTargetForUser(actionLink, user, targetPassId);
+  }
+
+  private async readActiveActionLink(token: string): Promise<WalletActionLinkRecord> {
+    const actionLink = await this.readActionLink(token);
 
     if (actionLink.status === 'Consumed') {
       throw new BadRequestException('该操作链接已经被使用。');
@@ -1953,7 +2061,15 @@ export class ActionLinksService {
     return actionLink;
   }
 
-  private async readActionLinkForUser(token: string, user: AuthenticatedUser) {
+  private async readActionLinkForUser(
+    token: string,
+    user: AuthenticatedUser,
+  ): Promise<ResolvedWalletActionLinkRecord> {
+    const actionLink = await this.readActionLink(token);
+    return this.resolveActionLinkTargetForUser(actionLink, user);
+  }
+
+  private async readActionLink(token: string): Promise<WalletActionLinkRecord> {
     const actionLink = await this.prisma.walletActionLink.findUnique({
       where: {
         tokenHash: hashActionToken(token),
@@ -1965,11 +2081,179 @@ export class ActionLinksService {
       throw new NotFoundException('操作链接不存在。');
     }
 
-    if (actionLink.targetPass.userId !== user.id) {
-      throw new ForbiddenException('该操作链接不属于当前登录用户。');
+    return actionLink;
+  }
+
+  private async resolveActionLinkTargetForUser(
+    actionLink: WalletActionLinkRecord,
+    user: AuthenticatedUser,
+    selectedTargetPassId?: string,
+  ): Promise<ResolvedWalletActionLinkRecord> {
+    if (actionLink.targetPassId && actionLink.targetPass) {
+      if (actionLink.targetPass.userId !== user.id) {
+        throw new ForbiddenException('该操作链接不属于当前登录用户。');
+      }
+
+      return actionLink as ResolvedWalletActionLinkRecord;
     }
 
-    return actionLink;
+    if (!actionLink.selectionScope) {
+      throw new BadRequestException('该操作链接的目标卡券已不存在。');
+    }
+
+    if (!selectedTargetPassId) {
+      throw new BadRequestException('请选择要核销的卡券。');
+    }
+
+    const selectedPass = await this.prisma.pass.findFirst({
+      where: {
+        id: selectedTargetPassId,
+        userId: user.id,
+        archivedAt: null,
+      },
+      include: {
+        provider: true,
+        template: true,
+        templateVersion: true,
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!selectedPass || !this.isSelectableTargetPass(actionLink, selectedPass)) {
+      throw new ForbiddenException('所选卡券不在该链接允许的核销范围内。');
+    }
+
+    return {
+      ...actionLink,
+      targetPassId: selectedPass.id,
+      targetPass: selectedPass,
+    };
+  }
+
+  private async listSelectableTargetPasses(
+    actionLink: WalletActionLinkRecord,
+    user: AuthenticatedUser,
+  ) {
+    const passes = await this.prisma.pass.findMany({
+      where: {
+        userId: user.id,
+        archivedAt: null,
+        status: { in: ['Added', 'Active'] },
+      },
+      include: {
+        provider: true,
+        template: true,
+        templateVersion: true,
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+    });
+
+    return passes.filter((pass) => this.isSelectableTargetPass(actionLink, pass));
+  }
+
+  private isSelectableTargetPass(
+    actionLink: WalletActionLinkRecord,
+    pass: {
+      providerId: string;
+      status: string;
+      balanceValue: Prisma.Decimal;
+      frozenValue: Prisma.Decimal;
+      overdraftLimit: Prisma.Decimal;
+      templateVersion: { rules: Prisma.JsonValue };
+    },
+  ): boolean {
+    if (!actionLink.selectionScope) {
+      return false;
+    }
+
+    const providerCanRedeem =
+      pass.providerId === actionLink.providerId ||
+      readAllowedRedemptionProviderIds(pass.templateVersion.rules).includes(actionLink.providerId);
+    if (!providerCanRedeem) {
+      return false;
+    }
+
+    if (
+      actionLink.selectionScope === 'same_provider' &&
+      pass.providerId !== actionLink.providerId
+    ) {
+      return false;
+    }
+
+    if (
+      actionLink.selectionScope === 'top_up_sources' &&
+      (pass.status !== 'Active' || !readAllowTopUpOut(pass.templateVersion.rules))
+    ) {
+      return false;
+    }
+
+    return canConsumeValue(
+      pass.balanceValue.toString(),
+      pass.frozenValue.toString(),
+      pass.overdraftLimit.toString(),
+      actionLink.requestedValue.toString(),
+    );
+  }
+
+  private async lockSelectedActionLinkTarget(
+    actionLink: ResolvedWalletActionLinkRecord,
+    user: AuthenticatedUser,
+  ): Promise<ResolvedWalletActionLinkRecord> {
+    if (!actionLink.selectionScope) {
+      return actionLink;
+    }
+
+    const transition = await this.prisma.walletActionLink.updateMany({
+      where: {
+        id: actionLink.id,
+        status: 'Active',
+        targetPassId: null,
+      },
+      data: {
+        targetPassId: actionLink.targetPassId,
+      },
+    });
+    const lockedLink = await this.prisma.walletActionLink.findUnique({
+      where: { id: actionLink.id },
+      include: this.actionLinkInclude(),
+    });
+
+    if (!lockedLink || lockedLink.targetPassId !== actionLink.targetPassId) {
+      throw new ConflictException('该链接已由其他用户选择了目标卡券。');
+    }
+
+    if (transition.count > 0) {
+      await this.eventBus.publish({
+        type: 'WalletActionLinkTargetSelected',
+        eventId: randomUUID(),
+        occurredAt: new Date().toISOString(),
+        actorType: 'user',
+        actorId: user.id,
+        payload: {
+          actionLinkId: lockedLink.id,
+          providerId: lockedLink.providerId,
+          userId: user.id,
+          targetPassId: actionLink.targetPassId,
+          selectionScope: actionLink.selectionScope,
+        },
+      });
+    }
+
+    return this.resolveActionLinkTargetForUser(lockedLink, user);
   }
 
   private async verifyUserPin(
@@ -2010,7 +2294,7 @@ export class ActionLinksService {
   }
 
   private async consumeActionLink(
-    actionLink: WalletActionLinkRecord,
+    actionLink: ResolvedWalletActionLinkRecord,
     user: AuthenticatedUser,
     referenceType: 'redemption_request' | 'pass_top_up',
     referenceId: string,
@@ -2019,7 +2303,7 @@ export class ActionLinksService {
       return actionLink;
     }
 
-    const consumedLink = await this.prisma.walletActionLink.update({
+    const consumedLink = (await this.prisma.walletActionLink.update({
       where: {
         id: actionLink.id,
       },
@@ -2029,7 +2313,7 @@ export class ActionLinksService {
         consumedAt: new Date(),
       },
       include: this.actionLinkInclude(),
-    });
+    })) as ResolvedWalletActionLinkRecord;
 
     await this.publishActionLinkConsumed(consumedLink, user.id, referenceType, referenceId);
     return consumedLink;
@@ -2059,7 +2343,8 @@ export class ActionLinksService {
       payload: {
         actionLinkId: expiredLink.id,
         providerId: expiredLink.providerId,
-        targetPassId: expiredLink.targetPassId,
+        ...(expiredLink.targetPassId ? { targetPassId: expiredLink.targetPassId } : {}),
+        ...(expiredLink.selectionScope ? { selectionScope: expiredLink.selectionScope } : {}),
         kind: expiredLink.kind,
       },
     });
@@ -2224,7 +2509,7 @@ export class ActionLinksService {
   }
 
   private async publishUseSucceededEvents(input: {
-    actionLink: WalletActionLinkRecord;
+    actionLink: ResolvedWalletActionLinkRecord;
     redemptionRequestId: string;
     ledgerEntryId: string;
     userId: string;
@@ -2276,7 +2561,7 @@ export class ActionLinksService {
   }
 
   private async publishTopUpSucceededEvents(input: {
-    actionLink: WalletActionLinkRecord;
+    actionLink: ResolvedWalletActionLinkRecord;
     topUpId: string;
     userId: string;
     value: string;
@@ -2357,7 +2642,7 @@ export class ActionLinksService {
   }
 
   private async publishActionLinkConsumed(
-    actionLink: WalletActionLinkRecord,
+    actionLink: ResolvedWalletActionLinkRecord,
     userId: string,
     referenceType: 'redemption_request' | 'pass_top_up',
     referenceId: string,
@@ -2396,7 +2681,8 @@ export class ActionLinksService {
       payload: {
         actionLinkId: actionLink.id,
         providerId: actionLink.providerId,
-        targetPassId: actionLink.targetPassId,
+        ...(actionLink.targetPassId ? { targetPassId: actionLink.targetPassId } : {}),
+        ...(actionLink.selectionScope ? { selectionScope: actionLink.selectionScope } : {}),
         kind: actionLink.kind,
         reason,
       },
@@ -2424,20 +2710,22 @@ export class ActionLinksService {
       ...this.toWalletActionLink(actionLink),
       revokedAt: actionLink.revokedAt?.toISOString() ?? null,
       revokeReason: actionLink.revokeReason,
-      targetPass: {
-        id: actionLink.targetPass.id,
-        displayName:
-          readVersionDisplayName(actionLink.targetPass.templateVersion.fields) ??
-          actionLink.targetPass.template.displayName,
-        title: actionLink.targetPass.templateVersion.title,
-        category: actionLink.targetPass.template.category,
-        benefitType: actionLink.targetPass.template.benefitType,
-        status: actionLink.targetPass.status,
-        publicNumber: actionLink.targetPass.publicNumber,
-        maskedNumber: actionLink.targetPass.maskedNumber,
-        balanceValue: actionLink.targetPass.balanceValue.toString(),
-        user: actionLink.targetPass.user,
-      },
+      targetPass: actionLink.targetPass
+        ? {
+            id: actionLink.targetPass.id,
+            displayName:
+              readVersionDisplayName(actionLink.targetPass.templateVersion.fields) ??
+              actionLink.targetPass.template.displayName,
+            title: actionLink.targetPass.templateVersion.title,
+            category: actionLink.targetPass.template.category,
+            benefitType: actionLink.targetPass.template.benefitType,
+            status: actionLink.targetPass.status,
+            publicNumber: actionLink.targetPass.publicNumber,
+            maskedNumber: actionLink.targetPass.maskedNumber,
+            balanceValue: actionLink.targetPass.balanceValue.toString(),
+            user: actionLink.targetPass.user,
+          }
+        : null,
       consumedByUser: actionLink.consumedByUser,
     };
   }
@@ -2450,6 +2738,8 @@ export class ActionLinksService {
       providerId: actionLink.providerId,
       providerName: actionLink.provider.name,
       targetPassId: actionLink.targetPassId,
+      selectionScope: actionLink.selectionScope,
+      clientApplication: actionLink.clientApplication,
       requestedValue: actionLink.requestedValue.toString(),
       verificationMethod: actionLink.verificationMethod,
       note: actionLink.note,
@@ -2571,6 +2861,20 @@ function readAllowTopUpOut(value: unknown): boolean {
   }
 
   return (value as { allowTopUpOut?: unknown }).allowTopUpOut === true;
+}
+
+function readAllowedRedemptionProviderIds(value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+
+  const candidate = (value as { allowedRedemptionProviderIds?: unknown })
+    .allowedRedemptionProviderIds;
+  if (!Array.isArray(candidate)) {
+    return [];
+  }
+
+  return candidate.filter((item): item is string => typeof item === 'string' && item.length > 0);
 }
 
 function normalizePositiveDecimal(value: string, message = '数值必须大于 0。'): string {

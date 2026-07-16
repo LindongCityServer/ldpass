@@ -140,7 +140,13 @@ interface ProviderActionLink {
   kind: 'use' | 'top_up';
   status: string;
   providerName: string;
-  targetPassId: string;
+  targetPassId: string | null;
+  selectionScope: 'same_provider' | 'top_up_sources' | 'all_authorized' | null;
+  clientApplication: {
+    id: string;
+    clientId: string;
+    name: string;
+  } | null;
   requestedValue: string;
   verificationMethod: 'server_account' | 'pin';
   note: string | null;
@@ -163,7 +169,7 @@ interface ProviderActionLink {
     | 'maskedNumber'
     | 'balanceValue'
     | 'user'
-  >;
+  > | null;
   consumedByUser: ProviderPassUser | null;
 }
 
@@ -210,6 +216,11 @@ export function ProviderPassesPanel() {
   const [consumeExpiresInSeconds, setConsumeExpiresInSeconds] = useState('120');
   const [consumeMaxVerificationAttempts, setConsumeMaxVerificationAttempts] = useState('3');
   const [actionLinkKind, setActionLinkKind] = useState<'use' | 'top_up'>('use');
+  const [actionLinkTargetMode, setActionLinkTargetMode] = useState<'current' | 'select'>('current');
+  const [actionLinkSelectionScope, setActionLinkSelectionScope] = useState<
+    'same_provider' | 'top_up_sources' | 'all_authorized'
+  >('same_provider');
+  const [actionLinkClientId, setActionLinkClientId] = useState('');
   const [actionLinkValue, setActionLinkValue] = useState('');
   const [actionLinkMethod, setActionLinkMethod] = useState<'server_account' | 'pin'>('pin');
   const [actionLinkExpiresInSeconds, setActionLinkExpiresInSeconds] = useState('900');
@@ -583,8 +594,13 @@ export function ProviderPassesPanel() {
       return;
     }
 
-    if (!selectedPass.user) {
+    if (actionLinkTargetMode === 'current' && !selectedPass.user) {
       setMessage('卡券尚未被用户领取，不能生成操作链接。');
+      return;
+    }
+
+    if (actionLinkKind === 'top_up' && actionLinkTargetMode !== 'current') {
+      setMessage('额度补充链接必须指定目标卡券。');
       return;
     }
 
@@ -600,7 +616,9 @@ export function ProviderPassesPanel() {
     try {
       const result = await postJson<CreateActionLinkResponse>('/api/provider/action-links', {
         kind: actionLinkKind,
-        targetPassId: selectedPass.id,
+        targetPassId: actionLinkTargetMode === 'current' ? selectedPass.id : undefined,
+        selectionScope: actionLinkTargetMode === 'select' ? actionLinkSelectionScope : undefined,
+        clientId: actionLinkClientId.trim() || undefined,
         requestedValue: actionLinkValue.trim(),
         verificationMethod: actionLinkMethod,
         expiresInSeconds: Number(actionLinkExpiresInSeconds || '900'),
@@ -1165,11 +1183,56 @@ export function ProviderPassesPanel() {
                     onChange={(event) => {
                       const nextKind = event.target.value as 'use' | 'top_up';
                       setActionLinkKind(nextKind);
+                      if (nextKind === 'top_up') {
+                        setActionLinkTargetMode('current');
+                      }
                     }}
                   >
                     <option value="use">确认使用</option>
                     <option value="top_up">额度补充</option>
                   </select>
+                </label>
+                <label>
+                  <span>目标卡券</span>
+                  <select
+                    value={actionLinkTargetMode}
+                    onChange={(event) =>
+                      setActionLinkTargetMode(event.target.value as 'current' | 'select')
+                    }
+                    disabled={actionLinkKind === 'top_up'}
+                  >
+                    <option value="current">当前卡券</option>
+                    <option value="select">由用户选择</option>
+                  </select>
+                </label>
+                {actionLinkTargetMode === 'select' ? (
+                  <label>
+                    <span>用户可选范围</span>
+                    <select
+                      value={actionLinkSelectionScope}
+                      onChange={(event) =>
+                        setActionLinkSelectionScope(
+                          event.target.value as
+                            | 'same_provider'
+                            | 'top_up_sources'
+                            | 'all_authorized',
+                        )
+                      }
+                    >
+                      <option value="same_provider">本发卡方卡券</option>
+                      <option value="top_up_sources">可作为充值来源的卡券</option>
+                      <option value="all_authorized">全部获授权卡券</option>
+                    </select>
+                  </label>
+                ) : null}
+                <label>
+                  <span>回调应用 client_id</span>
+                  <input
+                    value={actionLinkClientId}
+                    onChange={(event) => setActionLinkClientId(event.target.value)}
+                    maxLength={80}
+                    placeholder="可选"
+                  />
                 </label>
                 <label>
                   <span>{actionLinkKind === 'use' ? '消耗值' : '补充值'}</span>
@@ -1213,7 +1276,10 @@ export function ProviderPassesPanel() {
                 <button
                   className="primary-action"
                   type="submit"
-                  disabled={isCreatingActionLink || !selectedPass.user}
+                  disabled={
+                    isCreatingActionLink ||
+                    (actionLinkTargetMode === 'current' && !selectedPass.user)
+                  }
                 >
                   <span className="material-symbols-rounded" aria-hidden="true">
                     link
@@ -1349,15 +1415,22 @@ export function ProviderPassesPanel() {
                             <span>
                               {formatBenefitValue(
                                 actionLink.requestedValue,
-                                actionLink.targetPass.benefitType,
+                                actionLink.targetPass?.benefitType ?? 'amount',
                               )}{' '}
                               · {formatVerificationMethod(actionLink.verificationMethod)}
                             </span>
                             <small>
-                              {actionLink.targetPass.displayName} · 到期{' '}
-                              {formatDate(actionLink.expiresAt)} ·{' '}
-                              {actionLink.targetPass.user?.username ?? '未知用户'}
+                              {actionLink.targetPass
+                                ? `${actionLink.targetPass.displayName} · ${actionLink.targetPass.user?.username ?? '未知用户'}`
+                                : `用户选择 · ${formatActionLinkSelectionScope(actionLink.selectionScope)}`}{' '}
+                              · 到期 {formatDate(actionLink.expiresAt)}
                             </small>
+                            {actionLink.clientApplication ? (
+                              <small>
+                                回调应用：{actionLink.clientApplication.name}（
+                                {actionLink.clientApplication.clientId}）
+                              </small>
+                            ) : null}
                             {actionLink.revokeReason ? (
                               <small>撤销原因：{actionLink.revokeReason}</small>
                             ) : null}
@@ -1836,6 +1909,16 @@ function formatVerificationMethod(method: ProviderRedemptionRequest['verificatio
 
 function formatActionLinkKind(kind: ProviderActionLink['kind']): string {
   return kind === 'top_up' ? '额度补充' : '确认使用';
+}
+
+function formatActionLinkSelectionScope(scope: ProviderActionLink['selectionScope']): string {
+  const labels: Record<NonNullable<ProviderActionLink['selectionScope']>, string> = {
+    same_provider: '本发卡方卡券',
+    top_up_sources: '可作为充值来源的卡券',
+    all_authorized: '全部获授权卡券',
+  };
+
+  return scope ? labels[scope] : '未指定范围';
 }
 
 function formatActionLinkStatus(status: string): string {

@@ -17,8 +17,18 @@ export class CreateWalletActionLinkDto {
   @IsIn(['use', 'top_up'])
   kind!: 'use' | 'top_up';
 
+  @IsOptional()
   @IsUUID()
-  targetPassId!: string;
+  targetPassId?: string;
+
+  @IsOptional()
+  @IsIn(['same_provider', 'top_up_sources', 'all_authorized'])
+  selectionScope?: 'same_provider' | 'top_up_sources' | 'all_authorized';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  clientId?: string;
 
   @IsString()
   @Matches(/^\d+(\.\d{1,6})?$/)
@@ -91,6 +101,10 @@ export class ConfirmWalletActionLinkWithPinDto {
   @IsOptional()
   @IsUUID()
   sourcePassId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  targetPassId?: string;
 }
 
 export class StartWalletActionLinkServerRedemptionDto {
@@ -102,6 +116,10 @@ export class StartWalletActionLinkServerRedemptionDto {
   @IsOptional()
   @IsUUID()
   sourcePassId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  targetPassId?: string;
 }
 
 export class CompleteWalletActionLinkServerRedemptionDto {
