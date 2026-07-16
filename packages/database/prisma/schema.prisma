@@ -164,6 +164,12 @@ enum WalletActionLinkStatus {
   Revoked
 }
 
+enum WalletActionLinkSelectionScope {
+  same_provider
+  top_up_sources
+  all_authorized
+}
+
 enum PassTransferStatus {
   Pending
   Accepted
@@ -363,14 +369,23 @@ model UserAvatarChangeRequest {
 }
 
 model ClientApplication {
-  id               String   @id @default(uuid())
-  clientId         String   @unique
-  name             String
-  allowedRedirects Json
-  allowedOrigins   Json
-  enabled          Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                         String   @id @default(uuid())
+  clientId                   String   @unique
+  name                       String
+  providerId                 String?
+  createdByProviderAccountId String?
+  allowedRedirects           Json
+  allowedOrigins             Json
+  enabled                    Boolean  @default(true)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  provider                 Provider?          @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  createdByProviderAccount ProviderAccount?   @relation(fields: [createdByProviderAccountId], references: [id], onDelete: SetNull)
+  actionLinks              WalletActionLink[]
+
+  @@index([providerId, enabled, createdAt])
+  @@index([createdByProviderAccountId, createdAt])
 }
 
 model ServerVerificationChallenge {
@@ -397,19 +412,19 @@ model ServerVerificationChallenge {
 }
 
 model Provider {
-  id           String         @id @default(uuid())
-  name         String
-  slug         String         @unique
-  status       ProviderStatus @default(PendingReview)
-  source       String         @default("open_registration")
-  logoUrl      String?
+  id              String         @id @default(uuid())
+  name            String
+  slug            String         @unique
+  status          ProviderStatus @default(PendingReview)
+  source          String         @default("open_registration")
+  logoUrl         String?
   introductionUrl String?
-  contactName  String?
-  contactEmail String?
-  businessInfo String?
-  reviewReason String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  contactName     String?
+  contactEmail    String?
+  businessInfo    String?
+  reviewReason    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   templates                 PassTemplate[]
   passes                    Pass[]
@@ -423,6 +438,7 @@ model Provider {
   ledgerEntries             LedgerEntry[]
   redemptionRequests        RedemptionRequest[]
   actionLinks               WalletActionLink[]
+  clientApplications        ClientApplication[]
   ticketUpdateRequests      PassTicketUpdateRequest[]
   profileChangeRequests     ProviderProfileChangeRequest[]
 
@@ -440,13 +456,14 @@ model ProviderAccount {
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt
 
-  provider         Provider                  @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  sessions         ProviderAuthSession[]
-  apiKeys          ProviderApiKey[]
-  apiKeyChangeRequests ProviderApiKeyChangeRequest[]
-  webhookEndpoints ProviderWebhookEndpoint[]
-  webhookChangeRequests ProviderWebhookChangeRequest[]
-  profileChangeRequests ProviderProfileChangeRequest[]
+  provider                  Provider                       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  sessions                  ProviderAuthSession[]
+  apiKeys                   ProviderApiKey[]
+  apiKeyChangeRequests      ProviderApiKeyChangeRequest[]
+  webhookEndpoints          ProviderWebhookEndpoint[]
+  webhookChangeRequests     ProviderWebhookChangeRequest[]
+  profileChangeRequests     ProviderProfileChangeRequest[]
+  createdClientApplications ClientApplication[]
 
   @@unique([providerId, email])
   @@index([email, status])
@@ -483,8 +500,8 @@ model ProviderApiKey {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  provider           Provider                   @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  createdBy          ProviderAccount?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  provider           Provider                     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdBy          ProviderAccount?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
   changeRequest      ProviderApiKeyChangeRequest?
   idempotencyRecords OpenApiIdempotencyRecord[]
   rateLimitBuckets   OpenApiRateLimitBucket[]
@@ -573,9 +590,9 @@ model ProviderWebhookEndpoint {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  provider   Provider                  @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  createdBy  ProviderAccount?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  deliveries ProviderWebhookDelivery[]
+  provider       Provider                       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdBy      ProviderAccount?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries     ProviderWebhookDelivery[]
   changeRequests ProviderWebhookChangeRequest[]
 
   @@index([providerId, deletedAt, enabled, createdAt])
@@ -711,24 +728,24 @@ model Pass {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
-  user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  provider           Provider            @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  template           PassTemplate        @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  templateVersion    PassTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
-  ledgerEntries      LedgerEntry[]
-  redemptionRequests RedemptionRequest[]
-  disputes           Dispute[]
-  transfers          PassTransfer[]
-  notifications      UserNotification[]
-  actionLinks        WalletActionLink[]  @relation("ActionLinkTargetPass")
-  sourceTopUpRequests PassTopUpRequest[] @relation("SourceTopUpPass")
-  targetTopUpRequests PassTopUpRequest[] @relation("TargetTopUpPass")
+  user                 User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider             Provider                  @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  template             PassTemplate              @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  templateVersion      PassTemplateVersion       @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  ledgerEntries        LedgerEntry[]
+  redemptionRequests   RedemptionRequest[]
+  disputes             Dispute[]
+  transfers            PassTransfer[]
+  notifications        UserNotification[]
+  actionLinks          WalletActionLink[]        @relation("ActionLinkTargetPass")
+  sourceTopUpRequests  PassTopUpRequest[]        @relation("SourceTopUpPass")
+  targetTopUpRequests  PassTopUpRequest[]        @relation("TargetTopUpPass")
   ticketUpdateRequests PassTicketUpdateRequest[]
 
+  @@unique([providerId, publicNumber])
   @@index([userId, status, sortOrder])
   @@index([userId, archivedAt, sortOrder])
   @@index([providerId, templateId, status])
-  @@unique([providerId, publicNumber])
 }
 
 model UserNotification {
@@ -774,34 +791,38 @@ model AddPassToken {
 }
 
 model WalletActionLink {
-  id                 String                 @id @default(uuid())
-  tokenHash          String                 @unique
-  kind               WalletActionLinkKind
-  status             WalletActionLinkStatus @default(Active)
-  providerId         String
-  targetPassId       String
-  requestedValue     Decimal
-  verificationMethod VerificationMethod
-  note               String?
-  expiresAt          DateTime
-  consumedByUserId   String?
-  consumedAt         DateTime?
-  revokedAt          DateTime?
-  revokedByType      ActorType?
-  revokedById        String?
-  revokeReason       String?
-  createdByType      ActorType
-  createdById        String?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id                  String                          @id @default(uuid())
+  tokenHash           String                          @unique
+  kind                WalletActionLinkKind
+  status              WalletActionLinkStatus          @default(Active)
+  providerId          String
+  clientApplicationId String?
+  targetPassId        String?
+  selectionScope      WalletActionLinkSelectionScope?
+  requestedValue      Decimal
+  verificationMethod  VerificationMethod
+  note                String?
+  expiresAt           DateTime
+  consumedByUserId    String?
+  consumedAt          DateTime?
+  revokedAt           DateTime?
+  revokedByType       ActorType?
+  revokedById         String?
+  revokeReason        String?
+  createdByType       ActorType
+  createdById         String?
+  createdAt           DateTime                        @default(now())
+  updatedAt           DateTime                        @updatedAt
 
-  provider       Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  targetPass     Pass     @relation("ActionLinkTargetPass", fields: [targetPassId], references: [id], onDelete: Cascade)
-  consumedByUser User?    @relation("ConsumedActionLinks", fields: [consumedByUserId], references: [id], onDelete: SetNull)
-  topUpRequests  PassTopUpRequest[]
+  provider          Provider           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  clientApplication ClientApplication? @relation(fields: [clientApplicationId], references: [id], onDelete: SetNull)
+  targetPass        Pass?              @relation("ActionLinkTargetPass", fields: [targetPassId], references: [id], onDelete: SetNull)
+  consumedByUser    User?              @relation("ConsumedActionLinks", fields: [consumedByUserId], references: [id], onDelete: SetNull)
+  topUpRequests     PassTopUpRequest[]
 
   @@index([providerId, status, expiresAt])
   @@index([targetPassId, status])
+  @@index([clientApplicationId, status, createdAt])
   @@index([consumedByUserId])
 }
 
@@ -879,9 +900,9 @@ model PassTopUpRequest {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  user       User @relation(fields: [userId], references: [id], onDelete: Restrict)
-  sourcePass Pass @relation("SourceTopUpPass", fields: [sourcePassId], references: [id], onDelete: Restrict)
-  targetPass Pass @relation("TargetTopUpPass", fields: [targetPassId], references: [id], onDelete: Restrict)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sourcePass Pass              @relation("SourceTopUpPass", fields: [sourcePassId], references: [id], onDelete: Restrict)
+  targetPass Pass              @relation("TargetTopUpPass", fields: [targetPassId], references: [id], onDelete: Restrict)
   actionLink WalletActionLink? @relation(fields: [actionLinkId], references: [id], onDelete: SetNull)
 
   @@index([userId, status, createdAt])
@@ -956,28 +977,28 @@ model PassTicketUpdateRequest {
 }
 
 model ProviderProfileChangeRequest {
-  id                          String                             @id @default(uuid())
-  providerId                  String
-  requestedById               String?
-  status                      ProviderProfileChangeRequestStatus @default(PendingReview)
-  currentName                 String
-  currentLogoUrl              String?
-  currentIntroductionUrl      String?
-  currentContactName          String?
-  currentContactEmail         String?
-  currentBusinessInfo         String?
-  proposedName                String
-  proposedLogoUrl             String?
-  proposedIntroductionUrl     String?
-  proposedContactName         String
-  proposedContactEmail        String
-  proposedBusinessInfo        String?
-  reason                      String?
-  reviewedById                String?
-  reviewReason                String?
-  reviewedAt                  DateTime?
-  createdAt                   DateTime                           @default(now())
-  updatedAt                   DateTime                           @updatedAt
+  id                      String                             @id @default(uuid())
+  providerId              String
+  requestedById           String?
+  status                  ProviderProfileChangeRequestStatus @default(PendingReview)
+  currentName             String
+  currentLogoUrl          String?
+  currentIntroductionUrl  String?
+  currentContactName      String?
+  currentContactEmail     String?
+  currentBusinessInfo     String?
+  proposedName            String
+  proposedLogoUrl         String?
+  proposedIntroductionUrl String?
+  proposedContactName     String
+  proposedContactEmail    String
+  proposedBusinessInfo    String?
+  reason                  String?
+  reviewedById            String?
+  reviewReason            String?
+  reviewedAt              DateTime?
+  createdAt               DateTime                           @default(now())
+  updatedAt               DateTime                           @updatedAt
 
   provider    Provider         @relation(fields: [providerId], references: [id], onDelete: Restrict)
   requestedBy ProviderAccount? @relation(fields: [requestedById], references: [id], onDelete: SetNull)

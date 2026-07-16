@@ -19,6 +19,7 @@ import type {
   UserStatus,
   VerificationMethod,
   WalletActionLinkKind,
+  WalletActionLinkSelectionScope,
 } from './domain.js';
 
 export interface BaseEvent {
@@ -139,6 +140,35 @@ export interface DeviceLoginApprovalRejected extends BaseEvent {
     approvalId: string;
     userId: string;
     rejectedBy: string;
+  };
+}
+
+export interface DeviceLoginApprovalCompleted extends BaseEvent {
+  type: 'DeviceLoginApprovalCompleted';
+  payload: {
+    approvalId: string;
+    userId: string;
+    deviceId: string;
+  };
+}
+
+export interface DeviceLoginApprovalExpired extends BaseEvent {
+  type: 'DeviceLoginApprovalExpired';
+  payload: {
+    approvalId: string;
+    userId: string;
+    expiredAt: string;
+  };
+}
+
+export interface ExternalClientSessionIssued extends BaseEvent {
+  type: 'ExternalClientSessionIssued';
+  payload: {
+    userId: string;
+    clientId: string;
+    sessionId: string;
+    expiresAt: string;
+    localSessionPreserved: boolean;
   };
 }
 
@@ -697,6 +727,8 @@ export interface ClientApplicationCreated extends BaseEvent {
     clientId: string;
     name: string;
     createdBy: string;
+    createdByType?: 'admin' | 'provider';
+    providerId?: string;
   };
 }
 
@@ -708,6 +740,31 @@ export interface ClientApplicationUpdated extends BaseEvent {
     name: string;
     enabled: boolean;
     updatedBy: string;
+    updatedByType?: 'admin' | 'provider';
+    providerId?: string;
+  };
+}
+
+export interface ClientApplicationProviderBindingChanged extends BaseEvent {
+  type: 'ClientApplicationProviderBindingChanged';
+  payload: {
+    clientApplicationId: string;
+    clientId: string;
+    previousProviderId?: string;
+    providerId?: string;
+    changedByType: 'admin' | 'provider';
+    changedBy: string;
+  };
+}
+
+export interface ClientApplicationDeleted extends BaseEvent {
+  type: 'ClientApplicationDeleted';
+  payload: {
+    clientApplicationId: string;
+    clientId: string;
+    providerId?: string;
+    deletedByType: 'admin' | 'provider';
+    deletedBy: string;
   };
 }
 
@@ -965,7 +1022,9 @@ export interface WalletActionLinkCreated extends BaseEvent {
   payload: {
     actionLinkId: string;
     providerId: string;
-    targetPassId: string;
+    targetPassId?: string;
+    selectionScope?: WalletActionLinkSelectionScope;
+    clientApplicationId?: string;
     kind: WalletActionLinkKind;
     value: string;
     verificationMethod: VerificationMethod;
@@ -992,7 +1051,8 @@ export interface WalletActionLinkExpired extends BaseEvent {
   payload: {
     actionLinkId: string;
     providerId: string;
-    targetPassId: string;
+    targetPassId?: string;
+    selectionScope?: WalletActionLinkSelectionScope;
     kind: WalletActionLinkKind;
   };
 }
@@ -1002,9 +1062,21 @@ export interface WalletActionLinkRevoked extends BaseEvent {
   payload: {
     actionLinkId: string;
     providerId: string;
-    targetPassId: string;
+    targetPassId?: string;
+    selectionScope?: WalletActionLinkSelectionScope;
     kind: WalletActionLinkKind;
     reason: string;
+  };
+}
+
+export interface WalletActionLinkTargetSelected extends BaseEvent {
+  type: 'WalletActionLinkTargetSelected';
+  payload: {
+    actionLinkId: string;
+    providerId: string;
+    userId: string;
+    targetPassId: string;
+    selectionScope: WalletActionLinkSelectionScope;
   };
 }
 
@@ -1296,6 +1368,9 @@ export type DomainEvent =
   | DeviceLoginApprovalRequested
   | DeviceLoginApprovalApproved
   | DeviceLoginApprovalRejected
+  | DeviceLoginApprovalCompleted
+  | DeviceLoginApprovalExpired
+  | ExternalClientSessionIssued
   | ServerAccountRebound
   | DeviceBound
   | LoginDeviceRecorded
@@ -1351,6 +1426,8 @@ export type DomainEvent =
   | ProviderWebhookDeliveryRetryRequested
   | ClientApplicationCreated
   | ClientApplicationUpdated
+  | ClientApplicationProviderBindingChanged
+  | ClientApplicationDeleted
   | PassTemplateCreated
   | PassTemplateUpdateSubmitted
   | PassTemplateApproved
@@ -1375,6 +1452,7 @@ export type DomainEvent =
   | WalletActionLinkConsumed
   | WalletActionLinkExpired
   | WalletActionLinkRevoked
+  | WalletActionLinkTargetSelected
   | AddPassTokenRevoked
   | AddPassTokenReissued
   | PassBalanceChanged

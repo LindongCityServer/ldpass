@@ -96,6 +96,8 @@ export type WalletActionLinkKind = 'use' | 'top_up';
 
 export type WalletActionLinkStatus = 'Active' | 'Consumed' | 'Expired' | 'Revoked';
 
+export type WalletActionLinkSelectionScope = 'same_provider' | 'top_up_sources' | 'all_authorized';
+
 export type PassTopUpStatus =
   | 'Created'
   | 'WaitingVerification'
