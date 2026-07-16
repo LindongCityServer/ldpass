@@ -29,6 +29,7 @@ const providerNavItems = [
   { href: '/provider/redemptions', label: '核销', icon: 'point_of_sale' },
   { href: '/provider/passes', label: '卡券', icon: 'cards' },
   { href: '/provider/disputes', label: '争议', icon: 'forum' },
+  { href: '/provider/client-applications', label: '回调接入', icon: 'hub' },
   { href: '/provider/api-keys', label: 'API 密钥', icon: 'key' },
   { href: '/provider/webhooks', label: 'Webhook', icon: 'webhook' },
 ];

@@ -18,7 +18,10 @@ export class AdminClientApplicationsController {
   }
 
   @Post()
-  async createClientApplication(@Body() dto: CreateClientApplicationDto, @Req() request: ApiRequestLike) {
+  async createClientApplication(
+    @Body() dto: CreateClientApplicationDto,
+    @Req() request: ApiRequestLike,
+  ) {
     const admin = await this.sessionAuth.requireAdmin(request);
     return this.adminClientApplicationsService.createClientApplication(dto, admin);
   }
@@ -31,5 +34,14 @@ export class AdminClientApplicationsController {
   ) {
     const admin = await this.sessionAuth.requireAdmin(request);
     return this.adminClientApplicationsService.updateClientApplication(applicationId, dto, admin);
+  }
+
+  @Post(':applicationId/delete')
+  async deleteClientApplication(
+    @Param('applicationId') applicationId: string,
+    @Req() request: ApiRequestLike,
+  ) {
+    const admin = await this.sessionAuth.requireAdmin(request);
+    return this.adminClientApplicationsService.deleteClientApplication(applicationId, admin);
   }
 }

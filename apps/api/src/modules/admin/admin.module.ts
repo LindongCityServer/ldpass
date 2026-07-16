@@ -5,6 +5,7 @@ import { AdminDashboardController } from './admin-dashboard.controller.js';
 import { AdminDashboardService } from './admin-dashboard.service.js';
 import { AdminClientApplicationsController } from './admin-client-applications.controller.js';
 import { AdminClientApplicationsService } from './admin-client-applications.service.js';
+import { ProviderClientApplicationsController } from './provider-client-applications.controller.js';
 import { AdminPassesController } from './admin-passes.controller.js';
 import { AdminPassesService } from './admin-passes.service.js';
 import { AdminProvidersController } from './admin-providers.controller.js';
@@ -20,6 +21,7 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminPassesController,
     AdminProvidersController,
     AdminClientApplicationsController,
+    ProviderClientApplicationsController,
   ],
   providers: [
     AdminDashboardService,

@@ -8,11 +8,34 @@ interface ClientApplication {
   id: string;
   clientId: string;
   name: string;
+  providerId: string | null;
+  provider: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+  } | null;
+  requestedBy: {
+    id: string;
+    displayName: string;
+    email: string;
+  } | null;
   allowedRedirects: string[];
   allowedOrigins: string[];
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface AdminProvider {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+}
+
+interface AdminProvidersResponse {
+  providers: AdminProvider[];
 }
 
 interface ClientApplicationsResponse {
@@ -25,6 +48,7 @@ interface ClientApplicationResponse {
 
 export function AdminClientApplicationsPanel() {
   const [applications, setApplications] = useState<ClientApplication[]>([]);
+  const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [keyword, setKeyword] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingApplication, setEditingApplication] = useState<ClientApplication | null>(null);
@@ -43,6 +67,10 @@ export function AdminClientApplicationsPanel() {
         application.name,
         application.clientId,
         application.enabled ? '启用' : '停用',
+        application.provider?.name ?? '未绑定发卡方',
+        application.provider?.slug ?? '',
+        application.requestedBy?.displayName ?? '',
+        application.requestedBy?.email ?? '',
         ...application.allowedRedirects,
         ...application.allowedOrigins,
       ]
@@ -66,8 +94,18 @@ export function AdminClientApplicationsPanel() {
     }
   };
 
+  const loadProviders = async () => {
+    try {
+      const result = await getJson<AdminProvidersResponse>('/api/admin/providers?take=100');
+      setProviders(result.providers);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '读取发卡方列表失败。');
+    }
+  };
+
   useEffect(() => {
     void loadApplications();
+    void loadProviders();
   }, []);
 
   const createApplication = async (event: FormEvent<HTMLFormElement>) => {
@@ -82,6 +120,7 @@ export function AdminClientApplicationsPanel() {
       clientId: String(form.get('clientId') ?? ''),
       allowedRedirects: splitLines(String(form.get('allowedRedirects') ?? '')),
       allowedOrigins: splitLines(String(form.get('allowedOrigins') ?? '')),
+      providerId: String(form.get('providerId') ?? '') || null,
       enabled: form.get('enabled') === 'on',
     };
 
@@ -111,6 +150,7 @@ export function AdminClientApplicationsPanel() {
       name: String(form.get('name') ?? ''),
       allowedRedirects: splitLines(String(form.get('allowedRedirects') ?? '')),
       allowedOrigins: splitLines(String(form.get('allowedOrigins') ?? '')),
+      providerId: String(form.get('providerId') ?? '') || null,
       enabled: form.get('enabled') === 'on',
     };
 
@@ -126,6 +166,28 @@ export function AdminClientApplicationsPanel() {
       setMessage('客户端应用已保存。');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '保存客户端应用失败。');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const deleteApplication = async (application: ClientApplication) => {
+    if (!window.confirm(`确定删除客户端应用“${application.name}”吗？`)) {
+      return;
+    }
+
+    setUpdatingId(application.id);
+    setMessage(null);
+
+    try {
+      await postJson(`/api/admin/client-applications/${application.id}/delete`);
+      setApplications((currentApplications) =>
+        currentApplications.filter((item) => item.id !== application.id),
+      );
+      setEditingApplication(null);
+      setMessage('客户端应用已删除。');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '删除客户端应用失败。');
     } finally {
       setUpdatingId(null);
     }
@@ -227,6 +289,12 @@ export function AdminClientApplicationsPanel() {
                   回跳地址：{application.allowedRedirects.length} 个 · 允许来源：
                   {application.allowedOrigins.length} 个
                 </p>
+                <p>
+                  绑定发卡方：{application.provider?.name ?? '未绑定'}
+                  {application.requestedBy
+                    ? ` · 申请人：${application.requestedBy.displayName}`
+                    : ' · 平台登记'}
+                </p>
               </div>
               <div className="admin-list-actions">
                 <a className="secondary-action" href={buildLoginExample(application)}>
@@ -279,6 +347,17 @@ export function AdminClientApplicationsPanel() {
                 <label>
                   <span>client_id</span>
                   <input type="text" name="clientId" maxLength={80} required />
+                </label>
+                <label>
+                  <span>绑定发卡方</span>
+                  <select name="providerId" defaultValue="">
+                    <option value="">不绑定发卡方</option>
+                    {providers.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.name}（{provider.slug}）
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label>
                   <span>允许回跳地址（每行一个完整 URL）</span>
@@ -356,6 +435,17 @@ export function AdminClientApplicationsPanel() {
                   />
                 </label>
                 <label>
+                  <span>绑定发卡方</span>
+                  <select name="providerId" defaultValue={editingApplication.providerId ?? ''}>
+                    <option value="">不绑定发卡方</option>
+                    {providers.map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.name}（{provider.slug}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   <span>允许回跳地址</span>
                   <textarea
                     name="allowedRedirects"
@@ -382,6 +472,14 @@ export function AdminClientApplicationsPanel() {
                   <span>启用</span>
                 </label>
                 <div className="admin-dialog-actions">
+                  <button
+                    className="secondary-action danger-action"
+                    type="button"
+                    disabled={updatingId === editingApplication.id}
+                    onClick={() => void deleteApplication(editingApplication)}
+                  >
+                    删除
+                  </button>
                   <button
                     className="secondary-action"
                     type="button"
@@ -434,6 +532,9 @@ function exportApplicationsCsv(
     id: application.id,
     clientId: application.clientId,
     name: application.name,
+    provider: application.provider?.name ?? '',
+    providerId: application.providerId ?? '',
+    requestedBy: application.requestedBy?.email ?? '',
     enabled: application.enabled ? '启用' : '停用',
     redirects: application.allowedRedirects.join('\n'),
     origins: application.allowedOrigins.join('\n'),

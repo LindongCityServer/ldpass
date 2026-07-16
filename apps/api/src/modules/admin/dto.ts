@@ -1,4 +1,13 @@
-import { IsArray, IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class AdminUsersQueryDto {
   @IsOptional()
@@ -88,6 +97,10 @@ export class CreateClientApplicationDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  providerId?: string | null;
 }
 
 export class UpdateClientApplicationDto {
@@ -106,4 +119,43 @@ export class UpdateClientApplicationDto {
 
   @IsBoolean()
   enabled!: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  providerId?: string | null;
+}
+
+export class CreateProviderClientApplicationDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name!: string;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(80)
+  clientId!: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  allowedRedirects!: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  allowedOrigins!: string[];
+}
+
+export class UpdateProviderClientApplicationDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  name!: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  allowedRedirects!: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  allowedOrigins!: string[];
 }
