@@ -139,6 +139,68 @@ body {
   letter-spacing: 0;
 }
 
+:root[data-embedded='true'],
+:root[data-embedded='true'] body,
+:root[data-embedded='true'] .backoffice-shell {
+  background: transparent;
+}
+
+:root[data-embedded='true'] :is(.topbar, .auth-topbar, .backoffice-topbar) {
+  border-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+:root[data-embedded='true'] :is(.topbar, .auth-topbar) {
+  justify-content: flex-end;
+}
+
+:root[data-embedded='true'] :is(.topbar, .auth-topbar) > .brand,
+:root[data-embedded='true'] .backoffice-brand,
+:root[data-embedded='true'] .backoffice-title {
+  display: none;
+}
+
+:root[data-embedded='true'] .backoffice-topbar {
+  display: flex;
+}
+
+:root[data-embedded='true']
+  :is(.topbar-actions, .backoffice-topbar-actions, .auth-topbar > .theme-settings),
+:root[data-embedded='true'] .backoffice-topbar > .backoffice-topbar-back {
+  border: 1px solid var(--line);
+  background: var(--chrome-surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+:root[data-embedded='true']
+  :is(.topbar-actions, .backoffice-topbar-actions, .auth-topbar > .theme-settings) {
+  padding: 4px;
+  border-radius: 999px;
+}
+
+:root[data-embedded='true'] .backoffice-topbar-actions {
+  margin-inline-start: auto;
+}
+
+:root[data-embedded='true'] .backoffice-page-actions-topbar {
+  display: flex;
+}
+
+:root[data-embedded='true'] .backoffice-page-actions-floating {
+  display: none;
+}
+
+:root[data-embedded='true'] .backoffice-topbar > .backoffice-topbar-back {
+  inline-size: 42px;
+  block-size: 42px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
 .platform-status-region {
   position: sticky;
   inset-block-start: 0;

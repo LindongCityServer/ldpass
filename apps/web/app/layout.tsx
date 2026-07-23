@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { EmbeddedModeScript } from './embedded-mode-script';
 import { PlatformStatusBanner } from './platform-status-banner';
 import { ServiceWorkerRegistration } from './service-worker-registration';
 import { SiteLegalFooter } from './site-legal-footer';
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <ThemeScript />
+        <EmbeddedModeScript />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
