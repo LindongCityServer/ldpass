@@ -40,6 +40,12 @@ GET /api/auth/login/redirect?client_id=<client_id>&redirect_uri=<redirect_uri>&s
 
 如果当前设备原本没有临东通会话，登录成功仍会建立正常的临东通主会话，同时签发本次外部验证会话。
 
+### 2.1 跨站 iframe 回跳
+
+当外层页面与临东通不是同一二级域名时，登录页仍可放在 iframe 中，登录成功后会在该 iframe 内跳转到已登记的 `redirect_uri`。嵌入态仅会将本次 5 分钟外部验证会话签发为 host-only 的 `SameSite=None; Secure; Partitioned` Cookie；临东通主会话继续保持 `SameSite=Lax`，不会被外部页面用于访问钱包或账户接口。
+
+生产环境必须使用 HTTPS，并保持 `AUTH_COOKIE_SECURE=true`。支持 Storage Access API 的浏览器会在用户提交登录时请求存储权限；支持 CHIPS 的浏览器则可使用分区 Cookie 完成本次 iframe 回跳。仍完全拒绝第三方存储的浏览器需要退回到顶层登录，后续可升级为 Authorization Code + PKCE。
+
 ### 3. 跳转到账号验证页
 
 外部系统如果需要用户对当前账号做一次二次确认，可以将用户跳转到：
@@ -77,7 +83,7 @@ GET /api/auth/login/redirect?client_id=<client_id>&redirect_uri=<redirect_uri>&s
 
 ### 4. 校验当前登录态
 
-外部系统前端从已登记 Origin 携带 Cookie 调用：
+外部系统前端从已登记 Origin 携带 Cookie 调用临东通的 API 域名：
 
 ```http
 GET /api/auth/client-session?client_id=<client_id>
@@ -86,7 +92,7 @@ GET /api/auth/client-session?client_id=<client_id>
 请求必须带上浏览器凭据，例如：
 
 ```ts
-await fetch('/api/auth/client-session?client_id=<client_id>', {
+await fetch('https://<ldpass-host>/api/auth/client-session?client_id=<client_id>', {
   credentials: 'include',
 });
 ```

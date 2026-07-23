@@ -37,6 +37,7 @@ interface LoginPayload {
   client_id?: string;
   redirect_uri?: string;
   state?: string;
+  embedded?: boolean;
 }
 
 interface LoginRedirectValidation {
@@ -175,6 +176,7 @@ export function LoginForm({
     const form = new FormData(event.currentTarget);
 
     try {
+      await requestEmbeddedStorageAccess(Boolean(redirectValidation));
       const payload: LoginPayload = {
         identifier: String(form.get('identifier') ?? ''),
         password: String(form.get('password') ?? ''),
@@ -184,6 +186,7 @@ export function LoginForm({
               client_id: redirectValidation.clientApplication.clientId,
               redirect_uri: redirectValidation.redirectUri,
               ...(redirectValidation.state ? { state: redirectValidation.state } : {}),
+              ...(isEmbeddedDocument() ? { embedded: true } : {}),
             }
           : {}),
       };
@@ -310,10 +313,12 @@ export function LoginForm({
     setMessage(`正在使用当前账号 ${currentSession.username} 完成外部登录。`);
 
     try {
+      await requestEmbeddedStorageAccess(true);
       await postJson('/api/auth/login/client-session/current', {
         client_id: redirectValidation.clientApplication.clientId,
         redirect_uri: redirectValidation.redirectUri,
         ...(redirectValidation.state ? { state: redirectValidation.state } : {}),
+        ...(isEmbeddedDocument() ? { embedded: true } : {}),
       });
       const redirectTarget = readRedirectTarget(redirectValidation);
       setMessage(
@@ -454,6 +459,28 @@ function readSafeInternalNext(value?: string): string | null {
     return blockedPaths.has(url.pathname) ? null : path;
   } catch {
     return null;
+  }
+}
+
+function isEmbeddedDocument(): boolean {
+  return (
+    document.documentElement.dataset.embedded === 'true' || window.self !== window.top
+  );
+}
+
+async function requestEmbeddedStorageAccess(hasExternalRedirect: boolean): Promise<void> {
+  if (!hasExternalRedirect || !isEmbeddedDocument()) {
+    return;
+  }
+
+  const storageAccessDocument = document as Document & {
+    requestStorageAccess?: () => Promise<void>;
+  };
+
+  try {
+    await storageAccessDocument.requestStorageAccess?.();
+  } catch {
+    // 分区 Cookie 仍可在支持 CHIPS 的浏览器中完成本次外部回跳。
   }
 }
 

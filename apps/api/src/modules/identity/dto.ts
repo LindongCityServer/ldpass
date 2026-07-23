@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -100,6 +101,10 @@ export class LoginDto {
   @IsString()
   @MaxLength(500)
   state?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  embedded?: boolean;
 }
 
 export class LoginRedirectQueryDto {
@@ -117,6 +122,10 @@ export class LoginRedirectQueryDto {
   @IsString()
   @MaxLength(500)
   state?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  embedded?: boolean;
 }
 
 export class ClientSessionQueryDto {

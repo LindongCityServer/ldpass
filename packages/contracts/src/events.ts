@@ -169,6 +169,7 @@ export interface ExternalClientSessionIssued extends BaseEvent {
     sessionId: string;
     expiresAt: string;
     localSessionPreserved: boolean;
+    deliveryMode: 'top_level' | 'embedded';
   };
 }
 

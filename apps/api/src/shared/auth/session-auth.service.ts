@@ -11,11 +11,16 @@ import {
   readHeader,
   readUserAgent,
 } from './request-context.js';
-import { serializeAuthCookie, serializeExpiredAuthCookies } from './cookie.js';
+import {
+  serializeAuthCookie,
+  serializeExpiredEmbeddedAuthCookie,
+  serializeExpiredAuthCookies,
+} from './cookie.js';
 
 export const SESSION_COOKIE_NAME = 'ldpass_session';
 const CLIENT_SESSION_COOKIE_PREFIX = 'ldpass_client_session_';
 const CLIENT_SESSION_TTL_MS = 1000 * 60 * 5;
+type ClientSessionDeliveryMode = 'top_level' | 'embedded';
 
 export interface AuthenticatedUser {
   id: string;
@@ -75,8 +80,10 @@ export class SessionAuthService {
     response: ApiResponseLike,
     options: {
       localSessionPreserved: boolean;
+      deliveryMode?: ClientSessionDeliveryMode;
     },
   ): Promise<void> {
+    const deliveryMode = options.deliveryMode ?? 'top_level';
     const cookieName = this.createClientSessionCookieName(clientId);
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + CLIENT_SESSION_TTL_MS);
@@ -114,6 +121,13 @@ export class SessionAuthService {
       serializeAuthCookie(request, cookieName, token, {
         expiresAt,
         maxAgeSeconds: Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)),
+        ...(deliveryMode === 'embedded'
+          ? {
+              domainMode: 'hostOnly',
+              sameSite: 'None',
+              partitioned: true,
+            }
+          : {}),
       }),
     );
 
@@ -129,6 +143,7 @@ export class SessionAuthService {
         sessionId: session.id,
         expiresAt: expiresAt.toISOString(),
         localSessionPreserved: options.localSessionPreserved,
+        deliveryMode,
       },
     });
   }
@@ -159,7 +174,10 @@ export class SessionAuthService {
 
     response.setHeader('Set-Cookie', [
       ...serializeExpiredAuthCookies(request, SESSION_COOKIE_NAME),
-      ...clientSessionCookies.flatMap(({ name }) => serializeExpiredAuthCookies(request, name)),
+      ...clientSessionCookies.flatMap(({ name }) => [
+        ...serializeExpiredAuthCookies(request, name),
+        serializeExpiredEmbeddedAuthCookie(request, name),
+      ]),
     ]);
   }
 

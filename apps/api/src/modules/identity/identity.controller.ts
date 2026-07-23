@@ -89,6 +89,7 @@ export class IdentityController {
       response,
       {
         localSessionPreserved: true,
+        deliveryMode: dto.embedded ? 'embedded' : 'top_level',
       },
     );
 
@@ -140,7 +141,7 @@ export class IdentityController {
       dto,
       request,
     );
-    await this.completeLoginSession(result, redirect, request, response);
+    await this.completeLoginSession(result, redirect, request, response, dto.embedded === true);
 
     return result;
   }
@@ -154,7 +155,7 @@ export class IdentityController {
   ) {
     const redirect = await this.validateOptionalLoginRedirect(dto);
     const result = await this.identityService.checkDeviceLoginApproval(approvalId, dto, request);
-    await this.completeLoginSession(result, redirect, request, response);
+    await this.completeLoginSession(result, redirect, request, response, dto.embedded === true);
 
     return result;
   }
@@ -167,7 +168,7 @@ export class IdentityController {
   ) {
     const redirect = await this.validateOptionalLoginRedirect(dto);
     const result = await this.identityService.login(dto, request);
-    await this.completeLoginSession(result, redirect, request, response);
+    await this.completeLoginSession(result, redirect, request, response, dto.embedded === true);
 
     return result;
   }
@@ -362,6 +363,7 @@ export class IdentityController {
     redirect: LoginRedirectValidationResult | null,
     request: ApiRequestLike,
     response: ApiResponseLike,
+    embedded: boolean,
   ): Promise<void> {
     if (result.nextAction !== 'authenticated' && result.nextAction !== 'account_status') {
       return;
@@ -385,6 +387,7 @@ export class IdentityController {
       response,
       {
         localSessionPreserved: Boolean(localSession),
+        deliveryMode: embedded ? 'embedded' : 'top_level',
       },
     );
   }

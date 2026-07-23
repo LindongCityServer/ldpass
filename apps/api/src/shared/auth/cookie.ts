@@ -5,6 +5,8 @@ export interface AuthCookieOptions {
   expiresAt: Date;
   maxAgeSeconds: number;
   domainMode?: 'configured' | 'hostOnly';
+  sameSite?: 'Lax' | 'None';
+  partitioned?: boolean;
 }
 
 export function serializeAuthCookie(
@@ -13,11 +15,12 @@ export function serializeAuthCookie(
   value: string,
   options: AuthCookieOptions,
 ): string {
+  const sameSite = options.sameSite ?? 'Lax';
   const parts = [
     `${name}=${encodeURIComponent(value)}`,
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
+    `SameSite=${sameSite}`,
     `Expires=${options.expiresAt.toUTCString()}`,
     `Max-Age=${options.maxAgeSeconds}`,
   ];
@@ -30,8 +33,12 @@ export function serializeAuthCookie(
     parts.push(`Domain=${cookieDomain}`);
   }
 
-  if (shouldUseSecureCookie(request)) {
+  if (shouldUseSecureCookie(request) || sameSite === 'None' || options.partitioned) {
     parts.push('Secure');
+  }
+
+  if (options.partitioned) {
+    parts.push('Partitioned');
   }
 
   return parts.join('; ');
@@ -54,6 +61,19 @@ export function serializeExpiredAuthCookies(request: ApiRequestLike, name: strin
   }
 
   return cookies;
+}
+
+export function serializeExpiredEmbeddedAuthCookie(
+  request: ApiRequestLike,
+  name: string,
+): string {
+  return serializeAuthCookie(request, name, '', {
+    expiresAt: new Date(0),
+    maxAgeSeconds: 0,
+    domainMode: 'hostOnly',
+    sameSite: 'None',
+    partitioned: true,
+  });
 }
 
 function normalizeCookieDomain(value: string | undefined): string | null {
