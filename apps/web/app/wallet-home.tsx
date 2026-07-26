@@ -17,6 +17,7 @@ import {
   type OfflineWalletSnapshot,
 } from './offline-wallet-cache';
 import { ThemeSettings } from './theme-provider';
+import { TopbarMaterialLayers } from './topbar-material-layers';
 
 const categories = [
   { key: 'account', label: '账户/卡', icon: 'credit_card', count: 0 },
@@ -2071,6 +2072,7 @@ export function WalletHome({ initialCategory, initialPassId }: WalletHomeProps) 
       className={`wallet-shell${isGuestLanding ? ' wallet-guest-shell' : ''}${isDetailOpen ? ' wallet-detail-open' : ''}${isDetailClosing ? ' wallet-detail-closing' : ''}`}
     >
       <header className="topbar">
+        <TopbarMaterialLayers />
         <a className="brand" href="/" aria-label="临东通首页">
           <img src={brandAssets.colorLogo} alt="" width={36} height={36} />
           <span>{sessionUser ? '钱包' : '临东通'}</span>

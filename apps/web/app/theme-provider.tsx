@@ -11,6 +11,15 @@ import {
   type PlatformThemeConfig,
   type PlatformThemeScheduleResponse,
 } from './theme-config';
+import {
+  defaultUiEffectsPreference,
+  readUiEffectsPreference,
+  subscribeUiEffectsPreferenceChanged,
+  updateUiEffectsPreference,
+  type MaterialMode,
+  type MotionMode,
+  type UiEffectsPreference,
+} from './ui-effects-preference';
 
 export type AppearanceMode = 'light' | 'dark' | 'system';
 export type AccentMode = 'teal' | 'red' | 'gray' | 'auto';
@@ -35,6 +44,18 @@ const fontModes: Array<{ value: FontMode; label: string }> = [
   { value: 'system', label: '系统字体' },
 ];
 
+const materialModes: Array<{ value: MaterialMode; label: string }> = [
+  { value: 'performance', label: '性能' },
+  { value: 'balanced', label: '平衡' },
+  { value: 'advanced', label: '高级' },
+];
+
+const motionModes: Array<{ value: MotionMode; label: string }> = [
+  { value: 'system', label: '跟随系统' },
+  { value: 'full', label: '开启' },
+  { value: 'reduced', label: '关闭' },
+];
+
 const storageKeys = {
   appearance: 'ldpass.appearance',
   accent: 'ldpass.accent',
@@ -56,7 +77,9 @@ function readStoredAccent(): AccentMode {
   }
 
   const value = window.localStorage.getItem(storageKeys.accent);
-  return value === 'teal' || value === 'red' || value === 'gray' || value === 'auto' ? value : 'auto';
+  return value === 'teal' || value === 'red' || value === 'gray' || value === 'auto'
+    ? value
+    : 'auto';
 }
 
 function readStoredFont(): FontMode {
@@ -115,17 +138,29 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
   const [appearance, setAppearance] = useState<AppearanceMode>('system');
   const [accent, setAccent] = useState<AccentMode>('auto');
   const [font, setFont] = useState<FontMode>('harmony');
+  const [uiEffectsPreference, setUiEffectsPreference] = useState<UiEffectsPreference>(
+    defaultUiEffectsPreference,
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
-  const [platformThemeConfig, setPlatformThemeConfig] = useState<PlatformThemeConfig>(fallbackPlatformThemeConfig);
+  const [platformThemeConfig, setPlatformThemeConfig] = useState<PlatformThemeConfig>(
+    fallbackPlatformThemeConfig,
+  );
   const [scheduledAutoTone, setScheduledAutoTone] = useState<AccentTone>(autoTone);
 
   useEffect(() => {
     setAppearance(readStoredAppearance());
     setAccent(readStoredAccent());
     setFont(readStoredFont());
+    setUiEffectsPreference(readUiEffectsPreference());
     setPlatformThemeConfig(readCachedPlatformThemeConfig());
   }, []);
+
+  useEffect(
+    () =>
+      subscribeUiEffectsPreferenceChanged(({ preference }) => setUiEffectsPreference(preference)),
+    [],
+  );
 
   useEffect(() => {
     const syncScheduledTone = () => {
@@ -248,7 +283,8 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
     }
 
     const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const syncSystemTheme = () => applyThemePreferences(appearance, accent, scheduledAutoTone, font);
+    const syncSystemTheme = () =>
+      applyThemePreferences(appearance, accent, scheduledAutoTone, font);
     media.addEventListener('change', syncSystemTheme);
 
     return () => media.removeEventListener('change', syncSystemTheme);
@@ -269,9 +305,35 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
     window.localStorage.setItem(storageKeys.font, nextFont);
   }, []);
 
+  const setMaterialModePreference = useCallback(
+    (materialMode: MaterialMode) => {
+      const next = updateUiEffectsPreference({ ...uiEffectsPreference, materialMode });
+      setUiEffectsPreference(next);
+    },
+    [uiEffectsPreference],
+  );
+
+  const setMaterialThicknessPreference = useCallback(
+    (materialThickness: number) => {
+      const next = updateUiEffectsPreference({ ...uiEffectsPreference, materialThickness });
+      setUiEffectsPreference(next);
+    },
+    [uiEffectsPreference],
+  );
+
+  const setMotionModePreference = useCallback(
+    (motionMode: MotionMode) => {
+      const next = updateUiEffectsPreference({ ...uiEffectsPreference, motionMode });
+      setUiEffectsPreference(next);
+    },
+    [uiEffectsPreference],
+  );
+
   const resolvedAccentLabel = useMemo(() => {
     const tone = resolveAccentTone(accent, scheduledAutoTone);
-    return accent === 'auto' ? `自动：${accentModes.find((mode) => mode.value === tone)?.label}` : '';
+    return accent === 'auto'
+      ? `自动：${accentModes.find((mode) => mode.value === tone)?.label}`
+      : '';
   }, [accent, scheduledAutoTone]);
 
   return (
@@ -301,6 +363,64 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
                   aria-pressed={appearance === mode.value}
                   key={mode.value}
                   onClick={() => setAppearancePreference(mode.value)}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="theme-group">
+            <h2>材质</h2>
+            <div className="segmented-control">
+              {materialModes.map((mode) => (
+                <button
+                  className={uiEffectsPreference.materialMode === mode.value ? 'is-selected' : ''}
+                  type="button"
+                  aria-pressed={uiEffectsPreference.materialMode === mode.value}
+                  key={mode.value}
+                  onClick={() => setMaterialModePreference(mode.value)}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+            <label
+              className={`theme-range-control${
+                uiEffectsPreference.materialMode === 'advanced' ? '' : ' is-disabled'
+              }`}
+            >
+              <span>
+                <span>高级材质厚度</span>
+                <output htmlFor="material-thickness">
+                  {uiEffectsPreference.materialThickness}%
+                </output>
+              </span>
+              <input
+                id="material-thickness"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={uiEffectsPreference.materialThickness}
+                disabled={uiEffectsPreference.materialMode !== 'advanced'}
+                onChange={(event) =>
+                  setMaterialThicknessPreference(Number(event.currentTarget.value))
+                }
+              />
+            </label>
+          </div>
+
+          <div className="theme-group">
+            <h2>动态效果</h2>
+            <div className="segmented-control">
+              {motionModes.map((mode) => (
+                <button
+                  className={uiEffectsPreference.motionMode === mode.value ? 'is-selected' : ''}
+                  type="button"
+                  aria-pressed={uiEffectsPreference.motionMode === mode.value}
+                  key={mode.value}
+                  onClick={() => setMotionModePreference(mode.value)}
                 >
                   {mode.label}
                 </button>

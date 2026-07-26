@@ -1,5 +1,6 @@
 import { brandAssets } from '@ldpass/ui';
 import { ThemeSettings } from '../theme-provider';
+import { TopbarMaterialLayers } from '../topbar-material-layers';
 import { AccountPanel } from './account-panel';
 
 interface AccountPageProps {
@@ -16,6 +17,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   return (
     <main className="wallet-shell account-shell">
       <header className="topbar">
+        <TopbarMaterialLayers />
         <a className="brand auth-brand" href="/" aria-label="返回钱包">
           <img src={brandAssets.colorLogo} alt="" width={36} height={36} />
           <span>临东通</span>

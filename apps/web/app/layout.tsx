@@ -5,6 +5,7 @@ import { ServiceWorkerRegistration } from './service-worker-registration';
 import { SiteLegalFooter } from './site-legal-footer';
 import { StaticAssetReloadGuard } from './static-asset-reload-guard';
 import { ThemeScript } from './theme-script';
+import { UiEffectsBridge } from './ui-effects-bridge';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         />
       </head>
       <body>
+        <UiEffectsBridge />
         <StaticAssetReloadGuard />
         <ServiceWorkerRegistration />
         <PlatformStatusBanner />

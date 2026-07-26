@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { brandAssets } from '@ldpass/ui';
 import { postJson } from './api-client';
 import { ThemeSettings } from './theme-provider';
+import { TopbarMaterialLayers } from './topbar-material-layers';
 
 const adminNavItems = [
   { href: '/admin', label: '概览', icon: 'space_dashboard' },
@@ -81,6 +82,7 @@ export function BackofficeShell({ children, kind }: BackofficeShellProps) {
   return (
     <main className={`backoffice-shell backoffice-shell-${kind}`}>
       <header className={`backoffice-topbar${isSubpage ? ' is-subpage' : ''}`}>
+        <TopbarMaterialLayers />
         {isSubpage ? (
           <a className="backoffice-topbar-back" href={homeHref} aria-label={`返回${title}`}>
             <span className="material-symbols-rounded" aria-hidden="true">

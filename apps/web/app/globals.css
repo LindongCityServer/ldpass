@@ -52,15 +52,35 @@
   --shadow: 0 16px 40px rgba(15, 18, 22, 0.08);
   --image-filter: none;
   --system-font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    'Microsoft YaHei',
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei',
     sans-serif;
   --harmony-font-family: 'HarmonyOS Sans SC', var(--system-font-family);
   --app-font-family: var(--harmony-font-family);
+  --ldpass-material-blur: 9.5px;
+  --ldpass-material-blur-strong: 12.83px;
+  --ldpass-material-blur-medium: 7.6px;
+  --ldpass-material-blur-soft: 3.33px;
+  --ldpass-material-brightness-light: 1.22;
+  --ldpass-material-brightness-dark: 0.81;
+  --ldpass-material-brightness: var(--ldpass-material-brightness-light);
+  --ldpass-material-contrast: 1.14;
+  --ldpass-material-saturation: 1.475;
+  --ldpass-material-floating-surface: 65%;
+  --ldpass-material-action-surface: 72.5%;
+  --ldpass-material-title-surface: 65%;
+  --ldpass-material-title-mid-surface: 33%;
+  --ldpass-material-text-shadow-strength: 46%;
+  --ldpass-material-hover-state: color-mix(in srgb, var(--surface-muted) 68%, transparent);
+  --ldpass-material-selected-state: color-mix(in srgb, var(--brand-soft) 78%, transparent);
+  --ldpass-material-selected-panel-state: color-mix(in srgb, var(--surface) 78%, transparent);
+  --ldpass-motion-duration-fast: 120ms;
+  --ldpass-motion-duration-standard: 180ms;
+  --ldpass-motion-duration-enter: 240ms;
+  --ldpass-motion-duration-layout: 320ms;
+  --ldpass-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ldpass-motion-easing-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ldpass-motion-distance-sm: 8px;
+  --ldpass-motion-distance-md: 16px;
 }
 
 :root[data-font-family='system'] {
@@ -78,6 +98,27 @@
   --text: #f2f3f4;
   --muted: #a8adb4;
   --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+  --ldpass-material-brightness: var(--ldpass-material-brightness-dark);
+}
+
+:root[data-motion='reduced'] {
+  --ldpass-motion-duration-fast: 0ms;
+  --ldpass-motion-duration-standard: 0ms;
+  --ldpass-motion-duration-enter: 0ms;
+  --ldpass-motion-duration-layout: 0ms;
+  --ldpass-motion-distance-sm: 0px;
+  --ldpass-motion-distance-md: 0px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) {
+    --ldpass-motion-duration-fast: 0ms;
+    --ldpass-motion-duration-standard: 0ms;
+    --ldpass-motion-duration-enter: 0ms;
+    --ldpass-motion-duration-layout: 0ms;
+    --ldpass-motion-distance-sm: 0px;
+    --ldpass-motion-distance-md: 0px;
+  }
 }
 
 :root[data-resolved-accent='teal'] {
@@ -151,18 +192,20 @@ body {
   backdrop-filter: none;
 }
 
-:root[data-embedded='true'] :is(.topbar, .auth-topbar) {
-  justify-content: flex-end;
+:root[data-embedded='true']
+  :is(.topbar, .auth-topbar, .backoffice-topbar)
+  :is(.brand span, .backoffice-title span, .backoffice-title strong) {
+  text-shadow:
+    0 1px 4px color-mix(in srgb, var(--surface) 82%, transparent),
+    0 2px 10px color-mix(in srgb, var(--text) 24%, transparent);
 }
 
-:root[data-embedded='true'] :is(.topbar, .auth-topbar) > .brand,
-:root[data-embedded='true'] .backoffice-brand,
-:root[data-embedded='true'] .backoffice-title {
-  display: none;
+:root[data-embedded='true'] :is(.brand, .backoffice-brand) img {
+  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--text) 30%, transparent));
 }
 
-:root[data-embedded='true'] .backoffice-topbar {
-  display: flex;
+:root[data-embedded='true'][data-resolved-accent='gray'] :is(.brand, .backoffice-brand) img {
+  filter: grayscale(1) drop-shadow(0 2px 6px color-mix(in srgb, var(--text) 30%, transparent));
 }
 
 :root[data-embedded='true']
@@ -360,6 +403,57 @@ textarea {
   background: var(--chrome-surface);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(18px);
+}
+
+.topbar-material-layers {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: none;
+  overflow: hidden;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--surface) var(--ldpass-material-title-surface), transparent) 0%,
+    color-mix(in srgb, var(--surface) var(--ldpass-material-title-mid-surface), transparent) 60%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+:is(.topbar, .backoffice-topbar) > :where(:not(.topbar-material-layers)) {
+  z-index: 1;
+}
+
+.topbar-material-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.topbar-material-layer.is-strong {
+  -webkit-backdrop-filter: blur(var(--ldpass-material-blur-strong));
+  backdrop-filter: blur(var(--ldpass-material-blur-strong));
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 28%, transparent 64%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 28%, transparent 64%);
+}
+
+.topbar-material-layer.is-medium {
+  -webkit-backdrop-filter: blur(var(--ldpass-material-blur-medium));
+  backdrop-filter: blur(var(--ldpass-material-blur-medium));
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 12%,
+    #000 36%,
+    #000 54%,
+    transparent 82%
+  );
+  mask-image: linear-gradient(to bottom, transparent 12%, #000 36%, #000 54%, transparent 82%);
+}
+
+.topbar-material-layer.is-soft {
+  -webkit-backdrop-filter: blur(var(--ldpass-material-blur-soft));
+  backdrop-filter: blur(var(--ldpass-material-blur-soft));
+  -webkit-mask-image: linear-gradient(to bottom, transparent 42%, #000 66%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 42%, #000 66%, transparent 100%);
 }
 
 .brand {
@@ -4567,4 +4661,313 @@ input[type='radio'] {
     flex-wrap: wrap;
     justify-content: flex-end;
   }
+}
+
+.theme-range-control {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  transition: opacity var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard);
+}
+
+.theme-range-control > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.theme-range-control output {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.theme-range-control input {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.theme-range-control.is-disabled {
+  opacity: 0.48;
+}
+
+.theme-range-control input:disabled {
+  cursor: not-allowed;
+}
+
+:root:not([data-embedded='true'])[data-material-mode='performance']
+  :is(.topbar, .backoffice-topbar) {
+  border-color: var(--line);
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root[data-material-mode='performance']
+  :is(
+    .topbar-actions,
+    .backoffice-topbar-actions,
+    .auth-topbar > .theme-settings,
+    .backoffice-topbar > .backoffice-topbar-back,
+    .theme-popover,
+    .category-rail,
+    .backoffice-nav,
+    .backoffice-mobile-nav,
+    .detail-panel,
+    .detail-module-slot.is-dialog .detail-module-panel,
+    .admin-dialog-panel,
+    .backoffice-page-actions-floating
+  ) {
+  background: var(--surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  text-shadow: none;
+}
+
+:root[data-material-mode='advanced'] :is(.topbar, .backoffice-topbar) {
+  border-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root[data-material-mode='advanced'] .topbar-material-layers {
+  display: block;
+}
+
+:root[data-material-mode='advanced']
+  :is(
+    .topbar-actions,
+    .backoffice-topbar-actions,
+    .auth-topbar > .theme-settings,
+    .backoffice-topbar > .backoffice-topbar-back
+  ) {
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) var(--ldpass-material-action-surface), transparent);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: contrast(var(--ldpass-material-contrast))
+    brightness(var(--ldpass-material-brightness)) saturate(var(--ldpass-material-saturation))
+    blur(var(--ldpass-material-blur));
+  backdrop-filter: contrast(var(--ldpass-material-contrast))
+    brightness(var(--ldpass-material-brightness)) saturate(var(--ldpass-material-saturation))
+    blur(var(--ldpass-material-blur));
+  text-shadow: 0 1px 4px
+    color-mix(in srgb, var(--surface) var(--ldpass-material-text-shadow-strength), transparent);
+}
+
+:root[data-material-mode='advanced']
+  :is(.brand span, .backoffice-title span, .backoffice-title strong) {
+  text-shadow:
+    0 1px 5px
+      color-mix(in srgb, var(--surface) var(--ldpass-material-text-shadow-strength), transparent),
+    0 2px 10px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+:root[data-material-mode='advanced']
+  :is(
+    .theme-popover,
+    .category-rail,
+    .backoffice-nav,
+    .backoffice-mobile-nav,
+    .detail-panel,
+    .detail-module-slot.is-dialog .detail-module-panel,
+    .admin-dialog-panel,
+    .backoffice-page-actions-floating
+  ) {
+  background: color-mix(
+    in srgb,
+    var(--surface) var(--ldpass-material-floating-surface),
+    transparent
+  );
+  -webkit-backdrop-filter: contrast(var(--ldpass-material-contrast))
+    brightness(var(--ldpass-material-brightness)) saturate(var(--ldpass-material-saturation))
+    blur(var(--ldpass-material-blur));
+  backdrop-filter: contrast(var(--ldpass-material-contrast))
+    brightness(var(--ldpass-material-brightness)) saturate(var(--ldpass-material-saturation))
+    blur(var(--ldpass-material-blur));
+  text-shadow: 0 1px 4px
+    color-mix(in srgb, var(--surface) var(--ldpass-material-text-shadow-strength), transparent);
+}
+
+:root[data-material-mode='performance'] {
+  --ldpass-material-hover-state: var(--surface-muted);
+  --ldpass-material-selected-state: var(--brand-soft);
+  --ldpass-material-selected-panel-state: var(--surface);
+}
+
+:root[data-material-mode]
+  :is(
+    .icon-button,
+    .category-item,
+    .search-clear,
+    .segmented-control button,
+    .segmented-control a,
+    .swatch-button,
+    .account-setting-item,
+    .detail-close-button,
+    .detail-action-grid button,
+    .top-up-source-option,
+    .backoffice-page-actions .secondary-action,
+    .backoffice-nav a,
+    .backoffice-mobile-nav-group a
+  ):is(:hover, :focus-visible) {
+  background: var(--ldpass-material-hover-state);
+}
+
+:root[data-material-mode]
+  :is(
+    .icon-button.is-active,
+    .category-item.is-active,
+    .detail-action-grid button.is-active,
+    .top-up-source-option.is-selected,
+    .backoffice-nav a.is-active,
+    .backoffice-mobile-nav-group a.is-active
+  ) {
+  background: var(--ldpass-material-selected-state);
+}
+
+:root[data-material-mode]
+  :is(
+    .segmented-control button.is-selected,
+    .segmented-control a.is-selected,
+    .swatch-button.is-selected
+  ) {
+  background: var(--ldpass-material-selected-panel-state);
+}
+
+.material-symbols-rounded {
+  transition:
+    color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    font-variation-settings var(--ldpass-motion-duration-standard)
+      var(--ldpass-motion-easing-standard),
+    transform var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard);
+}
+
+.wallet-layout {
+  transition:
+    grid-template-columns var(--ldpass-motion-duration-layout)
+      var(--ldpass-motion-easing-emphasized),
+    justify-content var(--ldpass-motion-duration-layout) var(--ldpass-motion-easing-emphasized);
+}
+
+.pass-card-list-stacked .pass-card-stack-slot {
+  transition:
+    margin-top var(--ldpass-motion-duration-layout) var(--ldpass-motion-easing-emphasized),
+    transform var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard);
+}
+
+:is(
+  .icon-button,
+  .category-item,
+  .backoffice-nav a,
+  .backoffice-mobile-nav-group a,
+  .segmented-control button,
+  .segmented-control a,
+  .swatch-button,
+  .detail-action-grid button,
+  .wallet-pass-card,
+  .admin-list-item
+) {
+  transition:
+    background-color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    border-color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    box-shadow var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard),
+    transform var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard);
+}
+
+:is(
+  .icon-button,
+  .category-item,
+  .backoffice-nav a,
+  .backoffice-mobile-nav-group a,
+  .segmented-control button,
+  .segmented-control a,
+  .swatch-button,
+  .detail-action-grid button
+):active {
+  transform: scale(0.98);
+}
+
+:is(
+  .theme-popover,
+  .detail-panel,
+  .detail-module-slot.is-dialog .detail-module-panel,
+  .admin-dialog-panel,
+  .backoffice-page-actions-floating
+) {
+  animation: ldpass-floating-enter var(--ldpass-motion-duration-enter)
+    var(--ldpass-motion-easing-emphasized) both;
+}
+
+.detail-panel.is-closing {
+  animation: wallet-detail-panel-exit var(--ldpass-motion-duration-standard)
+    var(--ldpass-motion-easing-standard) both;
+}
+
+:is(.detail-panel-scrim, .detail-module-backdrop, .admin-dialog-scrim) {
+  animation: ldpass-fade-in var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard)
+    both;
+}
+
+@keyframes ldpass-floating-enter {
+  from {
+    opacity: 0;
+    transform: translateY(calc(0px - var(--ldpass-motion-distance-sm))) scale(0.985);
+  }
+}
+
+@keyframes ldpass-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-embedded='true']) :is(.topbar, .backoffice-topbar),
+  :root
+    :is(
+      .topbar-actions,
+      .backoffice-topbar-actions,
+      .auth-topbar > .theme-settings,
+      .backoffice-topbar > .backoffice-topbar-back,
+      .theme-popover,
+      .category-rail,
+      .backoffice-nav,
+      .backoffice-mobile-nav,
+      .detail-panel,
+      .detail-module-slot.is-dialog .detail-module-panel,
+      .admin-dialog-panel,
+      .backoffice-page-actions-floating
+    ) {
+    background: var(--surface) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    text-shadow: none !important;
+  }
+
+  :root .topbar-material-layers {
+    display: none !important;
+  }
+}
+
+:root[data-embedded='true'] .backoffice-topbar {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+
+:root[data-embedded='true']
+  :is(.topbar, .auth-topbar, .backoffice-topbar)
+  :is(.brand, .backoffice-brand),
+:root[data-embedded='true'] .backoffice-title span,
+:root[data-embedded='true'] :is(.topbar, .auth-topbar) > .brand span {
+  display: inline-flex;
 }
