@@ -65,6 +65,8 @@ interface LoginFormProps {
   initialNext?: string;
 }
 
+const loginRequestTimeoutMs = 45000;
+
 export function LoginForm({
   initialClientId,
   initialRedirectUri,
@@ -176,21 +178,23 @@ export function LoginForm({
     const form = new FormData(event.currentTarget);
 
     try {
-      await requestEmbeddedStorageAccess(Boolean(redirectValidation));
+      await requestEmbeddedStorageAccess();
       const payload: LoginPayload = {
         identifier: String(form.get('identifier') ?? ''),
         password: String(form.get('password') ?? ''),
         ...readClientDevice(),
+        ...(isEmbeddedDocument() ? { embedded: true } : {}),
         ...(redirectValidation
           ? {
               client_id: redirectValidation.clientApplication.clientId,
               redirect_uri: redirectValidation.redirectUri,
               ...(redirectValidation.state ? { state: redirectValidation.state } : {}),
-              ...(isEmbeddedDocument() ? { embedded: true } : {}),
             }
           : {}),
       };
-      const result = await postJson<LoginResponse>('/api/auth/login', payload);
+      const result = await postJson<LoginResponse>('/api/auth/login', payload, {
+        timeoutMs: loginRequestTimeoutMs,
+      });
 
       if (result.nextAction === 'verify_new_device') {
         setPendingLogin(payload);
@@ -234,6 +238,7 @@ export function LoginForm({
       const result = await postJson<LoginResponse>(
         `/api/auth/login/device/${loginChallenge.id}/check`,
         pendingLogin,
+        { timeoutMs: loginRequestTimeoutMs },
       );
 
       if (result.nextAction === 'authenticated') {
@@ -273,6 +278,7 @@ export function LoginForm({
       const result = await postJson<LoginResponse>(
         `/api/auth/login/device-approvals/${loginApproval.id}/check`,
         pendingLogin,
+        { timeoutMs: loginRequestTimeoutMs },
       );
 
       if (result.nextAction === 'authenticated') {
@@ -313,13 +319,17 @@ export function LoginForm({
     setMessage(`正在使用当前账号 ${currentSession.username} 完成外部登录。`);
 
     try {
-      await requestEmbeddedStorageAccess(true);
-      await postJson('/api/auth/login/client-session/current', {
-        client_id: redirectValidation.clientApplication.clientId,
-        redirect_uri: redirectValidation.redirectUri,
-        ...(redirectValidation.state ? { state: redirectValidation.state } : {}),
-        ...(isEmbeddedDocument() ? { embedded: true } : {}),
-      });
+      await requestEmbeddedStorageAccess();
+      await postJson(
+        '/api/auth/login/client-session/current',
+        {
+          client_id: redirectValidation.clientApplication.clientId,
+          redirect_uri: redirectValidation.redirectUri,
+          ...(redirectValidation.state ? { state: redirectValidation.state } : {}),
+          ...(isEmbeddedDocument() ? { embedded: true } : {}),
+        },
+        { timeoutMs: loginRequestTimeoutMs },
+      );
       const redirectTarget = readRedirectTarget(redirectValidation);
       setMessage(
         `将使用当前账号 ${currentSession.username} 返回 ${redirectValidation.clientApplication.name}。`,
@@ -463,13 +473,11 @@ function readSafeInternalNext(value?: string): string | null {
 }
 
 function isEmbeddedDocument(): boolean {
-  return (
-    document.documentElement.dataset.embedded === 'true' || window.self !== window.top
-  );
+  return document.documentElement.dataset.embedded === 'true' || window.self !== window.top;
 }
 
-async function requestEmbeddedStorageAccess(hasExternalRedirect: boolean): Promise<void> {
-  if (!hasExternalRedirect || !isEmbeddedDocument()) {
+async function requestEmbeddedStorageAccess(): Promise<void> {
+  if (!isEmbeddedDocument()) {
     return;
   }
 

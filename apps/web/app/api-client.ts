@@ -9,15 +9,30 @@ export class ApiClientError extends Error {
 
 const defaultApiRequestTimeoutMs = 15000;
 
-export async function getJson<TResponse>(url: string): Promise<TResponse> {
-  const response = await fetchWithTimeout(url, {
-    credentials: 'include',
-  });
+interface ApiRequestOptions {
+  timeoutMs?: number;
+}
+
+export async function getJson<TResponse>(
+  url: string,
+  options: ApiRequestOptions = {},
+): Promise<TResponse> {
+  const response = await fetchWithTimeout(
+    url,
+    {
+      credentials: 'include',
+    },
+    options.timeoutMs,
+  );
 
   return readJsonResponse<TResponse>(response);
 }
 
-export async function postJson<TResponse>(url: string, body?: unknown): Promise<TResponse> {
+export async function postJson<TResponse>(
+  url: string,
+  body?: unknown,
+  options: ApiRequestOptions = {},
+): Promise<TResponse> {
   const init: RequestInit = {
     method: 'POST',
     headers: {
@@ -30,14 +45,18 @@ export async function postJson<TResponse>(url: string, body?: unknown): Promise<
     init.body = JSON.stringify(body);
   }
 
-  const response = await fetchWithTimeout(url, init);
+  const response = await fetchWithTimeout(url, init, options.timeoutMs);
 
   return readJsonResponse<TResponse>(response);
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs = defaultApiRequestTimeoutMs,
+): Promise<Response> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), defaultApiRequestTimeoutMs);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(url, {
