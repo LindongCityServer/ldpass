@@ -20,7 +20,7 @@ import {
 export const SESSION_COOKIE_NAME = 'ldpass_session';
 const CLIENT_SESSION_COOKIE_PREFIX = 'ldpass_client_session_';
 const CLIENT_SESSION_TTL_MS = 1000 * 60 * 5;
-type ClientSessionDeliveryMode = 'top_level' | 'embedded';
+type SessionDeliveryMode = 'top_level' | 'embedded';
 
 export interface AuthenticatedUser {
   id: string;
@@ -55,7 +55,11 @@ export class SessionAuthService {
     request: ApiRequestLike,
     response: ApiResponseLike,
     deviceId?: string,
+    options: {
+      deliveryMode?: SessionDeliveryMode;
+    } = {},
   ): Promise<void> {
+    const deliveryMode = options.deliveryMode ?? 'top_level';
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
 
@@ -70,7 +74,7 @@ export class SessionAuthService {
       },
     });
 
-    this.setSessionCookie(request, response, token, expiresAt);
+    this.setSessionCookie(request, response, token, expiresAt, deliveryMode);
   }
 
   async createClientApplicationSession(
@@ -80,7 +84,7 @@ export class SessionAuthService {
     response: ApiResponseLike,
     options: {
       localSessionPreserved: boolean;
-      deliveryMode?: ClientSessionDeliveryMode;
+      deliveryMode?: SessionDeliveryMode;
     },
   ): Promise<void> {
     const deliveryMode = options.deliveryMode ?? 'top_level';
@@ -174,6 +178,7 @@ export class SessionAuthService {
 
     response.setHeader('Set-Cookie', [
       ...serializeExpiredAuthCookies(request, SESSION_COOKIE_NAME),
+      serializeExpiredEmbeddedAuthCookie(request, SESSION_COOKIE_NAME),
       ...clientSessionCookies.flatMap(({ name }) => [
         ...serializeExpiredAuthCookies(request, name),
         serializeExpiredEmbeddedAuthCookie(request, name),
@@ -446,12 +451,20 @@ export class SessionAuthService {
     response: ApiResponseLike,
     token: string,
     expiresAt: Date,
+    deliveryMode: SessionDeliveryMode,
   ): void {
     this.appendResponseCookie(
       response,
       serializeAuthCookie(request, SESSION_COOKIE_NAME, token, {
         expiresAt,
         maxAgeSeconds: Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000)),
+        ...(deliveryMode === 'embedded'
+          ? {
+              domainMode: 'hostOnly',
+              sameSite: 'None',
+              partitioned: true,
+            }
+          : {}),
       }),
     );
   }

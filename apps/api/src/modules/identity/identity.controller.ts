@@ -370,14 +370,18 @@ export class IdentityController {
     }
 
     if (!redirect) {
-      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id);
+      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id, {
+        deliveryMode: embedded ? 'embedded' : 'top_level',
+      });
       return;
     }
 
     const localSession = await this.sessionAuth.getCurrentSession(request);
 
     if (!localSession) {
-      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id);
+      await this.sessionAuth.createSession(result.user.id, request, response, result.device?.id, {
+        deliveryMode: embedded ? 'embedded' : 'top_level',
+      });
     }
 
     await this.sessionAuth.createClientApplicationSession(
