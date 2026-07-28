@@ -155,6 +155,7 @@ enum AddPassTokenStatus {
 enum WalletActionLinkKind {
   use
   top_up
+  ride_authorization
 }
 
 enum WalletActionLinkStatus {
@@ -168,6 +169,14 @@ enum WalletActionLinkSelectionScope {
   same_provider
   top_up_sources
   all_authorized
+}
+
+enum RideAuthorizationStatus {
+  Authorized
+  Entered
+  Captured
+  Released
+  Expired
 }
 
 enum PassTransferStatus {
@@ -283,6 +292,7 @@ model User {
   receivedPassTransfers PassTransfer[]                @relation("ReceivedPassTransfers")
   notifications         UserNotification[]
   consumedActionLinks   WalletActionLink[]            @relation("ConsumedActionLinks")
+  rideAuthorizations   RideAuthorization[]
   topUpRequests         PassTopUpRequest[]
   avatarChangeRequests  UserAvatarChangeRequest[]
 
@@ -438,6 +448,7 @@ model Provider {
   ledgerEntries             LedgerEntry[]
   redemptionRequests        RedemptionRequest[]
   actionLinks               WalletActionLink[]
+  rideAuthorizations        RideAuthorization[]
   clientApplications        ClientApplication[]
   ticketUpdateRequests      PassTicketUpdateRequest[]
   profileChangeRequests     ProviderProfileChangeRequest[]
@@ -741,6 +752,7 @@ model Pass {
   sourceTopUpRequests  PassTopUpRequest[]        @relation("SourceTopUpPass")
   targetTopUpRequests  PassTopUpRequest[]        @relation("TargetTopUpPass")
   ticketUpdateRequests PassTicketUpdateRequest[]
+  rideAuthorizations   RideAuthorization[]
 
   @@unique([providerId, publicNumber])
   @@index([userId, status, sortOrder])
@@ -800,9 +812,11 @@ model WalletActionLink {
   targetPassId        String?
   selectionScope      WalletActionLinkSelectionScope?
   requestedValue      Decimal
+  externalReferenceId String?
   verificationMethod  VerificationMethod
   note                String?
   expiresAt           DateTime
+  authorizationExpiresAt DateTime?
   consumedByUserId    String?
   consumedAt          DateTime?
   revokedAt           DateTime?
@@ -819,11 +833,44 @@ model WalletActionLink {
   targetPass        Pass?              @relation("ActionLinkTargetPass", fields: [targetPassId], references: [id], onDelete: SetNull)
   consumedByUser    User?              @relation("ConsumedActionLinks", fields: [consumedByUserId], references: [id], onDelete: SetNull)
   topUpRequests     PassTopUpRequest[]
+  rideAuthorization RideAuthorization?
 
   @@index([providerId, status, expiresAt])
   @@index([targetPassId, status])
   @@index([clientApplicationId, status, createdAt])
   @@index([consumedByUserId])
+  @@index([providerId, externalReferenceId])
+}
+
+model RideAuthorization {
+  id                    String                  @id @default(uuid())
+  providerId            String
+  userId                String
+  passId                String
+  actionLinkId          String                  @unique
+  externalReferenceId   String
+  status                RideAuthorizationStatus @default(Authorized)
+  maximumFareValue      Decimal
+  reservedValue         Decimal                 @default(0)
+  capturedValue         Decimal?
+  entryEventId          String?                 @unique
+  captureIdempotencyKey String?                 @unique
+  releaseIdempotencyKey String?                 @unique
+  enteredAt             DateTime?
+  capturedAt            DateTime?
+  releasedAt            DateTime?
+  expiresAt             DateTime
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  provider   Provider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  pass       Pass             @relation(fields: [passId], references: [id], onDelete: Restrict)
+  actionLink WalletActionLink @relation(fields: [actionLinkId], references: [id], onDelete: Restrict)
+
+  @@index([providerId, externalReferenceId, status])
+  @@index([passId, status, expiresAt])
+  @@index([userId, status, createdAt])
 }
 
 model LedgerEntry {

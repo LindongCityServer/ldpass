@@ -79,7 +79,11 @@ export type ProviderApiKeyScope =
   | 'redemptions:create'
   | 'redemptions:cancel'
   | 'redemptions:reverse'
-  | 'redemptions:read';
+  | 'redemptions:read'
+  | 'ride_authorizations:read'
+  | 'ride_authorizations:enter'
+  | 'ride_authorizations:capture'
+  | 'ride_authorizations:release';
 
 export type RedemptionStatus =
   | 'Created'
@@ -92,11 +96,18 @@ export type RedemptionStatus =
   | 'Cancelled'
   | 'Expired';
 
-export type WalletActionLinkKind = 'use' | 'top_up';
+export type WalletActionLinkKind = 'use' | 'top_up' | 'ride_authorization';
 
 export type WalletActionLinkStatus = 'Active' | 'Consumed' | 'Expired' | 'Revoked';
 
 export type WalletActionLinkSelectionScope = 'same_provider' | 'top_up_sources' | 'all_authorized';
+
+export type RideAuthorizationStatus =
+  | 'Authorized'
+  | 'Entered'
+  | 'Captured'
+  | 'Released'
+  | 'Expired';
 
 export type PassTopUpStatus =
   | 'Created'

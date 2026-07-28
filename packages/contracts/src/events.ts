@@ -1042,8 +1042,64 @@ export interface WalletActionLinkConsumed extends BaseEvent {
     userId: string;
     kind: WalletActionLinkKind;
     value: string;
-    referenceType: 'redemption_request' | 'pass_top_up';
+    referenceType: 'redemption_request' | 'pass_top_up' | 'ride_authorization';
     referenceId: string;
+  };
+}
+
+export interface RideAuthorizationGranted extends BaseEvent {
+  type: 'RideAuthorizationGranted';
+  payload: {
+    authorizationId: string;
+    actionLinkId: string;
+    providerId: string;
+    userId: string;
+    passId: string;
+    externalReferenceId: string;
+    maximumFareValue: string;
+    expiresAt: string;
+  };
+}
+
+export interface RideAuthorizationEntered extends BaseEvent {
+  type: 'RideAuthorizationEntered';
+  payload: {
+    authorizationId: string;
+    providerId: string;
+    userId: string;
+    passId: string;
+    externalReferenceId: string;
+    reservedValue: string;
+    deviceEventId: string;
+    enteredAt: string;
+  };
+}
+
+export interface RideAuthorizationCaptured extends BaseEvent {
+  type: 'RideAuthorizationCaptured';
+  payload: {
+    authorizationId: string;
+    providerId: string;
+    userId: string;
+    passId: string;
+    externalReferenceId: string;
+    capturedValue: string;
+    releasedValue: string;
+    capturedAt: string;
+  };
+}
+
+export interface RideAuthorizationReleased extends BaseEvent {
+  type: 'RideAuthorizationReleased';
+  payload: {
+    authorizationId: string;
+    providerId: string;
+    userId: string;
+    passId: string;
+    externalReferenceId: string;
+    releasedValue: string;
+    reason: string;
+    releasedAt: string;
   };
 }
 
@@ -1454,6 +1510,10 @@ export type DomainEvent =
   | WalletActionLinkExpired
   | WalletActionLinkRevoked
   | WalletActionLinkTargetSelected
+  | RideAuthorizationGranted
+  | RideAuthorizationEntered
+  | RideAuthorizationCaptured
+  | RideAuthorizationReleased
   | AddPassTokenRevoked
   | AddPassTokenReissued
   | PassBalanceChanged

@@ -1,4 +1,16 @@
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import type { ProviderApiKeyScope } from '@ldpass/contracts';
 
 export const providerApiKeyScopes = [
@@ -18,6 +30,10 @@ export const providerApiKeyScopes = [
   'redemptions:cancel',
   'redemptions:reverse',
   'redemptions:read',
+  'ride_authorizations:read',
+  'ride_authorizations:enter',
+  'ride_authorizations:capture',
+  'ride_authorizations:release',
 ] as const satisfies ProviderApiKeyScope[];
 
 export class CreateProviderApiKeyDto {

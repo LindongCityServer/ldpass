@@ -7,12 +7,15 @@ import { ActionLinksService } from './action-links.service.js';
 import {
   BatchRevokeWalletActionLinksDto,
   CancelWalletActionLinkTopUpRequestDto,
+  CaptureRideAuthorizationDto,
   CompleteWalletActionLinkServerRedemptionDto,
   ConfirmWalletActionLinkWithPinDto,
   ConfirmWalletActionLinkWithServerDto,
   CreateWalletActionLinkDto,
   PreviewWalletActionLinkQueryDto,
   RevokeWalletActionLinkDto,
+  ReleaseRideAuthorizationDto,
+  EnterRideAuthorizationDto,
   StartWalletActionLinkServerRedemptionDto,
   WalletActionLinkQueryDto,
 } from './dto.js';
@@ -93,7 +96,8 @@ export class ActionLinksController {
     return this.providerApiKeyAuth.executeSignedWrite(
       request,
       'action_links:revoke',
-      (providerActor) => this.actionLinksService.revokeProviderActionLink(actionLinkId, dto, providerActor),
+      (providerActor) =>
+        this.actionLinksService.revokeProviderActionLink(actionLinkId, dto, providerActor),
     );
   }
 
@@ -106,6 +110,73 @@ export class ActionLinksController {
       request,
       'action_links:revoke',
       (providerActor) => this.actionLinksService.batchRevokeProviderActionLinks(dto, providerActor),
+    );
+  }
+
+  @Post('open/provider/ride-authorizations/:authorizationId/enter')
+  async enterOpenProviderRideAuthorization(
+    @Param('authorizationId') authorizationId: string,
+    @Body() dto: EnterRideAuthorizationDto,
+    @Req() request: ApiRequestLike,
+  ) {
+    return this.providerApiKeyAuth.executeSignedWrite(
+      request,
+      'ride_authorizations:enter',
+      (providerActor) =>
+        this.actionLinksService.enterProviderRideAuthorization(authorizationId, dto, providerActor),
+    );
+  }
+
+  @Get('open/provider/ride-authorizations/:authorizationId')
+  async readOpenProviderRideAuthorization(
+    @Param('authorizationId') authorizationId: string,
+    @Req() request: ApiRequestLike,
+  ) {
+    const providerActor = await this.providerApiKeyAuth.requireScope(
+      request,
+      'ride_authorizations:read',
+    );
+    return this.actionLinksService.readProviderRideAuthorizationForProvider(
+      authorizationId,
+      providerActor,
+    );
+  }
+
+  @Post('open/provider/ride-authorizations/:authorizationId/capture')
+  async captureOpenProviderRideAuthorization(
+    @Param('authorizationId') authorizationId: string,
+    @Body() dto: CaptureRideAuthorizationDto,
+    @Req() request: ApiRequestLike,
+  ) {
+    return this.providerApiKeyAuth.executeSignedWrite(
+      request,
+      'ride_authorizations:capture',
+      (providerActor, idempotencyKey) =>
+        this.actionLinksService.captureProviderRideAuthorization(
+          authorizationId,
+          dto,
+          providerActor,
+          idempotencyKey,
+        ),
+    );
+  }
+
+  @Post('open/provider/ride-authorizations/:authorizationId/release')
+  async releaseOpenProviderRideAuthorization(
+    @Param('authorizationId') authorizationId: string,
+    @Body() dto: ReleaseRideAuthorizationDto,
+    @Req() request: ApiRequestLike,
+  ) {
+    return this.providerApiKeyAuth.executeSignedWrite(
+      request,
+      'ride_authorizations:release',
+      (providerActor, idempotencyKey) =>
+        this.actionLinksService.releaseProviderRideAuthorization(
+          authorizationId,
+          dto,
+          providerActor,
+          idempotencyKey,
+        ),
     );
   }
 

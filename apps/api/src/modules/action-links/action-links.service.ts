@@ -31,9 +31,12 @@ import { PrismaService } from '../../shared/database/prisma.service.js';
 import { BdslmClientService } from '../bdslm/bdslm-client.service.js';
 import type {
   BatchRevokeWalletActionLinksDto,
+  CaptureRideAuthorizationDto,
   ConfirmWalletActionLinkWithPinDto,
   ConfirmWalletActionLinkWithServerDto,
   CreateWalletActionLinkDto,
+  EnterRideAuthorizationDto,
+  ReleaseRideAuthorizationDto,
   RevokeWalletActionLinkDto,
   StartWalletActionLinkServerRedemptionDto,
   WalletActionLinkQueryDto,
@@ -116,6 +119,12 @@ export class ActionLinksService {
     providerAccount: AuthenticatedProviderAccount,
   ) {
     const value = normalizePositiveDecimal(dto.requestedValue, '链接数值必须大于 0。');
+    if (dto.kind === 'ride_authorization' && dto.verificationMethod !== 'pin') {
+      throw new BadRequestException('乘车预授权当前需要使用 PIN 确认。');
+    }
+    if (dto.kind === 'ride_authorization' && !dto.externalReferenceId?.trim()) {
+      throw new BadRequestException('乘车预授权必须关联外部行程编号。');
+    }
     const clientApplication = await this.readBoundClientApplication(
       dto.clientId,
       providerAccount.providerId,
@@ -124,7 +133,7 @@ export class ActionLinksService {
       ? await this.readActionLinkTargetPass(dto.targetPassId, providerAccount.providerId)
       : null;
 
-    if (!targetPass && dto.kind !== 'use') {
+    if (!targetPass && dto.kind === 'top_up') {
       throw new BadRequestException('额度补充链接必须指定目标卡券。');
     }
 
@@ -141,9 +150,14 @@ export class ActionLinksService {
     }
 
     const token = createActionToken();
+    const now = new Date();
     const expiresAt = new Date(
-      Date.now() + 1000 * (dto.expiresInSeconds ?? defaultActionLinkExpiresInSeconds),
+      now.getTime() + 1000 * (dto.expiresInSeconds ?? defaultActionLinkExpiresInSeconds),
     );
+    const authorizationExpiresAt =
+      dto.kind === 'ride_authorization'
+        ? new Date(now.getTime() + 1000 * (dto.authorizationExpiresInSeconds ?? 4 * 60 * 60))
+        : null;
     const actionLink = await this.prisma.walletActionLink.create({
       data: {
         tokenHash: hashActionToken(token),
@@ -153,9 +167,11 @@ export class ActionLinksService {
         targetPassId: targetPass?.id ?? null,
         selectionScope: targetPass ? null : dto.selectionScope!,
         requestedValue: value,
+        externalReferenceId: dto.externalReferenceId?.trim() || null,
         verificationMethod: dto.verificationMethod,
         note: dto.note?.trim() || null,
         expiresAt,
+        authorizationExpiresAt,
         createdByType: 'provider',
         createdById: providerAccount.id,
       },
@@ -249,14 +265,14 @@ export class ActionLinksService {
 
   private assertActionLinkTargetPass(
     targetPass: Awaited<ReturnType<ActionLinksService['readActionLinkTargetPass']>>,
-    kind: 'use' | 'top_up',
+    kind: 'use' | 'top_up' | 'ride_authorization',
     value: string,
   ): void {
     if (!targetPass.userId || !targetPass.user) {
       throw new BadRequestException('目标卡券尚未被用户领取，不能生成操作链接。');
     }
 
-    if (kind === 'use') {
+    if (kind === 'use' || kind === 'ride_authorization') {
       if (targetPass.status !== 'Added' && targetPass.status !== 'Active') {
         throw new BadRequestException('当前卡券状态不能生成消耗链接。');
       }
@@ -530,6 +546,12 @@ export class ActionLinksService {
       await this.verifyUserPin(user, dto.pin, actionLink.id, 'pass_use');
       actionLink = await this.lockSelectedActionLinkTarget(actionLink, user);
       return this.confirmUseActionLink(actionLink, user);
+    }
+
+    if (actionLink.kind === 'ride_authorization') {
+      await this.verifyUserPin(user, dto.pin, actionLink.id, 'pass_use');
+      actionLink = await this.lockSelectedActionLinkTarget(actionLink, user);
+      return this.confirmRideAuthorizationActionLink(actionLink, user);
     }
 
     if (!dto.sourcePassId) {
@@ -1128,6 +1150,376 @@ export class ActionLinksService {
         createdAt: result.ledgerEntry.createdAt.toISOString(),
       },
     };
+  }
+
+  private async confirmRideAuthorizationActionLink(
+    actionLink: ResolvedWalletActionLinkRecord,
+    user: AuthenticatedUser,
+  ) {
+    if (!actionLink.externalReferenceId) {
+      throw new BadRequestException('乘车预授权缺少外部行程编号。');
+    }
+
+    let authorization = await this.prisma.rideAuthorization.findUnique({
+      where: { actionLinkId: actionLink.id },
+    });
+    let created = false;
+    if (!authorization) {
+      try {
+        authorization = await this.prisma.rideAuthorization.create({
+          data: {
+            providerId: actionLink.providerId,
+            userId: user.id,
+            passId: actionLink.targetPassId,
+            actionLinkId: actionLink.id,
+            externalReferenceId: actionLink.externalReferenceId,
+            maximumFareValue: actionLink.requestedValue,
+            expiresAt: actionLink.authorizationExpiresAt ?? actionLink.expiresAt,
+          },
+        });
+        created = true;
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) {
+          throw error;
+        }
+        authorization = await this.prisma.rideAuthorization.findUnique({
+          where: { actionLinkId: actionLink.id },
+        });
+      }
+    }
+
+    if (!authorization) {
+      throw new ConflictException('乘车授权创建冲突，请重试。');
+    }
+
+    if (authorization.userId !== user.id || authorization.passId !== actionLink.targetPassId) {
+      throw new ConflictException('该操作链接已被其他乘车授权上下文占用。');
+    }
+
+    const consumedLink = await this.consumeActionLink(
+      actionLink,
+      user,
+      'ride_authorization',
+      authorization.id,
+    );
+
+    if (created) {
+      await this.eventBus.publish({
+        type: 'RideAuthorizationGranted',
+        eventId: randomUUID(),
+        occurredAt: new Date().toISOString(),
+        actorType: 'user',
+        actorId: user.id,
+        payload: {
+          authorizationId: authorization.id,
+          actionLinkId: actionLink.id,
+          providerId: authorization.providerId,
+          userId: authorization.userId,
+          passId: authorization.passId,
+          externalReferenceId: authorization.externalReferenceId,
+          maximumFareValue: authorization.maximumFareValue.toString(),
+          expiresAt: authorization.expiresAt.toISOString(),
+        },
+      });
+    }
+
+    return {
+      status: 'authorized',
+      actionLink: this.toWalletActionLink(consumedLink),
+      targetPass: this.toWalletPass(actionLink.targetPass),
+      rideAuthorization: this.toRideAuthorization(authorization),
+      ledgerEntry: null,
+    };
+  }
+
+  async enterProviderRideAuthorization(
+    authorizationId: string,
+    dto: EnterRideAuthorizationDto,
+    providerAccount: AuthenticatedProviderAccount,
+  ) {
+    const authorization = await this.readProviderRideAuthorization(
+      authorizationId,
+      providerAccount,
+    );
+    if (authorization.entryEventId === dto.deviceEventId) {
+      return { rideAuthorization: this.toRideAuthorization(authorization) };
+    }
+    if (authorization.status !== 'Authorized') {
+      throw new ConflictException('该乘车授权当前不能进站冻结。');
+    }
+    if (authorization.expiresAt <= new Date()) {
+      throw new BadRequestException('该乘车授权已过期。');
+    }
+    if (authorization.pass.status !== 'Added' && authorization.pass.status !== 'Active') {
+      throw new BadRequestException('当前卡券状态不能用于乘车。');
+    }
+
+    const maximumFareValue = authorization.maximumFareValue.toString();
+
+    const enteredAt = new Date();
+    const enteredAuthorization = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.rideAuthorization.updateMany({
+        where: { id: authorization.id, status: 'Authorized', entryEventId: null },
+        data: {
+          status: 'Entered',
+          reservedValue: maximumFareValue,
+          entryEventId: dto.deviceEventId,
+          enteredAt,
+        },
+      });
+      if (updated.count === 0) {
+        const current = await tx.rideAuthorization.findUnique({
+          where: { id: authorization.id },
+          include: { pass: true },
+        });
+        if (current?.entryEventId === dto.deviceEventId) {
+          return current;
+        }
+        throw new ConflictException('该乘车授权已被其他设备事件处理。');
+      }
+
+      const currentPass = await tx.pass.findUniqueOrThrow({
+        where: { id: authorization.passId },
+      });
+      if (
+        !canConsumeValue(
+          currentPass.balanceValue.toString(),
+          currentPass.frozenValue.toString(),
+          currentPass.overdraftLimit.toString(),
+          maximumFareValue,
+        )
+      ) {
+        throw new BadRequestException('当前卡券可用额度不足，无法进站。');
+      }
+      await tx.pass.update({
+        where: { id: authorization.passId },
+        data: {
+          frozenValue: addDecimalStrings(currentPass.frozenValue.toString(), maximumFareValue),
+        },
+      });
+      return tx.rideAuthorization.findUniqueOrThrow({
+        where: { id: authorization.id },
+        include: { pass: { include: { template: true } } },
+      });
+    });
+
+    await this.eventBus.publish({
+      type: 'RideAuthorizationEntered',
+      eventId: randomUUID(),
+      occurredAt: enteredAt.toISOString(),
+      actorType: 'provider',
+      actorId: providerAccount.id,
+      payload: {
+        authorizationId: enteredAuthorization.id,
+        providerId: enteredAuthorization.providerId,
+        userId: enteredAuthorization.userId,
+        passId: enteredAuthorization.passId,
+        externalReferenceId: enteredAuthorization.externalReferenceId,
+        reservedValue: enteredAuthorization.reservedValue.toString(),
+        deviceEventId: dto.deviceEventId,
+        enteredAt: enteredAuthorization.enteredAt?.toISOString() ?? enteredAt.toISOString(),
+      },
+    });
+    return { rideAuthorization: this.toRideAuthorization(enteredAuthorization) };
+  }
+
+  async readProviderRideAuthorizationForProvider(
+    authorizationId: string,
+    providerAccount: AuthenticatedProviderAccount,
+  ) {
+    const authorization = await this.readProviderRideAuthorization(
+      authorizationId,
+      providerAccount,
+    );
+    return { rideAuthorization: this.toRideAuthorization(authorization) };
+  }
+
+  async captureProviderRideAuthorization(
+    authorizationId: string,
+    dto: CaptureRideAuthorizationDto,
+    providerAccount: AuthenticatedProviderAccount,
+    idempotencyKey: string,
+  ) {
+    const fareValue = normalizeNonNegativeDecimal(dto.fareValue, '票价格式无效。');
+    const authorization = await this.readProviderRideAuthorization(
+      authorizationId,
+      providerAccount,
+    );
+    if (
+      authorization.status === 'Captured' &&
+      authorization.captureIdempotencyKey === idempotencyKey
+    ) {
+      return { rideAuthorization: this.toRideAuthorization(authorization) };
+    }
+    if (authorization.status !== 'Entered') {
+      throw new ConflictException('该乘车授权尚未进站或已完成结算。');
+    }
+    if (compareDecimalStrings(fareValue, authorization.reservedValue.toString()) > 0) {
+      throw new BadRequestException('实际票价不能超过已冻结的最高票价。');
+    }
+
+    const capturedAt = new Date();
+    const capturedAuthorization = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.rideAuthorization.findUniqueOrThrow({
+        where: { id: authorization.id },
+        include: { pass: { include: { template: true } } },
+      });
+      if (current.status === 'Captured' && current.captureIdempotencyKey === idempotencyKey) {
+        return current;
+      }
+      if (current.status !== 'Entered') {
+        throw new ConflictException('该乘车授权已被其他结算请求处理。');
+      }
+
+      const beforeValue = current.pass.balanceValue.toString();
+      const afterValue = subtractDecimalStrings(beforeValue, fareValue);
+      const nextFrozenValue = subtractDecimalStrings(
+        current.pass.frozenValue.toString(),
+        current.reservedValue.toString(),
+      );
+      if (compareDecimalStrings(nextFrozenValue, '0') < 0) {
+        throw new ConflictException('卡券冻结额度异常，无法完成本次结算。');
+      }
+
+      await tx.pass.update({
+        where: { id: current.passId },
+        data: {
+          balanceValue: afterValue,
+          frozenValue: nextFrozenValue,
+          status: compareDecimalStrings(afterValue, '0') <= 0 ? 'UsedUp' : 'Active',
+        },
+      });
+      await tx.ledgerEntry.create({
+        data: {
+          passId: current.passId,
+          userId: current.userId,
+          providerId: current.providerId,
+          benefitType: current.pass.template.benefitType,
+          reason: 'use',
+          beforeValue,
+          changeValue: `-${fareValue}`,
+          afterValue,
+          idempotencyKey: `ride-capture:${idempotencyKey}`,
+          referenceType: 'ride_authorization',
+          referenceId: current.id,
+          note: `乘车行程 ${current.externalReferenceId} 结算`,
+          createdByType: 'provider',
+          createdById: providerAccount.id,
+        },
+      });
+      return tx.rideAuthorization.update({
+        where: { id: current.id },
+        data: {
+          status: 'Captured',
+          capturedValue: fareValue,
+          captureIdempotencyKey: idempotencyKey,
+          capturedAt,
+        },
+        include: { pass: true },
+      });
+    });
+
+    await this.eventBus.publish({
+      type: 'RideAuthorizationCaptured',
+      eventId: randomUUID(),
+      occurredAt: capturedAt.toISOString(),
+      actorType: 'provider',
+      actorId: providerAccount.id,
+      payload: {
+        authorizationId: capturedAuthorization.id,
+        providerId: capturedAuthorization.providerId,
+        userId: capturedAuthorization.userId,
+        passId: capturedAuthorization.passId,
+        externalReferenceId: capturedAuthorization.externalReferenceId,
+        capturedValue: capturedAuthorization.capturedValue?.toString() ?? fareValue,
+        releasedValue: subtractDecimalStrings(
+          capturedAuthorization.reservedValue.toString(),
+          capturedAuthorization.capturedValue?.toString() ?? fareValue,
+        ),
+        capturedAt: capturedAuthorization.capturedAt?.toISOString() ?? capturedAt.toISOString(),
+      },
+    });
+    return { rideAuthorization: this.toRideAuthorization(capturedAuthorization) };
+  }
+
+  async releaseProviderRideAuthorization(
+    authorizationId: string,
+    dto: ReleaseRideAuthorizationDto,
+    providerAccount: AuthenticatedProviderAccount,
+    idempotencyKey: string,
+  ) {
+    const authorization = await this.readProviderRideAuthorization(
+      authorizationId,
+      providerAccount,
+    );
+    if (authorization.status === 'Released') {
+      return { rideAuthorization: this.toRideAuthorization(authorization) };
+    }
+    if (authorization.status === 'Captured') {
+      throw new ConflictException('已结算的乘车授权不能释放。');
+    }
+    if (authorization.status === 'Expired') {
+      return { rideAuthorization: this.toRideAuthorization(authorization) };
+    }
+
+    const releasedAt = new Date();
+    const reason = dto.reason?.trim() || 'provider_released';
+    const releasedAuthorization = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.rideAuthorization.findUniqueOrThrow({
+        where: { id: authorization.id },
+        include: { pass: true },
+      });
+      if (current.status === 'Released') {
+        return current;
+      }
+      if (current.status === 'Captured') {
+        throw new ConflictException('已结算的乘车授权不能释放。');
+      }
+      if (
+        current.status === 'Entered' &&
+        compareDecimalStrings(current.reservedValue.toString(), '0') > 0
+      ) {
+        const nextFrozenValue = subtractDecimalStrings(
+          current.pass.frozenValue.toString(),
+          current.reservedValue.toString(),
+        );
+        if (compareDecimalStrings(nextFrozenValue, '0') < 0) {
+          throw new ConflictException('卡券冻结额度异常，无法释放本次乘车授权。');
+        }
+        await tx.pass.update({
+          where: { id: current.passId },
+          data: { frozenValue: nextFrozenValue },
+        });
+      }
+      return tx.rideAuthorization.update({
+        where: { id: current.id },
+        data: {
+          status: 'Released',
+          releaseIdempotencyKey: idempotencyKey,
+          releasedAt,
+        },
+        include: { pass: true },
+      });
+    });
+
+    await this.eventBus.publish({
+      type: 'RideAuthorizationReleased',
+      eventId: randomUUID(),
+      occurredAt: releasedAt.toISOString(),
+      actorType: 'provider',
+      actorId: providerAccount.id,
+      payload: {
+        authorizationId: releasedAuthorization.id,
+        providerId: releasedAuthorization.providerId,
+        userId: releasedAuthorization.userId,
+        passId: releasedAuthorization.passId,
+        externalReferenceId: releasedAuthorization.externalReferenceId,
+        releasedValue: releasedAuthorization.reservedValue.toString(),
+        reason,
+        releasedAt: releasedAuthorization.releasedAt?.toISOString() ?? releasedAt.toISOString(),
+      },
+    });
+    return { rideAuthorization: this.toRideAuthorization(releasedAuthorization) };
   }
 
   private async confirmTopUpActionLink(
@@ -2296,27 +2688,65 @@ export class ActionLinksService {
   private async consumeActionLink(
     actionLink: ResolvedWalletActionLinkRecord,
     user: AuthenticatedUser,
-    referenceType: 'redemption_request' | 'pass_top_up',
+    referenceType: 'redemption_request' | 'pass_top_up' | 'ride_authorization',
     referenceId: string,
   ) {
     if (actionLink.status === 'Consumed') {
       return actionLink;
     }
 
-    const consumedLink = (await this.prisma.walletActionLink.update({
+    const transitioned = await this.prisma.walletActionLink.updateMany({
       where: {
         id: actionLink.id,
+        status: 'Active',
       },
       data: {
         status: 'Consumed',
         consumedByUserId: user.id,
         consumedAt: new Date(),
       },
+    });
+    const consumedLink = (await this.prisma.walletActionLink.findUnique({
+      where: { id: actionLink.id },
       include: this.actionLinkInclude(),
-    })) as ResolvedWalletActionLinkRecord;
+    })) as ResolvedWalletActionLinkRecord | null;
 
-    await this.publishActionLinkConsumed(consumedLink, user.id, referenceType, referenceId);
+    if (!consumedLink) {
+      throw new NotFoundException('操作链接不存在。');
+    }
+    if (consumedLink.status !== 'Consumed') {
+      throw new ConflictException('操作链接状态已发生变化，不能重复确认。');
+    }
+
+    if (transitioned.count > 0) {
+      await this.publishActionLinkConsumed(consumedLink, user.id, referenceType, referenceId);
+    }
     return consumedLink;
+  }
+
+  private async readProviderRideAuthorization(
+    authorizationId: string,
+    providerAccount: AuthenticatedProviderAccount,
+  ) {
+    const authorization = await this.prisma.rideAuthorization.findFirst({
+      where: {
+        id: authorizationId,
+        providerId: providerAccount.providerId,
+      },
+      include: {
+        pass: {
+          include: {
+            template: true,
+          },
+        },
+      },
+    });
+
+    if (!authorization) {
+      throw new NotFoundException('乘车授权不存在或不属于当前发卡方。');
+    }
+
+    return authorization;
   }
 
   private async markActionLinkExpired(actionLink: WalletActionLinkRecord) {
@@ -2508,6 +2938,92 @@ export class ActionLinksService {
     };
   }
 
+  async expireOutdatedRideAuthorizations(take = 100): Promise<{ expiredCount: number }> {
+    const now = new Date();
+    const candidates = await this.prisma.rideAuthorization.findMany({
+      where: {
+        status: {
+          in: ['Authorized', 'Entered'],
+        },
+        expiresAt: {
+          lte: now,
+        },
+      },
+      include: {
+        pass: true,
+      },
+      take,
+    });
+
+    let expiredCount = 0;
+    for (const candidate of candidates) {
+      const expiredAuthorization = await this.prisma.$transaction(async (tx) => {
+        const current = await tx.rideAuthorization.findUnique({
+          where: { id: candidate.id },
+          include: { pass: true },
+        });
+        if (
+          !current ||
+          (current.status !== 'Authorized' && current.status !== 'Entered') ||
+          current.expiresAt > now
+        ) {
+          return null;
+        }
+
+        if (
+          current.status === 'Entered' &&
+          compareDecimalStrings(current.reservedValue.toString(), '0') > 0
+        ) {
+          const nextFrozenValue = subtractDecimalStrings(
+            current.pass.frozenValue.toString(),
+            current.reservedValue.toString(),
+          );
+          if (compareDecimalStrings(nextFrozenValue, '0') < 0) {
+            throw new ConflictException('卡券冻结额度异常，无法自动释放过期乘车授权。');
+          }
+          await tx.pass.update({
+            where: { id: current.passId },
+            data: { frozenValue: nextFrozenValue },
+          });
+        }
+
+        return tx.rideAuthorization.update({
+          where: { id: current.id },
+          data: {
+            status: 'Expired',
+            releaseIdempotencyKey: `ride-expiry:${current.id}`,
+            releasedAt: now,
+          },
+          include: { pass: true },
+        });
+      });
+
+      if (!expiredAuthorization) {
+        continue;
+      }
+      expiredCount += 1;
+      await this.eventBus.publish({
+        type: 'RideAuthorizationReleased',
+        eventId: randomUUID(),
+        occurredAt: now.toISOString(),
+        actorType: 'system',
+        actorId: 'system',
+        payload: {
+          authorizationId: expiredAuthorization.id,
+          providerId: expiredAuthorization.providerId,
+          userId: expiredAuthorization.userId,
+          passId: expiredAuthorization.passId,
+          externalReferenceId: expiredAuthorization.externalReferenceId,
+          releasedValue: expiredAuthorization.reservedValue.toString(),
+          reason: 'authorization_expired',
+          releasedAt: expiredAuthorization.releasedAt?.toISOString() ?? now.toISOString(),
+        },
+      });
+    }
+
+    return { expiredCount };
+  }
+
   private async publishUseSucceededEvents(input: {
     actionLink: ResolvedWalletActionLinkRecord;
     redemptionRequestId: string;
@@ -2644,7 +3160,7 @@ export class ActionLinksService {
   private async publishActionLinkConsumed(
     actionLink: ResolvedWalletActionLinkRecord,
     userId: string,
-    referenceType: 'redemption_request' | 'pass_top_up',
+    referenceType: 'redemption_request' | 'pass_top_up' | 'ride_authorization',
     referenceId: string,
   ) {
     await this.eventBus.publish({
@@ -2744,10 +3260,49 @@ export class ActionLinksService {
       verificationMethod: actionLink.verificationMethod,
       note: actionLink.note,
       expiresAt: actionLink.expiresAt.toISOString(),
+      authorizationExpiresAt: actionLink.authorizationExpiresAt?.toISOString() ?? null,
       consumedAt: actionLink.consumedAt?.toISOString() ?? null,
       revokedAt: actionLink.revokedAt?.toISOString() ?? null,
       revokeReason: actionLink.revokeReason,
       createdAt: actionLink.createdAt.toISOString(),
+    };
+  }
+
+  private toRideAuthorization(authorization: {
+    id: string;
+    providerId: string;
+    userId: string;
+    passId: string;
+    actionLinkId: string;
+    externalReferenceId: string;
+    status: string;
+    maximumFareValue: Prisma.Decimal;
+    reservedValue: Prisma.Decimal;
+    capturedValue: Prisma.Decimal | null;
+    entryEventId: string | null;
+    enteredAt: Date | null;
+    capturedAt: Date | null;
+    releasedAt: Date | null;
+    expiresAt: Date;
+    createdAt: Date;
+  }) {
+    return {
+      id: authorization.id,
+      providerId: authorization.providerId,
+      userId: authorization.userId,
+      passId: authorization.passId,
+      actionLinkId: authorization.actionLinkId,
+      externalReferenceId: authorization.externalReferenceId,
+      status: authorization.status,
+      maximumFareValue: authorization.maximumFareValue.toString(),
+      reservedValue: authorization.reservedValue.toString(),
+      capturedValue: authorization.capturedValue?.toString() ?? null,
+      entryEventId: authorization.entryEventId,
+      enteredAt: authorization.enteredAt?.toISOString() ?? null,
+      capturedAt: authorization.capturedAt?.toISOString() ?? null,
+      releasedAt: authorization.releasedAt?.toISOString() ?? null,
+      expiresAt: authorization.expiresAt.toISOString(),
+      createdAt: authorization.createdAt.toISOString(),
     };
   }
 
@@ -2826,6 +3381,15 @@ function createActionToken(): string {
   return `ACT-${randomBytes(24).toString('base64url')}`;
 }
 
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'P2002'
+  );
+}
+
 function hashActionToken(value: string): string {
   return createHash('sha256').update(value.trim()).digest('base64url');
 }
@@ -2882,6 +3446,18 @@ function normalizePositiveDecimal(value: string, message = '数值必须大于 0
   if (
     !/^\d+(\.\d{1,6})?$/.test(normalizedValue) ||
     compareDecimalStrings(normalizedValue, '0') <= 0
+  ) {
+    throw new BadRequestException(message);
+  }
+
+  return normalizedValue;
+}
+
+function normalizeNonNegativeDecimal(value: string, message = '数值格式无效。'): string {
+  const normalizedValue = value.trim();
+  if (
+    !/^\d+(\.\d{1,6})?$/.test(normalizedValue) ||
+    compareDecimalStrings(normalizedValue, '0') < 0
   ) {
     throw new BadRequestException(message);
   }

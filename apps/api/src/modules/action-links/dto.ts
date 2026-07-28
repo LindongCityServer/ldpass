@@ -14,8 +14,8 @@ import {
 } from 'class-validator';
 
 export class CreateWalletActionLinkDto {
-  @IsIn(['use', 'top_up'])
-  kind!: 'use' | 'top_up';
+  @IsIn(['use', 'top_up', 'ride_authorization'])
+  kind!: 'use' | 'top_up' | 'ride_authorization';
 
   @IsOptional()
   @IsUUID()
@@ -34,6 +34,11 @@ export class CreateWalletActionLinkDto {
   @Matches(/^\d+(\.\d{1,6})?$/)
   requestedValue!: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  externalReferenceId?: string;
+
   @IsIn(['server_account', 'pin'])
   verificationMethod!: 'server_account' | 'pin';
 
@@ -44,6 +49,12 @@ export class CreateWalletActionLinkDto {
   expiresInSeconds?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(300)
+  @Max(14_400)
+  authorizationExpiresInSeconds?: number;
+
+  @IsOptional()
   @IsString()
   @MaxLength(500)
   note?: string;
@@ -51,8 +62,8 @@ export class CreateWalletActionLinkDto {
 
 export class WalletActionLinkQueryDto {
   @IsOptional()
-  @IsIn(['use', 'top_up'])
-  kind?: 'use' | 'top_up';
+  @IsIn(['use', 'top_up', 'ride_authorization'])
+  kind?: 'use' | 'top_up' | 'ride_authorization';
 
   @IsOptional()
   @IsIn(['Active', 'Consumed', 'Expired', 'Revoked'])
@@ -149,5 +160,23 @@ export class CancelWalletActionLinkTopUpRequestDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  reason?: string;
+}
+
+export class EnterRideAuthorizationDto {
+  @IsUUID()
+  deviceEventId!: string;
+}
+
+export class CaptureRideAuthorizationDto {
+  @IsString()
+  @Matches(/^\d+(\.\d{1,6})?$/)
+  fareValue!: string;
+}
+
+export class ReleaseRideAuthorizationDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
   reason?: string;
 }

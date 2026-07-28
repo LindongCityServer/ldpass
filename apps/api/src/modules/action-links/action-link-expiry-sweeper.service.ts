@@ -39,9 +39,14 @@ export class ActionLinkExpirySweeperService implements OnModuleInit, OnModuleDes
     this.isProcessing = true;
     try {
       const batchSize = readPositiveInt(process.env.ACTION_LINK_EXPIRY_SWEEP_BATCH_SIZE, 100);
-      const result = await this.actionLinksService.expireOutdatedActionLinks(undefined, batchSize);
-      if (result.expiredCount > 0) {
-        this.logger.log(`已清理 ${result.expiredCount} 条过期操作链接。`);
+      const [actionLinkResult, rideAuthorizationResult] = await Promise.all([
+        this.actionLinksService.expireOutdatedActionLinks(undefined, batchSize),
+        this.actionLinksService.expireOutdatedRideAuthorizations(batchSize),
+      ]);
+      if (actionLinkResult.expiredCount > 0 || rideAuthorizationResult.expiredCount > 0) {
+        this.logger.log(
+          `已清理 ${actionLinkResult.expiredCount} 条过期操作链接和 ${rideAuthorizationResult.expiredCount} 条过期乘车授权。`,
+        );
       }
     } catch (error) {
       this.logger.warn(error instanceof Error ? error.message : '操作链接过期清理失败。');

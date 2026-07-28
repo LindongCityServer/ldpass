@@ -1,4 +1,15 @@
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import type { DomainEventType } from '@ldpass/contracts';
 
 export const providerWebhookEventTypes = [
@@ -10,6 +21,10 @@ export const providerWebhookEventTypes = [
   'WalletActionLinkConsumed',
   'WalletActionLinkExpired',
   'WalletActionLinkRevoked',
+  'RideAuthorizationGranted',
+  'RideAuthorizationEntered',
+  'RideAuthorizationCaptured',
+  'RideAuthorizationReleased',
   'PassTopUpRequested',
   'PassTopUpSucceeded',
   'PassTopUpFailed',
