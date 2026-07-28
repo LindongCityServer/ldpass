@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ApiClientError, getJson, postJson } from '../api-client';
 
-type ActionKind = 'use' | 'top_up';
+type ActionKind = 'use' | 'top_up' | 'ride_authorization';
 type BenefitType = 'amount' | 'points' | 'times';
 type VerificationMethod = 'server_account' | 'pin';
 type SelectionScope = 'same_provider' | 'top_up_sources' | 'all_authorized';
@@ -39,6 +39,7 @@ interface ActionLinkPreviewResponse {
     verificationMethod: VerificationMethod;
     note: string | null;
     expiresAt: string;
+    authorizationExpiresAt: string | null;
   };
   targetPass: WalletPassPreview | null;
   selectablePasses: WalletPassPreview[];
@@ -236,7 +237,10 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
       return;
     }
 
-    if (preview.actionLink.kind === 'use' && !selectedTargetPassId) {
+    if (
+      (preview.actionLink.kind === 'use' || preview.actionLink.kind === 'ride_authorization') &&
+      !selectedTargetPassId
+    ) {
       setMessage('当前没有可核销的卡券。');
       return;
     }
@@ -264,7 +268,9 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
       setMessage(
         preview.actionLink.kind === 'top_up'
           ? `额度补充成功：${formatBenefitValue(preview.actionLink.requestedValue, result.targetPass.benefitType)}。`
-          : `确认使用成功：${formatBenefitValue(preview.actionLink.requestedValue, result.targetPass.benefitType)}。`,
+          : preview.actionLink.kind === 'ride_authorization'
+            ? '乘车授权已确认，进站时将冻结最高票价。'
+            : `确认使用成功：${formatBenefitValue(preview.actionLink.requestedValue, result.targetPass.benefitType)}。`,
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '确认失败。');
@@ -284,7 +290,10 @@ export function ActionLinkForm({ initialToken }: ActionLinkFormProps) {
       return;
     }
 
-    if (preview.actionLink.kind === 'use' && !selectedTargetPassId) {
+    if (
+      (preview.actionLink.kind === 'use' || preview.actionLink.kind === 'ride_authorization') &&
+      !selectedTargetPassId
+    ) {
       setMessage('当前没有可核销的卡券。');
       return;
     }
@@ -683,7 +692,9 @@ function ActionPreview({
       : '需要在服务器聊天内发送本次验证码确认',
     preview.actionLink.kind === 'top_up'
       ? '将从你选择的来源卡消耗额度，并补充到目标卡'
-      : '将从目标卡消耗额度或权益',
+      : preview.actionLink.kind === 'ride_authorization'
+        ? '进站时冻结最高票价，出站后按实际票价结算'
+        : '将从目标卡消耗额度或权益',
   ];
 
   if (!targetPass) {
@@ -729,7 +740,13 @@ function ActionPreview({
       <dl>
         <div>
           <dt>操作</dt>
-          <dd>{preview.actionLink.kind === 'top_up' ? '额度补充' : '确认使用'}</dd>
+          <dd>
+            {preview.actionLink.kind === 'top_up'
+              ? '额度补充'
+              : preview.actionLink.kind === 'ride_authorization'
+                ? '乘车授权'
+                : '确认使用'}
+          </dd>
         </div>
         <div>
           <dt>{preview.actionLink.kind === 'top_up' ? '补充值' : '消耗值'}</dt>
@@ -745,6 +762,12 @@ function ActionPreview({
         </div>
       </dl>
       {preview.actionLink.note ? <p>{preview.actionLink.note}</p> : null}
+      {preview.actionLink.kind === 'ride_authorization' ? (
+        <p>
+          授权有效期至{' '}
+          {formatDate(preview.actionLink.authorizationExpiresAt, '确认后按系统配置计算')}。
+        </p>
+      ) : null}
       {preview.actionLink.kind === 'top_up' ? (
         <label className="action-source-select">
           <span>来源卡</span>
