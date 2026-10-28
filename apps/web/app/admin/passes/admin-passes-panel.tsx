@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { SegmentedControl } from '../../segmented-control';
 
 interface AdminPassUser {
   id: string;
@@ -454,28 +455,36 @@ export function AdminPassesPanel() {
         </div>
       ) : null}
 
-      <div className="segmented-control" role="tablist" aria-label="卡券管理视图">
-        <button
-          className={activeView === 'passes' ? 'is-selected' : undefined}
-          type="button"
-          onClick={() => setActiveView('passes')}
-        >
-          <span className="material-symbols-rounded" aria-hidden="true">
-            cards
-          </span>
-          <span>卡券列表</span>
-        </button>
-        <button
-          className={activeView === 'tickets' ? 'is-selected' : undefined}
-          type="button"
-          onClick={() => setActiveView('tickets')}
-        >
-          <span className="material-symbols-rounded" aria-hidden="true">
-            confirmation_number
-          </span>
-          <span>票券变更 {ticketUpdateRequests.length}</span>
-        </button>
-      </div>
+      <SegmentedControl<AdminPassesView>
+        ariaLabel="卡券管理视图"
+        role="tablist"
+        value={activeView}
+        onChange={setActiveView}
+        options={[
+          {
+            value: 'passes',
+            label: (
+              <>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  cards
+                </span>
+                <span>卡券列表</span>
+              </>
+            ),
+          },
+          {
+            value: 'tickets',
+            label: (
+              <>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  confirmation_number
+                </span>
+                <span>票券变更 {ticketUpdateRequests.length}</span>
+              </>
+            ),
+          },
+        ]}
+      />
 
       {activeView === 'passes' ? (
         <form className="audit-filter-grid" onSubmit={submitSearch}>

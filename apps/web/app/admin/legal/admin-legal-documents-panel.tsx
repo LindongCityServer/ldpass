@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
+import { SegmentedControl } from '../../segmented-control';
 
 type LegalDocumentKey = 'terms' | 'privacy';
 
@@ -102,23 +103,24 @@ export function AdminLegalDocumentsPanel() {
         </div>
       </div>
 
-      <div className="segmented-control legal-document-tabs" role="tablist" aria-label="协议文档">
-        {documentTabs.map((tab) => (
-          <button
-            className={activeKey === tab.key ? 'is-selected' : ''}
-            type="button"
-            role="tab"
-            aria-selected={activeKey === tab.key}
-            key={tab.key}
-            onClick={() => selectDocument(tab.key)}
-          >
-            <span className="material-symbols-rounded" aria-hidden="true">
-              {tab.icon}
-            </span>
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+      <SegmentedControl<LegalDocumentKey>
+        ariaLabel="协议文档"
+        className="legal-document-tabs"
+        role="tablist"
+        value={activeKey}
+        onChange={selectDocument}
+        options={documentTabs.map((tab) => ({
+          value: tab.key,
+          label: (
+            <>
+              <span className="material-symbols-rounded" aria-hidden="true">
+                {tab.icon}
+              </span>
+              <span>{tab.label}</span>
+            </>
+          ),
+        }))}
+      />
 
       {message ? (
         <div className="flow-notice" role="status" aria-live="polite">

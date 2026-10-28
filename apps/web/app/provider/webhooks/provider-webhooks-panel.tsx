@@ -678,8 +678,9 @@ export function ProviderWebhooksPanel() {
                   maxLength={1000}
                 />
               </label>
-              <label className="inline-toggle">
+              <label className="inline-toggle is-switch">
                 <input name="enabled" type="checkbox" defaultChecked={editingEndpoint.enabled} />
+                <span className="switch-track" aria-hidden="true" />
                 <span>通过后启用端点</span>
               </label>
               <label>

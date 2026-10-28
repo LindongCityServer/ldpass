@@ -367,8 +367,9 @@ export function AdminClientApplicationsPanel() {
                   <span>允许来源（每行一个 Origin 或完整 URL）</span>
                   <textarea name="allowedOrigins" rows={3} required />
                 </label>
-                <label className="inline-toggle">
+                <label className="inline-toggle is-switch">
                   <input type="checkbox" name="enabled" defaultChecked />
+                  <span className="switch-track" aria-hidden="true" />
                   <span>启用</span>
                 </label>
                 <div className="admin-dialog-actions">
@@ -463,12 +464,13 @@ export function AdminClientApplicationsPanel() {
                     required
                   />
                 </label>
-                <label className="inline-toggle">
+                <label className="inline-toggle is-switch">
                   <input
                     type="checkbox"
                     name="enabled"
                     defaultChecked={editingApplication.enabled}
                   />
+                  <span className="switch-track" aria-hidden="true" />
                   <span>启用</span>
                 </label>
                 <div className="admin-dialog-actions">

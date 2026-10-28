@@ -318,7 +318,7 @@ export function RegisterMethodTabs({ initialMethod }: RegisterMethodTabsProps) {
       <div className="segmented-control register-segments" role="tablist" aria-label="注册方式">
         {registerMethods.map((method) => (
           <a
-            className={activeMethod === method.id ? 'is-selected' : ''}
+            className={activeMethod === method.id ? 'is-active' : ''}
             href={method.href}
             role="tab"
             id={`register-tab-${method.id}`}

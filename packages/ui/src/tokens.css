@@ -1,0 +1,128 @@
+/**
+ * 临东通设计令牌（与 yct-v2 的 @yct/design-tokens 同构）。
+ * 只放基础取值，主题切换（data-resolved-appearance / data-resolved-accent）
+ * 由 apps/web/app/globals.css 覆盖对应令牌完成，强调色保持临东通自有色值。
+ */
+:root {
+  color-scheme: light;
+
+  /* 品牌与语义色 */
+  --ldpass-color-primary: #28a67b;
+  --ldpass-color-primary-hover: #14775d;
+  --ldpass-color-primary-soft: #d8eee6;
+  --ldpass-color-on-primary: #ffffff;
+  --ldpass-color-accent: #d7e84f;
+  --ldpass-color-accent-red: #d34b45;
+  --ldpass-color-accent-gray: #6f7774;
+  --ldpass-color-secondary: #2584e8;
+  --ldpass-color-tertiary: #f59b22;
+  --ldpass-color-success: #168a5d;
+  --ldpass-color-warning: #b66d18;
+  --ldpass-color-danger: #d34b45;
+  --ldpass-color-error: #d34b45;
+
+  /* 表面与文字 */
+  --ldpass-color-surface: #f7f7f8;
+  --ldpass-color-surface-panel: #ffffff;
+  --ldpass-color-surface-elevated: #ffffff;
+  --ldpass-color-surface-muted: #f1f1f3;
+  --ldpass-color-field: #fbfbfc;
+  --ldpass-color-surface-selected: color-mix(
+    in srgb,
+    var(--ldpass-color-primary) 16%,
+    transparent
+  );
+  --ldpass-color-text: #161719;
+  --ldpass-color-text-muted: #686f75;
+  --ldpass-color-border: #e1e2e5;
+  --ldpass-color-border-subtle: #eceef0;
+  --ldpass-color-border-strong: #c8cdd3;
+  --ldpass-color-interaction-hover: color-mix(in srgb, var(--ldpass-color-text) 9%, transparent);
+  --ldpass-color-interaction-pressed: color-mix(
+    in srgb,
+    var(--ldpass-color-text) 14%,
+    transparent
+  );
+
+  /* 圆角 */
+  --ldpass-radius-xs: 4px;
+  --ldpass-radius-sm: 6px;
+  --ldpass-radius-md: 8px;
+  --ldpass-radius-lg: 20px;
+  --ldpass-radius-xl: 28px;
+  --ldpass-radius-pill: 999px;
+
+  /* 间距 */
+  --ldpass-space-1: 4px;
+  --ldpass-space-2: 8px;
+  --ldpass-space-3: 12px;
+  --ldpass-space-4: 16px;
+  --ldpass-space-5: 20px;
+  --ldpass-space-6: 24px;
+  --ldpass-space-8: 32px;
+  --ldpass-space-10: 40px;
+  --ldpass-space-12: 48px;
+  --ldpass-gutter-mobile: 16px;
+  --ldpass-gutter-desktop: 24px;
+
+  /* 阴影 */
+  --ldpass-shadow-sm: 0 1px 3px rgba(15, 18, 22, 0.12);
+  --ldpass-shadow-soft: 0 2px 8px rgba(15, 18, 22, 0.12);
+  --ldpass-shadow-panel: 0 16px 40px rgba(15, 18, 22, 0.08);
+  --ldpass-shadow-floating: 0 18px 48px rgba(15, 18, 22, 0.14);
+
+  /* 动效 */
+  --ldpass-motion-duration-fast: 120ms;
+  --ldpass-motion-duration-standard: 180ms;
+  --ldpass-motion-duration-enter: 240ms;
+  --ldpass-motion-duration-layout: 320ms;
+  --ldpass-motion-duration-spinner: 1100ms;
+  --ldpass-motion-duration-micro: 90ms;
+  --ldpass-motion-duration-state: 160ms;
+  --ldpass-motion-duration-reveal: 280ms;
+  --ldpass-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ldpass-motion-easing-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ldpass-motion-easing-linear: linear;
+  --ldpass-motion-scale-hover: 1.06;
+  --ldpass-motion-scale-press: 0.98;
+  --ldpass-motion-distance-sm: 8px;
+  --ldpass-motion-distance-md: 16px;
+
+  /* 控件尺寸与触控基线（iOS 16.7 兼容） */
+  --ldpass-tap-target-min: 44px;
+  --ldpass-control-height-sm: 34px;
+  /* 次要/危险/胶囊按钮的视觉高度（yct-v2 为 38px，不用 34/40 两档代替）。 */
+  --ldpass-control-height-secondary: 38px;
+  --ldpass-control-height-md: 40px;
+  --ldpass-control-height-lg: 44px;
+  --ldpass-control-size-md: 40px;
+  --ldpass-control-radius: var(--ldpass-radius-pill);
+  --ldpass-button-padding-x: 12px;
+  --ldpass-button-font-size: 14px;
+  --ldpass-button-font-weight: 600;
+  --ldpass-button-font-weight-strong: 700;
+  --ldpass-field-height: 44px;
+  --ldpass-field-height-search: 46px;
+  --ldpass-segment-track-height: 38px;
+  --ldpass-segment-track-height-mobile: 44px;
+  --ldpass-segment-track-padding: 3px;
+  --ldpass-segment-gap: 3px;
+  --ldpass-chip-height: 28px;
+  --ldpass-chip-padding-x: 8px;
+  --ldpass-chip-font-size: 12px;
+  --ldpass-chip-font-weight: 700;
+  --ldpass-focus-ring-width: 2px;
+  --ldpass-focus-ring-offset: 2px;
+  /* 焦点环用实色主色；表单聚焦光晕另用 18% 主色（与 yct-v2 的字段反馈一致）。 */
+  --ldpass-focus-ring-color: var(--ldpass-color-primary);
+  --ldpass-focus-halo: color-mix(in srgb, var(--ldpass-color-primary) 18%, transparent);
+  --ldpass-disabled-opacity: 0.58;
+  --ldpass-input-font-size-mobile: 16px;
+  --ldpass-safe-area-top: env(safe-area-inset-top, 0px);
+  --ldpass-safe-area-right: env(safe-area-inset-right, 0px);
+  --ldpass-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --ldpass-safe-area-left: env(safe-area-inset-left, 0px);
+  --ldpass-dialog-width-sm: 440px;
+  --ldpass-dialog-width-md: 560px;
+  --ldpass-dialog-radius: var(--ldpass-radius-lg);
+}

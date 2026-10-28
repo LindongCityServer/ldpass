@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { getJson, postJson } from '../api-client';
+import { deleteJson, getJson, postJson } from '../api-client';
+import { DialogPortal } from '../dialog-portal';
 
 interface SessionResponse {
   user: {
@@ -161,6 +162,7 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
   const [isResubmittingReview, setIsResubmittingReview] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null);
+  const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
   const [resolvingApprovalId, setResolvingApprovalId] = useState<string | null>(null);
   const [serverRebindChallenge, setServerRebindChallenge] = useState<ServerAccountChallenge | null>(
     null,
@@ -487,6 +489,29 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
       setMessage(error instanceof Error ? error.message : '下线设备失败。');
     } finally {
       setRevokingDeviceId(null);
+    }
+  };
+
+  const deleteDevice = async (device: AccountDevice) => {
+    if (
+      !window.confirm(
+        `删除「${device.label ?? formatDeviceSystem(device.system)}」吗？该设备的登录记录会从列表中移除。`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingDeviceId(device.id);
+    setMessage(null);
+
+    try {
+      await deleteJson(`/api/auth/account/devices/${device.id}`);
+      setDevices((currentDevices) => currentDevices.filter((item) => item.id !== device.id));
+      setMessage('已删除该下线设备。');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '删除设备失败。');
+    } finally {
+      setDeletingDeviceId(null);
     }
   };
 
@@ -907,324 +932,346 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
       ) : null}
 
       {activeDialog && session ? (
-        <div
-          className="detail-module-slot account-dialog is-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-label={activeDialogTitle}
-        >
-          <button
-            className="detail-module-backdrop"
-            type="button"
-            aria-label="关闭弹窗"
-            onClick={() => setActiveDialog(null)}
-          />
-          <div className="detail-module-panel account-dialog-panel">
-            <div className="detail-module-toolbar">
-              <strong>{activeDialogTitle}</strong>
-              <button
-                className="detail-close-button"
-                type="button"
-                aria-label="关闭"
-                onClick={() => setActiveDialog(null)}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  close
-                </span>
-              </button>
-            </div>
+        <DialogPortal>
+          <div
+            className="detail-module-slot account-dialog is-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={activeDialogTitle}
+          >
+            <button
+              className="detail-module-backdrop"
+              type="button"
+              aria-label="关闭弹窗"
+              onClick={() => setActiveDialog(null)}
+            />
+            <div className="detail-module-panel account-dialog-panel">
+              <div className="detail-module-toolbar">
+                <strong>{activeDialogTitle}</strong>
+                <button
+                  className="detail-close-button"
+                  type="button"
+                  aria-label="关闭"
+                  onClick={() => setActiveDialog(null)}
+                >
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    close
+                  </span>
+                </button>
+              </div>
 
-            {activeDialog === 'avatar' ? (
-              <form className="stacked-form" onSubmit={saveAvatar} noValidate>
-                <label>
-                  <span>图床头像链接</span>
-                  <input
-                    type="url"
-                    name="avatarUrl"
-                    placeholder="https://example.com/avatar.png"
-                    maxLength={1000}
-                  />
-                </label>
-                <label>
-                  <span>申请说明</span>
-                  <textarea name="reason" rows={3} maxLength={1000} />
-                </label>
-                <div className="form-actions">
-                  <button className="primary-action" type="submit" disabled={isSavingAvatar}>
-                    {isSavingAvatar ? '提交中' : '提交审核'}
-                  </button>
-                  <button
-                    className="secondary-action"
-                    type="button"
-                    disabled={isSavingAvatar}
-                    onClick={() => void restoreDefaultAvatar()}
-                  >
-                    恢复默认头像
-                  </button>
-                </div>
-              </form>
-            ) : null}
-
-            {activeDialog === 'preferences' ? (
-              <form className="stacked-form" onSubmit={savePreferences} noValidate>
-                <label>
-                  <span>过期前提醒天数</span>
-                  <input
-                    type="number"
-                    name="expirationReminderDays"
-                    min={1}
-                    max={90}
-                    step={1}
-                    inputMode="numeric"
-                    defaultValue={session.expirationReminderDays}
-                    required
-                  />
-                </label>
-                <div className="form-actions">
-                  <button className="primary-action" type="submit" disabled={isSavingPreferences}>
-                    {isSavingPreferences ? '保存中' : '保存'}
-                  </button>
-                </div>
-              </form>
-            ) : null}
-
-            {activeDialog === 'pin' ? (
-              <form className="stacked-form" onSubmit={setPin} noValidate>
-                <label>
-                  <span>当前密码</span>
-                  <input
-                    type="password"
-                    name="pinPassword"
-                    autoComplete="current-password"
-                    required
-                  />
-                </label>
-                <label>
-                  <span>PIN</span>
-                  <input
-                    type="password"
-                    name="pin"
-                    inputMode="numeric"
-                    pattern="[0-9]{4,12}"
-                    autoComplete="off"
-                    required
-                  />
-                </label>
-                <div className="form-actions">
-                  <button className="primary-action" type="submit" disabled={isSettingPin}>
-                    {isSettingPin ? '保存中' : '保存'}
-                  </button>
-                </div>
-              </form>
-            ) : null}
-
-            {activeDialog === 'password' ? (
-              <form className="stacked-form" onSubmit={changePassword} noValidate>
-                <label>
-                  <span>当前密码</span>
-                  <input
-                    type="password"
-                    name="currentPassword"
-                    autoComplete="current-password"
-                    required
-                  />
-                </label>
-                <label>
-                  <span>新密码</span>
-                  <input
-                    type="password"
-                    name="nextPassword"
-                    autoComplete="new-password"
-                    minLength={8}
-                    required
-                  />
-                </label>
-                <label>
-                  <span>确认新密码</span>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    autoComplete="new-password"
-                    minLength={8}
-                    required
-                  />
-                </label>
-                <div className="form-actions">
-                  <button className="primary-action" type="submit" disabled={isChangingPassword}>
-                    {isChangingPassword ? '保存中' : '保存'}
-                  </button>
-                </div>
-              </form>
-            ) : null}
-
-            {activeDialog === 'server' ? (
-              <form className="stacked-form" onSubmit={startServerRebind} noValidate>
-                <label>
-                  <span>新的服务器 ID</span>
-                  <input
-                    type="text"
-                    name="serverId"
-                    maxLength={64}
-                    defaultValue={session.serverAccountName ?? ''}
-                    required
-                  />
-                </label>
-                {serverRebindChallenge ? (
-                  <div className="flow-notice" role="status" aria-live="polite">
-                    <strong>{serverRebindChallenge.code}</strong>
-                    <span>
-                      请在服务器聊天中用 {serverRebindChallenge.serverId} 发送上面的验证码。
-                    </span>
-                    <div className="form-actions">
-                      <button
-                        className="secondary-action"
-                        type="button"
-                        disabled={isCheckingServerRebind}
-                        onClick={() => void checkServerRebind()}
-                      >
-                        {isCheckingServerRebind ? '检查中' : '我已发送，检查'}
-                      </button>
-                    </div>
+              {activeDialog === 'avatar' ? (
+                <form className="stacked-form" onSubmit={saveAvatar} noValidate>
+                  <label>
+                    <span>图床头像链接</span>
+                    <input
+                      type="url"
+                      name="avatarUrl"
+                      placeholder="https://example.com/avatar.png"
+                      maxLength={1000}
+                    />
+                  </label>
+                  <label>
+                    <span>申请说明</span>
+                    <textarea name="reason" rows={3} maxLength={1000} />
+                  </label>
+                  <div className="form-actions">
+                    <button className="primary-action" type="submit" disabled={isSavingAvatar}>
+                      {isSavingAvatar ? '提交中' : '提交审核'}
+                    </button>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      disabled={isSavingAvatar}
+                      onClick={() => void restoreDefaultAvatar()}
+                    >
+                      恢复默认头像
+                    </button>
                   </div>
-                ) : null}
-                <div className="form-actions">
-                  <button
-                    className="primary-action"
-                    type="submit"
-                    disabled={isStartingServerRebind}
-                  >
-                    {isStartingServerRebind ? '发送中' : '开始换绑'}
-                  </button>
-                </div>
-              </form>
-            ) : null}
+                </form>
+              ) : null}
 
-            {activeDialog === 'deviceApprovals' ? (
-              <section className="stacked-form" aria-label="新设备登录确认">
-                {isDeviceApprovalsLoading ? (
-                  <p className="empty-note">正在读取新设备请求。</p>
-                ) : null}
-                {!isDeviceApprovalsLoading && deviceApprovals.length === 0 ? (
-                  <p className="empty-note">暂无待确认的新设备登录。</p>
-                ) : null}
-                <div className="account-device-list">
-                  {deviceApprovals.map((approval) => (
-                    <article className="account-device-item" key={approval.id}>
-                      <div>
-                        <strong>
-                          {approval.deviceLabel ?? formatDeviceSystem(approval.deviceSystem)}
-                        </strong>
-                        <span>
-                          {formatDeviceSystem(approval.deviceSystem)} · IP{' '}
-                          {approval.ipAddress ?? '未知'} · 属地：
-                          {formatIpRegion(approval.ipRegion)}
-                        </span>
-                        <span>
-                          发起时间：{new Date(approval.createdAt).toLocaleString('zh-CN')}
-                        </span>
-                        <span>
-                          有效期至：{new Date(approval.expiresAt).toLocaleString('zh-CN')}
-                        </span>
-                      </div>
-                      <div className="form-actions compact-actions">
+              {activeDialog === 'preferences' ? (
+                <form className="stacked-form" onSubmit={savePreferences} noValidate>
+                  <label>
+                    <span>过期前提醒天数</span>
+                    <input
+                      type="number"
+                      name="expirationReminderDays"
+                      min={1}
+                      max={90}
+                      step={1}
+                      inputMode="numeric"
+                      defaultValue={session.expirationReminderDays}
+                      required
+                    />
+                  </label>
+                  <div className="form-actions">
+                    <button className="primary-action" type="submit" disabled={isSavingPreferences}>
+                      {isSavingPreferences ? '保存中' : '保存'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+
+              {activeDialog === 'pin' ? (
+                <form className="stacked-form" onSubmit={setPin} noValidate>
+                  <label>
+                    <span>当前密码</span>
+                    <input
+                      type="password"
+                      name="pinPassword"
+                      autoComplete="current-password"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>PIN</span>
+                    <input
+                      type="password"
+                      name="pin"
+                      inputMode="numeric"
+                      pattern="[0-9]{4,12}"
+                      autoComplete="off"
+                      required
+                    />
+                  </label>
+                  <div className="form-actions">
+                    <button className="primary-action" type="submit" disabled={isSettingPin}>
+                      {isSettingPin ? '保存中' : '保存'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+
+              {activeDialog === 'password' ? (
+                <form className="stacked-form" onSubmit={changePassword} noValidate>
+                  <label>
+                    <span>当前密码</span>
+                    <input
+                      type="password"
+                      name="currentPassword"
+                      autoComplete="current-password"
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>新密码</span>
+                    <input
+                      type="password"
+                      name="nextPassword"
+                      autoComplete="new-password"
+                      minLength={8}
+                      required
+                    />
+                  </label>
+                  <label>
+                    <span>确认新密码</span>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      autoComplete="new-password"
+                      minLength={8}
+                      required
+                    />
+                  </label>
+                  <div className="form-actions">
+                    <button className="primary-action" type="submit" disabled={isChangingPassword}>
+                      {isChangingPassword ? '保存中' : '保存'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+
+              {activeDialog === 'server' ? (
+                <form className="stacked-form" onSubmit={startServerRebind} noValidate>
+                  <label>
+                    <span>新的服务器 ID</span>
+                    <input
+                      type="text"
+                      name="serverId"
+                      maxLength={64}
+                      defaultValue={session.serverAccountName ?? ''}
+                      required
+                    />
+                  </label>
+                  {serverRebindChallenge ? (
+                    <div className="flow-notice" role="status" aria-live="polite">
+                      <strong>{serverRebindChallenge.code}</strong>
+                      <span>
+                        请在服务器聊天中用 {serverRebindChallenge.serverId} 发送上面的验证码。
+                      </span>
+                      <div className="form-actions">
                         <button
                           className="secondary-action"
                           type="button"
-                          disabled={resolvingApprovalId === approval.id}
-                          onClick={() => void resolveDeviceApproval(approval, 'reject')}
+                          disabled={isCheckingServerRebind}
+                          onClick={() => void checkServerRebind()}
                         >
-                          拒绝
-                        </button>
-                        <button
-                          className="primary-action"
-                          type="button"
-                          disabled={resolvingApprovalId === approval.id}
-                          onClick={() => void resolveDeviceApproval(approval, 'approve')}
-                        >
-                          批准
+                          {isCheckingServerRebind ? '检查中' : '我已发送，检查'}
                         </button>
                       </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ) : null}
+                    </div>
+                  ) : null}
+                  <div className="form-actions">
+                    <button
+                      className="primary-action"
+                      type="submit"
+                      disabled={isStartingServerRebind}
+                    >
+                      {isStartingServerRebind ? '发送中' : '开始换绑'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
 
-            {activeDialog === 'devices' ? (
-              <section className="stacked-form" aria-label="登录设备">
-                {isDevicesLoading ? <p className="empty-note">正在读取设备列表。</p> : null}
-                <div className="account-device-list">
-                  {devices.map((device) => (
-                    <article className="account-device-item" key={device.id}>
-                      <div>
-                        <strong>{device.label ?? formatDeviceSystem(device.system)}</strong>
-                        <span>
-                          {formatDeviceSystem(device.system)} ·{' '}
-                          {device.revokedAt ? '已下线' : `${device.activeSessionCount} 个活动会话`}
-                        </span>
-                        <span>
-                          最近登录：IP {device.lastLoginIp ?? '未知'} · 属地：
-                          {formatIpRegion(device.lastLoginIpRegion)}
-                        </span>
-                        <span>最近更新：{new Date(device.updatedAt).toLocaleString('zh-CN')}</span>
-                      </div>
-                      <button
-                        className="secondary-action"
-                        type="button"
-                        disabled={Boolean(device.revokedAt) || revokingDeviceId === device.id}
-                        onClick={() => void revokeDevice(device)}
-                      >
-                        {revokingDeviceId === device.id
-                          ? '下线中'
-                          : device.revokedAt
-                            ? '已下线'
-                            : '下线'}
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ) : null}
+              {activeDialog === 'deviceApprovals' ? (
+                <section className="stacked-form" aria-label="新设备登录确认">
+                  {isDeviceApprovalsLoading ? (
+                    <p className="empty-note">正在读取新设备请求。</p>
+                  ) : null}
+                  {!isDeviceApprovalsLoading && deviceApprovals.length === 0 ? (
+                    <p className="empty-note">暂无待确认的新设备登录。</p>
+                  ) : null}
+                  <div className="account-device-list">
+                    {deviceApprovals.map((approval) => (
+                      <article className="account-device-item" key={approval.id}>
+                        <div>
+                          <strong>
+                            {approval.deviceLabel ?? formatDeviceSystem(approval.deviceSystem)}
+                          </strong>
+                          <span>
+                            {formatDeviceSystem(approval.deviceSystem)} · IP{' '}
+                            {approval.ipAddress ?? '未知'} · 属地：
+                            {formatIpRegion(approval.ipRegion)}
+                          </span>
+                          <span>
+                            发起时间：{new Date(approval.createdAt).toLocaleString('zh-CN')}
+                          </span>
+                          <span>
+                            有效期至：{new Date(approval.expiresAt).toLocaleString('zh-CN')}
+                          </span>
+                        </div>
+                        <div className="form-actions compact-actions">
+                          <button
+                            className="secondary-action"
+                            type="button"
+                            disabled={resolvingApprovalId === approval.id}
+                            onClick={() => void resolveDeviceApproval(approval, 'reject')}
+                          >
+                            拒绝
+                          </button>
+                          <button
+                            className="primary-action"
+                            type="button"
+                            disabled={resolvingApprovalId === approval.id}
+                            onClick={() => void resolveDeviceApproval(approval, 'approve')}
+                          >
+                            批准
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
-            {activeDialog === 'review' ? (
-              <form className="stacked-form" onSubmit={resubmitReviewInfo} noValidate>
-                <label>
-                  <span>审核信息</span>
-                  <textarea
-                    name="reviewInfo"
-                    rows={5}
-                    maxLength={2000}
-                    defaultValue={session.reviewInfo ?? ''}
-                    required
-                  />
-                </label>
-                <div className="form-actions">
-                  <button className="primary-action" type="submit" disabled={isResubmittingReview}>
-                    {isResubmittingReview ? '提交中' : '提交'}
-                  </button>
-                </div>
-              </form>
-            ) : null}
+              {activeDialog === 'devices' ? (
+                <section className="stacked-form" aria-label="登录设备">
+                  {isDevicesLoading ? <p className="empty-note">正在读取设备列表。</p> : null}
+                  <div className="account-device-list">
+                    {devices.map((device) => (
+                      <article className="account-device-item" key={device.id}>
+                        <div>
+                          <strong>{device.label ?? formatDeviceSystem(device.system)}</strong>
+                          <span>
+                            {formatDeviceSystem(device.system)} ·{' '}
+                            {device.revokedAt
+                              ? '已下线'
+                              : `${device.activeSessionCount} 个活动会话`}
+                          </span>
+                          <span>
+                            最近登录：IP {device.lastLoginIp ?? '未知'} · 属地：
+                            {formatIpRegion(device.lastLoginIpRegion)}
+                          </span>
+                          <span>
+                            最近更新：{new Date(device.updatedAt).toLocaleString('zh-CN')}
+                          </span>
+                        </div>
+                        {device.revokedAt ? (
+                          <button
+                            className="danger-action"
+                            type="button"
+                            disabled={deletingDeviceId === device.id}
+                            onClick={() => void deleteDevice(device)}
+                          >
+                            {deletingDeviceId === device.id ? '删除中' : '删除'}
+                          </button>
+                        ) : (
+                          <button
+                            className="secondary-action"
+                            type="button"
+                            disabled={revokingDeviceId === device.id}
+                            onClick={() => void revokeDevice(device)}
+                          >
+                            {revokingDeviceId === device.id ? '下线中' : '下线'}
+                          </button>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
-            {activeDialog === 'delete' ? (
-              <form className="stacked-form danger-zone" onSubmit={deleteAccount} noValidate>
-                <p>注销后当前账号将被删除，已有关联记录会按系统规则保留或脱敏用于审计。</p>
-                <label>
-                  <span>当前密码</span>
-                  <input type="password" name="password" autoComplete="current-password" required />
-                </label>
-                <div className="form-actions">
-                  <button className="danger-action" type="submit" disabled={isDeleting}>
-                    <span className="material-symbols-rounded" aria-hidden="true">
-                      delete
-                    </span>
-                    <span>{isDeleting ? '注销中' : '注销账户'}</span>
-                  </button>
-                </div>
-              </form>
-            ) : null}
+              {activeDialog === 'review' ? (
+                <form className="stacked-form" onSubmit={resubmitReviewInfo} noValidate>
+                  <label>
+                    <span>审核信息</span>
+                    <textarea
+                      name="reviewInfo"
+                      rows={5}
+                      maxLength={2000}
+                      defaultValue={session.reviewInfo ?? ''}
+                      required
+                    />
+                  </label>
+                  <div className="form-actions">
+                    <button
+                      className="primary-action"
+                      type="submit"
+                      disabled={isResubmittingReview}
+                    >
+                      {isResubmittingReview ? '提交中' : '提交'}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+
+              {activeDialog === 'delete' ? (
+                <form className="stacked-form danger-zone" onSubmit={deleteAccount} noValidate>
+                  <p>注销后当前账号将被删除，已有关联记录会按系统规则保留或脱敏用于审计。</p>
+                  <label>
+                    <span>当前密码</span>
+                    <input
+                      type="password"
+                      name="password"
+                      autoComplete="current-password"
+                      required
+                    />
+                  </label>
+                  <div className="form-actions">
+                    <button className="danger-action" type="submit" disabled={isDeleting}>
+                      <span className="material-symbols-rounded" aria-hidden="true">
+                        delete
+                      </span>
+                      <span>{isDeleting ? '注销中' : '注销账户'}</span>
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+            </div>
           </div>
-        </div>
+        </DialogPortal>
       ) : null}
     </section>
   );

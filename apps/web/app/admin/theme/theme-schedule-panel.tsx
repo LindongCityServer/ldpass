@@ -166,12 +166,13 @@ export function ThemeSchedulePanel({ embedded = false }: { embedded?: boolean } 
                   ))}
                 </select>
               </label>
-              <label className="inline-toggle">
+              <label className="inline-toggle is-switch">
                 <input
                   type="checkbox"
                   checked={entry.enabled}
                   onChange={(event) => updateEntry(index, { enabled: event.target.checked })}
                 />
+                <span className="switch-track" aria-hidden="true" />
                 <span>启用</span>
               </label>
               <label>

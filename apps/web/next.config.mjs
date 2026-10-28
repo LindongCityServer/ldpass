@@ -25,6 +25,14 @@ const nextConfig = {
   },
   poweredByHeader: false,
   reactStrictMode: true,
+  webpack: (config) => {
+    // 工作区内 TS 包通过 tsconfig paths 直接引用源码，源码里的 NodeNext 风格 `./x.js` 需要映射回 `.ts`。
+    config.resolve.extensionAlias = {
+      ...config.resolve.extensionAlias,
+      '.js': ['.ts', '.tsx', '.js'],
+    };
+    return config;
+  },
   serverExternalPackages: [
     '@ldpass/api',
     '@ldpass/database',

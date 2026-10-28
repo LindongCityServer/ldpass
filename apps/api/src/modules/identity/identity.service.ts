@@ -710,6 +710,66 @@ export class IdentityService {
     };
   }
 
+  /**
+   * 本地开发免密登录：直接取一个可用的管理员账号。
+   *
+   * 优先使用 LDPASS_LOCAL_DEV_ADMIN_USERNAME（默认 admin），
+   * 该账号不可用时退回到最早创建的 Active 超级管理员/管理员。
+   */
+  async resolveLocalDevAdmin(): Promise<PublicUser> {
+    const preferredUsername = process.env.LDPASS_LOCAL_DEV_ADMIN_USERNAME?.trim() || 'admin';
+    const preferredUser = await this.prisma.user.findUnique({
+      where: {
+        username: preferredUsername,
+      },
+    });
+
+    const adminUser =
+      preferredUser && this.isActiveAdminUser(preferredUser)
+        ? preferredUser
+        : ((await this.prisma.user.findFirst({
+            where: {
+              status: 'Active',
+              role: 'super_admin',
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          })) ??
+          (await this.prisma.user.findFirst({
+            where: {
+              status: 'Active',
+              role: 'admin',
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          })));
+
+    if (!adminUser) {
+      throw new NotFoundException(
+        '本地开发环境没有可用的管理员账号，请先运行 pnpm seed:super-admin 创建初始管理员。',
+      );
+    }
+
+    await this.eventBus.publish({
+      type: 'UserLoggedIn',
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actorType: 'admin',
+      actorId: adminUser.id,
+      payload: {
+        userId: adminUser.id,
+      },
+    });
+
+    return this.toPublicUser(adminUser);
+  }
+
+  private isActiveAdminUser(user: { role: string; status: string }): boolean {
+    return user.status === 'Active' && (user.role === 'admin' || user.role === 'super_admin');
+  }
+
   async deleteOwnAccount(user: AuthenticatedUser, password: string): Promise<{ ok: true }> {
     const existingUser = await this.prisma.user.findUnique({
       where: {
@@ -1669,6 +1729,45 @@ export class IdentityService {
         reason: 'user_revoked',
       },
     });
+
+    return {
+      ok: true,
+    };
+  }
+
+  async deleteDevice(user: AuthenticatedUser, deviceId: string): Promise<{ ok: true }> {
+    const device = await this.prisma.device.findFirst({
+      where: {
+        id: deviceId,
+        userId: user.id,
+      },
+    });
+
+    if (!device) {
+      throw new NotFoundException('设备不存在或不属于当前账户。');
+    }
+
+    if (!device.revokedAt) {
+      throw new ConflictException('只能删除已下线的设备，请先下线该设备。');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.authSession.updateMany({
+        where: {
+          userId: user.id,
+          deviceId: device.id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      }),
+      this.prisma.device.delete({
+        where: {
+          id: device.id,
+        },
+      }),
+    ]);
 
     return {
       ok: true,

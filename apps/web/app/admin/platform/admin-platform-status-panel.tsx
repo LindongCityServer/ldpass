@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
 import { BackofficeTopbarPageActions } from '../../backoffice-shell';
+import { SegmentedControl } from '../../segmented-control';
 import { ThemeSchedulePanel } from '../theme/theme-schedule-panel';
 
 type PlatformNoticeTone = 'info' | 'warning' | 'critical';
@@ -123,45 +124,54 @@ export function AdminPlatformStatusPanel() {
 
       {isLoading ? <p className="empty-note">正在读取平台状态。</p> : null}
 
-      <div className="segmented-control" role="tablist" aria-label="平台状态设置">
-        <button
-          className={activeView === 'announcement' ? 'is-selected' : undefined}
-          type="button"
-          onClick={() => setActiveView('announcement')}
-        >
-          <span className="material-symbols-rounded" aria-hidden="true">
-            campaign
-          </span>
-          <span>公告</span>
-        </button>
-        <button
-          className={activeView === 'maintenance' ? 'is-selected' : undefined}
-          type="button"
-          onClick={() => setActiveView('maintenance')}
-        >
-          <span className="material-symbols-rounded" aria-hidden="true">
-            construction
-          </span>
-          <span>维护</span>
-        </button>
-        <button
-          className={activeView === 'theme' ? 'is-selected' : undefined}
-          type="button"
-          onClick={() => setActiveView('theme')}
-        >
-          <span className="material-symbols-rounded" aria-hidden="true">
-            palette
-          </span>
-          <span>主题</span>
-        </button>
-      </div>
+      <SegmentedControl<PlatformStatusView>
+        ariaLabel="平台状态设置"
+        role="tablist"
+        value={activeView}
+        onChange={setActiveView}
+        options={[
+          {
+            value: 'announcement',
+            label: (
+              <>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  campaign
+                </span>
+                <span>公告</span>
+              </>
+            ),
+          },
+          {
+            value: 'maintenance',
+            label: (
+              <>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  construction
+                </span>
+                <span>维护</span>
+              </>
+            ),
+          },
+          {
+            value: 'theme',
+            label: (
+              <>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  palette
+                </span>
+                <span>主题</span>
+              </>
+            ),
+          },
+        ]}
+      />
 
       {activeView !== 'theme' ? (
         <form className="stacked-form platform-status-form" onSubmit={saveStatus} noValidate>
           {activeView === 'announcement' ? (
             <fieldset>
               <legend>全站公告</legend>
-              <label className="inline-toggle">
+              <label className="inline-toggle is-switch">
                 <input
                   type="checkbox"
                   checked={editable.announcementEnabled}
@@ -169,6 +179,7 @@ export function AdminPlatformStatusPanel() {
                     updateEditable({ announcementEnabled: event.target.checked })
                   }
                 />
+                <span className="switch-track" aria-hidden="true" />
                 <span>启用公告横幅</span>
               </label>
               <label>
@@ -208,12 +219,13 @@ export function AdminPlatformStatusPanel() {
           {activeView === 'maintenance' ? (
             <fieldset>
               <legend>维护状态</legend>
-              <label className="inline-toggle">
+              <label className="inline-toggle is-switch">
                 <input
                   type="checkbox"
                   checked={editable.maintenanceEnabled}
                   onChange={(event) => updateEditable({ maintenanceEnabled: event.target.checked })}
                 />
+                <span className="switch-track" aria-hidden="true" />
                 <span>启用维护提醒</span>
               </label>
               <label>

@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
 import { BackofficeTopbarPageActions } from '../../backoffice-shell';
+import { SegmentedControl } from '../../segmented-control';
 
 interface AdminProvider {
   id: string;
@@ -567,48 +568,58 @@ export function AdminProvidersPanel() {
           </div>
         ) : null}
 
-        <div className="segmented-control" role="tablist" aria-label="发卡方管理视图">
-          <button
-            className={activeView === 'providers' ? 'is-selected' : undefined}
-            type="button"
-            onClick={() => setActiveView('providers')}
-          >
-            <span className="material-symbols-rounded" aria-hidden="true">
-              storefront
-            </span>
-            <span>发卡方</span>
-          </button>
-          <button
-            className={activeView === 'profile' ? 'is-selected' : undefined}
-            type="button"
-            onClick={() => setActiveView('profile')}
-          >
-            <span className="material-symbols-rounded" aria-hidden="true">
-              badge
-            </span>
-            <span>资料 {profileChangeRequests.length}</span>
-          </button>
-          <button
-            className={activeView === 'api' ? 'is-selected' : undefined}
-            type="button"
-            onClick={() => setActiveView('api')}
-          >
-            <span className="material-symbols-rounded" aria-hidden="true">
-              key
-            </span>
-            <span>API {apiKeyChangeRequests.length}</span>
-          </button>
-          <button
-            className={activeView === 'webhook' ? 'is-selected' : undefined}
-            type="button"
-            onClick={() => setActiveView('webhook')}
-          >
-            <span className="material-symbols-rounded" aria-hidden="true">
-              webhook
-            </span>
-            <span>Webhook {webhookChangeRequests.length}</span>
-          </button>
-        </div>
+        <SegmentedControl<ProviderAdminView>
+          ariaLabel="发卡方管理视图"
+          role="tablist"
+          value={activeView}
+          onChange={setActiveView}
+          options={[
+            {
+              value: 'providers',
+              label: (
+                <>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    storefront
+                  </span>
+                  <span>发卡方</span>
+                </>
+              ),
+            },
+            {
+              value: 'profile',
+              label: (
+                <>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    badge
+                  </span>
+                  <span>资料 {profileChangeRequests.length}</span>
+                </>
+              ),
+            },
+            {
+              value: 'api',
+              label: (
+                <>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    key
+                  </span>
+                  <span>API {apiKeyChangeRequests.length}</span>
+                </>
+              ),
+            },
+            {
+              value: 'webhook',
+              label: (
+                <>
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    webhook
+                  </span>
+                  <span>Webhook {webhookChangeRequests.length}</span>
+                </>
+              ),
+            },
+          ]}
+        />
 
         {activeView === 'profile' ? (
           <section

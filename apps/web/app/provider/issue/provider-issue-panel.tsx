@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { getJson, postJson } from '../../api-client';
 import { BackofficeTopbarPageActions } from '../../backoffice-shell';
 import { ClaimLinkTools } from '../../claim-link-tools';
+import { SegmentedControl } from '../../segmented-control';
 
 interface IssuableTemplate {
   id: string;
@@ -641,30 +642,19 @@ export function ProviderIssuePanel() {
               </button>
             </div>
             <form className="admin-dialog-form" onSubmit={createToken} noValidate>
-              <div className="segmented-control" aria-label="发放方式">
-                <button
-                  className={issueMode === 'single' ? 'is-selected' : ''}
-                  type="button"
-                  onClick={() => {
-                    setIssueMode('single');
-                    setResult(null);
-                    setMessage(null);
-                  }}
-                >
-                  单个领取码
-                </button>
-                <button
-                  className={issueMode === 'batch' ? 'is-selected' : ''}
-                  type="button"
-                  onClick={() => {
-                    setIssueMode('batch');
-                    setResult(null);
-                    setMessage(null);
-                  }}
-                >
-                  批量发放
-                </button>
-              </div>
+              <SegmentedControl<IssueMode>
+                ariaLabel="发放方式"
+                value={issueMode}
+                onChange={(next) => {
+                  setIssueMode(next);
+                  setResult(null);
+                  setMessage(null);
+                }}
+                options={[
+                  { value: 'single', label: '单个领取码' },
+                  { value: 'batch', label: '批量发放' },
+                ]}
+              />
 
               <label>
                 <span>选择模板</span>

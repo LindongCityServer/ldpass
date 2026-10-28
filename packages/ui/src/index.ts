@@ -1,3 +1,5 @@
+export { ldpassTokens, type LdpassTokens } from './tokens.js';
+
 export const brandAssets = {
   colorLogo: '/brand/ldpass_icon_color.svg',
   monoLogo: '/brand/ldpass_icon.svg',

@@ -1,5 +1,17 @@
-import { Body, Controller, Get, Options, Param, Post, Query, Req, Res } from '../../framework.js';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Options,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '../../framework.js';
 import { SessionAuthService } from '../../shared/auth/session-auth.service.js';
+import { assertLocalDevAdminLoginAllowed } from '../../shared/auth/local-dev-admin.js';
 import type { ApiRequestLike, ApiResponseLike } from '../../shared/auth/request-context.js';
 import {
   AccountVerificationContextDto,
@@ -71,6 +83,21 @@ export class IdentityController {
   @Get('login/redirect')
   async validateLoginRedirect(@Query() query: LoginRedirectQueryDto) {
     return this.identityService.validateLoginRedirect(query);
+  }
+
+  @Post('dev/local-admin/login')
+  async loginAsLocalDevAdmin(
+    @Req() request: ApiRequestLike,
+    @Res({ passthrough: true }) response: ApiResponseLike,
+  ) {
+    assertLocalDevAdminLoginAllowed(request);
+    const user = await this.identityService.resolveLocalDevAdmin();
+    await this.sessionAuth.createSession(user.id, request, response);
+
+    return {
+      user,
+      redirectTo: '/admin/users',
+    };
   }
 
   @Post('login/client-session/current')
@@ -340,6 +367,12 @@ export class IdentityController {
   async revokeDevice(@Param('deviceId') deviceId: string, @Req() request: ApiRequestLike) {
     const user = await this.sessionAuth.requireActiveUser(request);
     return this.identityService.revokeDevice(user, deviceId);
+  }
+
+  @Delete('account/devices/:deviceId')
+  async deleteDevice(@Param('deviceId') deviceId: string, @Req() request: ApiRequestLike) {
+    const user = await this.sessionAuth.requireActiveUser(request);
+    return this.identityService.deleteDevice(user, deviceId);
   }
 
   private writeClientSessionCorsHeaders(

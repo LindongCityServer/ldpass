@@ -10,9 +10,35 @@ interface AdminLoginResponse {
   };
 }
 
-export function AdminLoginForm() {
+interface LocalDevAdminLoginResponse {
+  user: {
+    username: string;
+  };
+  redirectTo: string;
+}
+
+export function AdminLoginForm({
+  localDevAdminLoginEnabled = false,
+}: {
+  localDevAdminLoginEnabled?: boolean;
+}) {
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocalDevLoggingIn, setIsLocalDevLoggingIn] = useState(false);
+
+  const handleLocalDevLogin = async () => {
+    setMessage(null);
+    setIsLocalDevLoggingIn(true);
+
+    try {
+      const result = await postJson<LocalDevAdminLoginResponse>('/api/auth/dev/local-admin/login');
+      setMessage(`已以本地开发管理员 ${result.user.username} 登录，正在进入后台。`);
+      window.location.href = result.redirectTo;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '本地管理员登录失败。');
+      setIsLocalDevLoggingIn(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -74,6 +100,25 @@ export function AdminLoginForm() {
           <span>{isSubmitting ? '登录中' : '进入后台'}</span>
         </button>
       </div>
+      {localDevAdminLoginEnabled ? (
+        <div className="flow-notice local-dev-admin-login">
+          <strong>本地开发登录</strong>
+          <span>
+            仅在本机开发环境显示：直接使用数据库中已有的管理员账号建立会话，跳过密码与 PIN。
+          </span>
+          <button
+            className="secondary-action"
+            type="button"
+            disabled={isLocalDevLoggingIn}
+            onClick={() => void handleLocalDevLogin()}
+          >
+            <span className="material-symbols-rounded" aria-hidden="true">
+              developer_mode
+            </span>
+            <span>{isLocalDevLoggingIn ? '登录中' : '以本地管理员登录'}</span>
+          </button>
+        </div>
+      ) : null}
     </form>
   );
 }

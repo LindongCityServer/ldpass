@@ -1,7 +1,10 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getJson } from './api-client';
+import { RangeInput } from './range-input';
+import { SegmentedControl } from './segmented-control';
 import {
   cachePlatformThemeConfig,
   fallbackPlatformThemeConfig,
@@ -12,6 +15,7 @@ import {
   type PlatformThemeScheduleResponse,
 } from './theme-config';
 import {
+  applyUiEffectsPreference,
   defaultUiEffectsPreference,
   readUiEffectsPreference,
   subscribeUiEffectsPreferenceChanged,
@@ -45,9 +49,9 @@ const fontModes: Array<{ value: FontMode; label: string }> = [
 ];
 
 const materialModes: Array<{ value: MaterialMode; label: string }> = [
-  { value: 'performance', label: '性能' },
-  { value: 'balanced', label: '平衡' },
-  { value: 'advanced', label: '高级' },
+  { value: 'performance', label: '简约' },
+  { value: 'balanced', label: '均衡' },
+  { value: 'advanced', label: '透光' },
 ];
 
 const motionModes: Array<{ value: MotionMode; label: string }> = [
@@ -127,6 +131,8 @@ export function applyThemePreferences(
   root.dataset.resolvedAccent = resolvedAccent;
   root.dataset.fontFamily = font;
   root.style.colorScheme = resolvedAppearance;
+  // 明暗切换后同步重算材质边缘、内阴影和文字阴影颜色。
+  applyUiEffectsPreference(readUiEffectsPreference());
 }
 
 interface ThemeSettingsProps {
@@ -135,6 +141,7 @@ interface ThemeSettingsProps {
 
 export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
   const settingsRef = useRef<HTMLDivElement | null>(null);
+  const popoverRef = useRef<HTMLElement | null>(null);
   const [appearance, setAppearance] = useState<AppearanceMode>('system');
   const [accent, setAccent] = useState<AccentMode>('auto');
   const [font, setFont] = useState<FontMode>('harmony');
@@ -230,6 +237,7 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
     setPopoverStyle({
       left,
       maxHeight,
+      right: 'auto',
       top,
       width: popoverWidth,
     });
@@ -246,7 +254,7 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
         return;
       }
 
-      if (!settingsRef.current?.contains(target)) {
+      if (!settingsRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
         setIsOpen(false);
       }
     };
@@ -351,120 +359,99 @@ export function ThemeSettings({ autoTone = 'teal' }: ThemeSettingsProps) {
         </span>
       </button>
 
-      {isOpen ? (
-        <section className="theme-popover" aria-label="主题设置" style={popoverStyle}>
-          <div className="theme-group">
-            <h2>外观</h2>
-            <div className="segmented-control">
-              {appearanceModes.map((mode) => (
-                <button
-                  className={appearance === mode.value ? 'is-selected' : ''}
-                  type="button"
-                  aria-pressed={appearance === mode.value}
-                  key={mode.value}
-                  onClick={() => setAppearancePreference(mode.value)}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="theme-group">
-            <h2>材质</h2>
-            <div className="segmented-control">
-              {materialModes.map((mode) => (
-                <button
-                  className={uiEffectsPreference.materialMode === mode.value ? 'is-selected' : ''}
-                  type="button"
-                  aria-pressed={uiEffectsPreference.materialMode === mode.value}
-                  key={mode.value}
-                  onClick={() => setMaterialModePreference(mode.value)}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            <label
-              className={`theme-range-control${
-                uiEffectsPreference.materialMode === 'advanced' ? '' : ' is-disabled'
-              }`}
+      {isOpen && typeof document !== 'undefined'
+        ? createPortal(
+            <section
+              className="theme-popover"
+              aria-label="主题设置"
+              style={popoverStyle}
+              ref={popoverRef}
             >
-              <span>
-                <span>高级材质厚度</span>
-                <output htmlFor="material-thickness">
-                  {uiEffectsPreference.materialThickness}%
-                </output>
-              </span>
-              <input
-                id="material-thickness"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={uiEffectsPreference.materialThickness}
-                disabled={uiEffectsPreference.materialMode !== 'advanced'}
-                onChange={(event) =>
-                  setMaterialThicknessPreference(Number(event.currentTarget.value))
-                }
-              />
-            </label>
-          </div>
+              <div className="theme-group">
+                <h2>外观</h2>
+                <SegmentedControl
+                  ariaLabel="外观"
+                  options={appearanceModes}
+                  value={appearance}
+                  onChange={setAppearancePreference}
+                />
+              </div>
 
-          <div className="theme-group">
-            <h2>动态效果</h2>
-            <div className="segmented-control">
-              {motionModes.map((mode) => (
-                <button
-                  className={uiEffectsPreference.motionMode === mode.value ? 'is-selected' : ''}
-                  type="button"
-                  aria-pressed={uiEffectsPreference.motionMode === mode.value}
-                  key={mode.value}
-                  onClick={() => setMotionModePreference(mode.value)}
+              <div className="theme-group">
+                <h2>界面材质</h2>
+                <SegmentedControl
+                  ariaLabel="界面材质"
+                  options={materialModes}
+                  value={uiEffectsPreference.materialMode}
+                  onChange={setMaterialModePreference}
+                />
+                <label
+                  className={`theme-range-control${
+                    uiEffectsPreference.materialMode === 'advanced' ? '' : ' is-disabled'
+                  }`}
                 >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-          </div>
+                  <span>
+                    <span>透光材质厚度</span>
+                    <output htmlFor="material-thickness">
+                      {uiEffectsPreference.materialThickness}%
+                    </output>
+                  </span>
+                  <RangeInput
+                    id="material-thickness"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={uiEffectsPreference.materialThickness}
+                    disabled={uiEffectsPreference.materialMode !== 'advanced'}
+                    onChange={(event) =>
+                      setMaterialThicknessPreference(Number(event.currentTarget.value))
+                    }
+                  />
+                </label>
+              </div>
 
-          <div className="theme-group">
-            <h2>主题色</h2>
-            <div className="swatch-grid">
-              {accentModes.map((mode) => (
-                <button
-                  className={`swatch-button swatch-${mode.value}${accent === mode.value ? ' is-selected' : ''}`}
-                  type="button"
-                  aria-pressed={accent === mode.value}
-                  key={mode.value}
-                  onClick={() => setAccentPreference(mode.value)}
-                >
-                  <span aria-hidden="true" />
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-            {resolvedAccentLabel ? <p>{resolvedAccentLabel}</p> : null}
-          </div>
+              <div className="theme-group">
+                <h2>动态效果</h2>
+                <SegmentedControl
+                  ariaLabel="动态效果"
+                  options={motionModes}
+                  value={uiEffectsPreference.motionMode}
+                  onChange={setMotionModePreference}
+                />
+              </div>
 
-          <div className="theme-group">
-            <h2>字体</h2>
-            <div className="segmented-control">
-              {fontModes.map((mode) => (
-                <button
-                  className={font === mode.value ? 'is-selected' : ''}
-                  type="button"
-                  aria-pressed={font === mode.value}
-                  key={mode.value}
-                  onClick={() => setFontPreference(mode.value)}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
+              <div className="theme-group">
+                <h2>主题色</h2>
+                <div className="swatch-grid">
+                  {accentModes.map((mode) => (
+                    <button
+                      className={`swatch-button swatch-${mode.value}${accent === mode.value ? ' is-selected' : ''}`}
+                      type="button"
+                      aria-pressed={accent === mode.value}
+                      key={mode.value}
+                      onClick={() => setAccentPreference(mode.value)}
+                    >
+                      <span aria-hidden="true" />
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+                {resolvedAccentLabel ? <p>{resolvedAccentLabel}</p> : null}
+              </div>
+
+              <div className="theme-group">
+                <h2>字体</h2>
+                <SegmentedControl
+                  ariaLabel="字体"
+                  options={fontModes}
+                  value={font}
+                  onChange={setFontPreference}
+                />
+              </div>
+            </section>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

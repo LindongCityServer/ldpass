@@ -50,6 +50,22 @@ export async function postJson<TResponse>(
   return readJsonResponse<TResponse>(response);
 }
 
+export async function deleteJson<TResponse>(
+  url: string,
+  options: ApiRequestOptions = {},
+): Promise<TResponse> {
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: 'DELETE',
+      credentials: 'include',
+    },
+    options.timeoutMs,
+  );
+
+  return readJsonResponse<TResponse>(response);
+}
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,

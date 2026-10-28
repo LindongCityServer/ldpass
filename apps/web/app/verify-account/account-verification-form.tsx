@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ApiClientError, getJson, postJson } from '../api-client';
+import { SegmentedControl } from '../segmented-control';
 
 type VerificationMethod = 'pin' | 'server_account';
 
@@ -281,37 +282,41 @@ export function AccountVerificationForm({
         </div>
       ) : null}
 
-      <div
-        className="segmented-control account-verification-methods"
-        role="group"
-        aria-label="验证方式"
-      >
-        <button
-          className={method === 'pin' ? 'is-selected' : undefined}
-          type="button"
-          disabled={!canVerify}
-          onClick={() => {
-            setMethod('pin');
-            setServerChallenge(null);
-          }}
-        >
-          <span className="material-symbols-rounded" aria-hidden="true">
-            password
-          </span>
-          <span>PIN</span>
-        </button>
-        <button
-          className={method === 'server_account' ? 'is-selected' : undefined}
-          type="button"
-          disabled={!canVerify}
-          onClick={() => setMethod('server_account')}
-        >
-          <span className="material-symbols-rounded" aria-hidden="true">
-            forum
-          </span>
-          <span>服务器账号</span>
-        </button>
-      </div>
+      <SegmentedControl<VerificationMethod>
+        ariaLabel="验证方式"
+        className="account-verification-methods"
+        value={method}
+        onChange={(next) => {
+          setMethod(next);
+          setServerChallenge(null);
+        }}
+        options={[
+          {
+            value: 'pin',
+            disabled: !canVerify,
+            label: (
+              <>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  password
+                </span>
+                <span>PIN</span>
+              </>
+            ),
+          },
+          {
+            value: 'server_account',
+            disabled: !canVerify,
+            label: (
+              <>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  forum
+                </span>
+                <span>服务器账号</span>
+              </>
+            ),
+          },
+        ]}
+      />
 
       {method === 'pin' ? (
         <form className="stacked-form" onSubmit={verifyWithPin} noValidate>

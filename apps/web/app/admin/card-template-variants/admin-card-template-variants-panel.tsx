@@ -282,8 +282,9 @@ export function AdminCardTemplateVariantsPanel() {
                         ))}
                       </select>
                     </label>
-                    <label className="inline-toggle">
+                    <label className="inline-toggle is-switch">
                       <input type="checkbox" name="enabled" defaultChecked={variant.enabled} />
+                      <span className="switch-track" aria-hidden="true" />
                       <span>启用</span>
                     </label>
                   </div>
@@ -397,8 +398,9 @@ export function AdminCardTemplateVariantsPanel() {
                     ))}
                   </select>
                 </label>
-                <label className="inline-toggle">
+                <label className="inline-toggle is-switch">
                   <input type="checkbox" name="enabled" defaultChecked />
+                  <span className="switch-track" aria-hidden="true" />
                   <span>启用</span>
                 </label>
                 <label>

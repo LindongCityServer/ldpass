@@ -33,23 +33,24 @@
 }
 
 :root {
-  --bg: #f7f7f8;
-  --surface: #ffffff;
-  --surface-muted: #f1f1f3;
+  /* 基础取值来自 @ldpass/ui 的 tokens.css，这里只保留应用层别名。 */
+  --bg: var(--ldpass-color-surface);
+  --surface: var(--ldpass-color-surface-panel);
+  --surface-muted: var(--ldpass-color-surface-muted);
   --chrome-surface: rgba(255, 255, 255, 0.9);
-  --field-bg: #fbfbfc;
-  --card-muted-bg: #fbfbfc;
-  --line: #e1e2e5;
-  --text: #161719;
-  --muted: #686f75;
-  --brand: #28a67b;
-  --brand-dark: #14775d;
-  --brand-soft: #d8eee6;
-  --focus-ring: rgba(40, 166, 123, 0.16);
-  --accent: #d7e84f;
-  --warning: #b66d18;
-  --danger: #d34b45;
-  --shadow: 0 16px 40px rgba(15, 18, 22, 0.08);
+  --field-bg: var(--ldpass-color-field);
+  --card-muted-bg: var(--ldpass-color-field);
+  --line: var(--ldpass-color-border);
+  --text: var(--ldpass-color-text);
+  --muted: var(--ldpass-color-text-muted);
+  --brand: var(--ldpass-color-primary);
+  --brand-dark: var(--ldpass-color-primary-hover);
+  --brand-soft: var(--ldpass-color-primary-soft);
+  --focus-ring: var(--ldpass-focus-halo);
+  --accent: var(--ldpass-color-accent);
+  --warning: var(--ldpass-color-warning);
+  --danger: var(--ldpass-color-danger);
+  --shadow: var(--ldpass-shadow-panel);
   --image-filter: none;
   --system-font-family:
     ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei',
@@ -66,21 +67,55 @@
   --ldpass-material-contrast: 1.14;
   --ldpass-material-saturation: 1.475;
   --ldpass-material-floating-surface: 65%;
-  --ldpass-material-action-surface: 72.5%;
+  --ldpass-material-action-surface: var(--ldpass-material-floating-surface);
   --ldpass-material-title-surface: 65%;
   --ldpass-material-title-mid-surface: 33%;
-  --ldpass-material-text-shadow-strength: 46%;
+  --ldpass-material-text-shadow-strength: 48%;
+  --ldpass-material-content-shadow-core: 3px;
+  --ldpass-material-content-shadow-halo: 9px;
+  --ldpass-material-surface-base-background: var(--ldpass-color-surface-panel);
+  --ldpass-material-content-shadow-color: color-mix(
+    in srgb,
+    var(--ldpass-color-surface-panel) var(--ldpass-material-text-shadow-strength),
+    transparent
+  );
+  --ldpass-material-text-shadow:
+    0 0 var(--ldpass-material-content-shadow-core) var(--ldpass-material-content-shadow-color),
+    0 1px var(--ldpass-material-content-shadow-halo) var(--ldpass-material-content-shadow-color);
+  --ldpass-material-inner-shadow-opacity: 44%;
+  --ldpass-material-edge-top-opacity: 15%;
+  --ldpass-material-floating-shadow: 0 18px 48px rgb(0 0 0 / 14%);
+  --ldpass-material-control-surface: color-mix(
+    in srgb,
+    var(--ldpass-color-surface-muted) 32%,
+    transparent
+  );
+  --ldpass-material-neutral-surface: color-mix(
+    in srgb,
+    var(--ldpass-color-surface-panel) var(--ldpass-material-floating-surface),
+    transparent
+  );
+  --ldpass-material-thumb-shadow:
+    inset 0 3px 0
+      color-mix(in srgb, var(--ldpass-material-ink) var(--ldpass-material-edge-top-opacity), transparent),
+    0 2px 8px rgb(0 0 0 / 12%);
+  /* 上偏移内描边沿圆角收窄到侧边，不再叠加恒定宽度的整圈描边。 */
+  --ldpass-material-surface-shadow:
+    inset 0 3px 0
+      color-mix(in srgb, var(--ldpass-material-ink) var(--ldpass-material-edge-top-opacity), transparent),
+    inset 0 -12px 24px
+      color-mix(
+        in srgb,
+        var(--ldpass-material-ink) var(--ldpass-material-inner-shadow-opacity),
+        transparent
+      ),
+    var(--ldpass-material-floating-shadow);
+  --ldpass-material-ink: #ffffff;
   --ldpass-material-hover-state: color-mix(in srgb, var(--surface-muted) 68%, transparent);
-  --ldpass-material-selected-state: color-mix(in srgb, var(--brand-soft) 78%, transparent);
-  --ldpass-material-selected-panel-state: color-mix(in srgb, var(--surface) 78%, transparent);
-  --ldpass-motion-duration-fast: 120ms;
-  --ldpass-motion-duration-standard: 180ms;
-  --ldpass-motion-duration-enter: 240ms;
-  --ldpass-motion-duration-layout: 320ms;
-  --ldpass-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ldpass-motion-easing-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ldpass-motion-distance-sm: 8px;
-  --ldpass-motion-distance-md: 16px;
+  /* 选中态统一走设计令牌的 16% 主色 tint，与 yct-v2 的 surface-selected 一致。 */
+  --ldpass-material-selected-state: var(--ldpass-color-surface-selected);
+  --ldpass-material-selected-panel-state: var(--ldpass-color-surface-selected);
+  /* 动效时长与缓动来自 tokens.css，这里不再重复声明；下面的 reduced 覆盖保留。 */
 }
 
 :root[data-font-family='system'] {
@@ -88,17 +123,24 @@
 }
 
 :root[data-resolved-appearance='dark'] {
-  --bg: #111214;
-  --surface: #1b1c1f;
-  --surface-muted: #25272b;
+  color-scheme: dark;
+  --ldpass-color-surface: #111214;
+  --ldpass-color-surface-panel: #1b1c1f;
+  --ldpass-color-surface-muted: #25272b;
+  --ldpass-color-field: #151619;
+  --ldpass-color-border: #34373d;
+  --ldpass-color-border-subtle: #262b2f;
+  --ldpass-color-border-strong: #4a5257;
+  --ldpass-color-text: #f2f3f4;
+  --ldpass-color-text-muted: #a8adb4;
   --chrome-surface: rgba(27, 28, 31, 0.92);
-  --field-bg: #151619;
   --card-muted-bg: #202226;
-  --line: #34373d;
-  --text: #f2f3f4;
-  --muted: #a8adb4;
   --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
   --ldpass-material-brightness: var(--ldpass-material-brightness-dark);
+  --ldpass-material-ink: #ffffff;
+  --ldpass-material-edge-top-opacity: 1.5%;
+  --ldpass-material-inner-shadow-opacity: 32%;
+  --ldpass-material-floating-shadow: 0 18px 48px rgb(0 0 0 / 18%);
 }
 
 :root[data-motion='reduced'] {
@@ -108,6 +150,14 @@
   --ldpass-motion-duration-layout: 0ms;
   --ldpass-motion-distance-sm: 0px;
   --ldpass-motion-distance-md: 0px;
+}
+
+.ldpass-material-filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -122,49 +172,55 @@
 }
 
 :root[data-resolved-accent='teal'] {
-  --brand: #28a67b;
-  --brand-dark: #14775d;
-  --brand-soft: #d8eee6;
-  --focus-ring: rgba(40, 166, 123, 0.16);
-  --accent: #d7e84f;
+  --ldpass-color-primary: #28a67b;
+  --ldpass-color-primary-hover: #14775d;
+  --ldpass-color-primary-soft: #d8eee6;
+  --ldpass-focus-halo: rgba(40, 166, 123, 0.18);
+  --accent: var(--ldpass-color-accent);
   --image-filter: none;
 }
 
 :root[data-resolved-accent='red'] {
-  --brand: #d34b45;
-  --brand-dark: #9e2f2b;
-  --brand-soft: #f6dddb;
-  --focus-ring: rgba(211, 75, 69, 0.18);
+  --ldpass-color-primary: #d34b45;
+  --ldpass-color-primary-hover: #9e2f2b;
+  --ldpass-color-primary-soft: #f6dddb;
+  --ldpass-focus-halo: rgba(211, 75, 69, 0.18);
   --accent: #ffd45a;
   --image-filter: none;
 }
 
 :root[data-resolved-accent='gray'] {
-  --brand: #6f7774;
-  --brand-dark: #4d5552;
-  --brand-soft: #e2e6e4;
-  --focus-ring: rgba(111, 119, 116, 0.2);
+  --ldpass-color-primary: #6f7774;
+  --ldpass-color-primary-hover: #4d5552;
+  --ldpass-color-primary-soft: #e2e6e4;
+  --ldpass-focus-halo: rgba(111, 119, 116, 0.2);
   --accent: #cfd6d2;
   --image-filter: grayscale(1);
 }
 
 :root[data-resolved-appearance='dark'][data-resolved-accent='teal'] {
-  --brand-soft: #17362e;
-  --focus-ring: rgba(40, 166, 123, 0.28);
+  --ldpass-color-primary-soft: #17362e;
+  --ldpass-focus-halo: rgba(40, 166, 123, 0.28);
 }
 
 :root[data-resolved-appearance='dark'][data-resolved-accent='red'] {
-  --brand-soft: #3c1f1e;
-  --focus-ring: rgba(211, 75, 69, 0.3);
+  --ldpass-color-primary-soft: #3c1f1e;
+  --ldpass-focus-halo: rgba(211, 75, 69, 0.3);
 }
 
 :root[data-resolved-appearance='dark'][data-resolved-accent='gray'] {
-  --brand-soft: #303634;
-  --focus-ring: rgba(150, 160, 156, 0.28);
+  --ldpass-color-primary-soft: #303634;
+  --ldpass-focus-halo: rgba(150, 160, 156, 0.28);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* iOS 16.7 基线：禁止横竖屏切换时自行放大字号。 */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 html,
@@ -220,7 +276,7 @@ body {
 :root[data-embedded='true']
   :is(.topbar-actions, .backoffice-topbar-actions, .auth-topbar > .theme-settings) {
   padding: 4px;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
 }
 
 :root[data-embedded='true'] .backoffice-topbar-actions {
@@ -241,7 +297,7 @@ body {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
 }
 
 .platform-status-region {
@@ -323,11 +379,62 @@ button {
   box-shadow: none;
 }
 
+/* 与 yct-v2 一致的触控基线：去掉点击高亮闪烁，关闭双击缩放等待。 */
+:is(a, button, summary, [role='button'], input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(button, summary, [role='button'], input[type='button'], input[type='submit'], input[type='reset']) {
+  touch-action: manipulation;
+}
+
 input,
 select,
 textarea {
   color: inherit;
   font: inherit;
+}
+
+/* 全局复选框/单选框：原生控件 + accent-color，18px 尺寸锁定，避免被容器输入框规则撑大。 */
+input[type='checkbox'],
+input[type='radio'] {
+  /* 容器里常见的「不限类型 input { width:100%; min-height:44px }」会波及勾选框，
+     用 min/max + !important 双向锁定，保证任何容器里都不被撑大。 */
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 !important;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+input[type='radio'] {
+  /* 单选框常被「不限类型 input」规则命中，这里把描边/底色/圆角一并复位。 */
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+}
+
+input[type='checkbox']:not(:disabled):hover,
+input[type='radio']:not(:disabled):hover {
+  accent-color: var(--brand-dark);
+}
+
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
+  outline: var(--ldpass-focus-ring-width) solid var(--ldpass-focus-ring-color);
+  outline-offset: var(--ldpass-focus-ring-offset);
+}
+
+input[type='checkbox']:disabled,
+input[type='radio']:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .material-symbols-rounded {
@@ -340,13 +447,19 @@ textarea {
   font-family: 'Material Symbols Rounded';
   font-size: 24px;
   font-style: normal;
+  /* 与 yct-v2 相同：用 --icon-* 变量驱动字形轴，选中态只切换变量，不再整段重写。 */
   font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
+    'FILL' var(--icon-fill, 0),
+    'wght' var(--icon-weight, 400),
+    'GRAD' var(--icon-grade, 0),
+    'opsz' var(--icon-optical-size, 24);
   font-weight: 400;
   line-height: 1;
+  transition:
+    color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    font-variation-settings var(--ldpass-motion-duration-standard)
+      var(--ldpass-motion-easing-standard),
+    transform var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard);
 }
 
 .category-item.is-active .material-symbols-rounded,
@@ -354,11 +467,8 @@ textarea {
 .backoffice-mobile-nav a.is-active .material-symbols-rounded,
 .detail-action-grid button.is-active .material-symbols-rounded,
 .icon-button.is-active .material-symbols-rounded {
-  font-variation-settings:
-    'FILL' 1,
-    'wght' 500,
-    'GRAD' 0,
-    'opsz' 24;
+  --icon-fill: 1;
+  --icon-weight: 500;
 }
 
 .site-legal-footer {
@@ -496,9 +606,9 @@ textarea {
   gap: 16px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--ldpass-shadow-floating);
   backdrop-filter: blur(18px);
   overflow: auto;
   overscroll-behavior: contain;
@@ -523,27 +633,36 @@ textarea {
 }
 
 .segmented-control {
+  /* 与 yct-v2 一致：选项数量不固定（2–4 个），横向按数量均分。 */
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--ldpass-segment-gap);
+  min-height: var(--ldpass-segment-track-height);
+  padding: var(--ldpass-segment-track-padding);
+  border: 1px solid var(--line);
+  border-radius: var(--ldpass-radius-pill);
   background: var(--surface-muted);
 }
 
 .segmented-control button,
 .segmented-control a,
 .swatch-button {
-  min-height: 34px;
+  min-height: 30px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: transparent;
   box-shadow: none;
   color: var(--muted);
   cursor: pointer;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   text-decoration: none;
+  transition:
+    background-color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    font-weight var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard);
 }
 
 .segmented-control button,
@@ -560,10 +679,50 @@ textarea {
 
 .segmented-control button.is-selected,
 .segmented-control a.is-selected,
+.segmented-control button.is-active,
+.segmented-control a.is-active {
+  background: var(--ldpass-color-interaction-hover);
+  color: var(--brand);
+  box-shadow: var(--ldpass-shadow-soft);
+  font-weight: var(--ldpass-button-font-weight-strong);
+}
+
+/* 选中项默认中性底，悬停/聚焦时才叠加强调色。 */
+.segmented-control button:is(.is-selected, .is-active):not(:disabled):is(:hover, :focus-visible),
+.segmented-control a:is(.is-selected, .is-active):is(:hover, :focus-visible) {
+  background: var(--ldpass-color-surface-selected);
+  color: var(--brand);
+}
+
 .swatch-button.is-selected {
-  background: var(--surface);
-  color: var(--brand-dark);
-  box-shadow: 0 4px 14px rgba(17, 24, 22, 0.08);
+  background: var(--ldpass-color-surface-selected);
+  color: var(--brand);
+  box-shadow: var(--ldpass-shadow-soft);
+  font-weight: var(--ldpass-button-font-weight-strong);
+}
+
+/* 与 yct-v2 相同的未选中悬停反馈：叠加 9% 文字色，而不是换一档灰底。 */
+.segmented-control button:not(.is-selected, .is-active):not(:disabled):is(:hover, :focus-visible),
+.segmented-control a:not(.is-selected, .is-active):is(:hover, :focus-visible) {
+  background: var(--ldpass-color-interaction-hover);
+  color: var(--text);
+}
+
+.segmented-control button:disabled,
+.segmented-control a[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: var(--ldpass-disabled-opacity);
+}
+
+@media (max-width: 760px) {
+  .segmented-control {
+    min-height: var(--ldpass-segment-track-height-mobile);
+  }
+
+  .segmented-control button,
+  .segmented-control a {
+    min-height: 36px;
+  }
 }
 
 .swatch-grid {
@@ -573,6 +732,7 @@ textarea {
 }
 
 .swatch-button {
+  min-height: var(--ldpass-control-height-sm);
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -585,7 +745,7 @@ textarea {
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   border: 1px solid rgba(17, 24, 22, 0.12);
 }
 
@@ -609,18 +769,21 @@ textarea {
 .account-entry,
 .primary-action,
 .category-item {
-  min-height: 40px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
 }
 
 .icon-button {
-  width: 40px;
+  width: var(--ldpass-control-size-md);
+  height: var(--ldpass-control-size-md);
   display: inline-grid;
   place-items: center;
   background: transparent;
   cursor: pointer;
   text-decoration: none;
+  transition:
+    background-color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard);
 }
 
 .icon-button:hover,
@@ -628,12 +791,18 @@ textarea {
   background: var(--surface-muted);
 }
 
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: var(--ldpass-disabled-opacity);
+}
+
 .icon-button.is-active {
-  background: var(--brand-soft);
-  color: var(--brand-dark);
+  background: var(--ldpass-color-surface-selected);
+  color: var(--brand);
 }
 
 .account-entry {
+  min-height: var(--ldpass-control-height-md);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -647,7 +816,7 @@ textarea {
   width: 28px;
   height: 28px;
   flex: 0 0 auto;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-sm);
   object-fit: cover;
   background: linear-gradient(135deg, #d7d9dc, #bfc8c4);
 }
@@ -680,11 +849,11 @@ textarea {
 }
 
 .wallet-search input {
-  min-height: 42px;
+  min-height: var(--ldpass-field-height-search);
   min-width: 0;
-  padding: 0 16px;
+  padding: 0 var(--ldpass-space-3);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--ldpass-control-radius);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -695,13 +864,19 @@ textarea {
   outline: 3px solid var(--focus-ring);
 }
 
+.wallet-search input[type='search']::-webkit-search-cancel-button {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 .search-clear {
-  width: 36px;
-  min-height: 36px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
   display: inline-grid;
   place-items: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: transparent;
   cursor: pointer;
 }
@@ -728,22 +903,28 @@ textarea {
 }
 
 .category-item {
+  min-height: var(--ldpass-tap-target-min);
   display: grid;
   grid-template-columns: 28px 1fr auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 0 14px;
+  padding: 0 var(--ldpass-space-4);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
   text-decoration: none;
   text-align: left;
+  font-weight: 500;
+  transition:
+    background-color var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard),
+    color var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard);
 }
 
 .category-item.is-active {
-  color: var(--brand-dark);
-  background: var(--brand-soft);
+  background: var(--ldpass-color-surface-selected);
+  color: var(--brand);
+  font-weight: 700;
 }
 
 .category-item strong {
@@ -775,7 +956,7 @@ textarea {
   margin-bottom: 12px;
   padding: 14px;
   border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--line));
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: color-mix(in srgb, var(--warning) 9%, var(--surface));
 }
 
@@ -818,7 +999,7 @@ textarea {
   width: fit-content;
   max-width: 100%;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--brand-soft);
   color: var(--brand-dark);
   font-weight: 700;
@@ -841,7 +1022,7 @@ textarea {
   max-width: 24rem;
   aspect-ratio: 856 / 540;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background-image: linear-gradient(135deg, var(--empty-tint-from), var(--empty-tint-to));
   background-color: #b8cdd1;
   background-position: center;
@@ -870,7 +1051,7 @@ textarea {
   z-index: var(--stack-z);
   overflow: visible;
   aspect-ratio: 856 / 540;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   transition:
     margin-top 180ms ease,
     transform 180ms ease;
@@ -903,7 +1084,7 @@ textarea {
   aspect-ratio: 856 / 540;
   padding: 20px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: linear-gradient(135deg, #b9e4dc, #66a99b);
   color: white;
   text-align: left;
@@ -1051,7 +1232,7 @@ textarea {
 .wallet-pass-card-title-hidden small {
   grid-row: 4;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--ldpass-radius-sm);
   background: rgba(17, 24, 22, 0.18);
   backdrop-filter: blur(10px);
 }
@@ -1116,12 +1297,12 @@ textarea {
 }
 
 .mini-icon-button {
-  width: 36px;
-  height: 36px;
+  width: var(--ldpass-control-size-md);
+  height: var(--ldpass-control-size-md);
   display: inline-grid;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: rgba(255, 255, 255, 0.24);
   color: white;
   cursor: pointer;
@@ -1211,7 +1392,7 @@ textarea {
   place-items: center;
   width: 5.7rem;
   height: 4rem;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   color: white;
   font-size: 34px;
   box-shadow: 0 10px 20px rgba(34, 49, 49, 0.08);
@@ -1274,16 +1455,16 @@ textarea {
 }
 
 .pill-action {
-  min-height: 34px;
+  min-height: var(--ldpass-control-height-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 18px;
-  border-radius: 999px;
+  padding: 0 var(--ldpass-button-padding-x);
+  border-radius: var(--ldpass-radius-pill);
   background: rgba(255, 255, 255, 0.92);
   color: var(--brand-dark);
   text-decoration: none;
-  font-weight: 800;
+  font-weight: var(--ldpass-button-font-weight-strong);
   box-shadow: 0 8px 22px rgba(20, 119, 93, 0.14);
 }
 
@@ -1294,18 +1475,24 @@ textarea {
 }
 
 .primary-action {
+  min-height: 42px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 14px;
-  border-radius: 999px;
+  justify-content: center;
+  gap: var(--ldpass-space-1);
+  padding: 0 var(--ldpass-space-4);
+  border-radius: var(--ldpass-radius-pill);
   background: var(--brand);
   border: 0;
   box-shadow: none;
-  color: white;
+  color: var(--ldpass-color-on-primary);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: var(--ldpass-button-font-weight-strong);
   cursor: pointer;
+  transition:
+    background-color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    transform var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard);
 }
 
 .primary-action:hover {
@@ -1315,38 +1502,48 @@ textarea {
 .primary-action:disabled,
 .secondary-action:disabled {
   cursor: not-allowed;
-  opacity: 0.58;
+  opacity: var(--ldpass-disabled-opacity);
+  box-shadow: none;
 }
 
 .secondary-action {
-  min-height: 40px;
+  min-height: var(--ldpass-control-height-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: var(--surface-muted);
-  border: 0;
+  gap: var(--ldpass-space-1);
+  padding: 0 var(--ldpass-button-padding-x);
+  border-radius: var(--ldpass-radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--line);
   box-shadow: none;
   color: var(--text);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: var(--ldpass-button-font-weight);
   cursor: pointer;
+  transition:
+    background-color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    border-color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard);
 }
 
 .danger-action {
-  min-height: 40px;
+  min-height: var(--ldpass-control-height-secondary);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 14px;
+  justify-content: center;
+  gap: var(--ldpass-space-1);
+  padding: 0 var(--ldpass-button-padding-x);
   border: 0;
-  border-radius: 999px;
-  background: #d34b45;
+  border-radius: var(--ldpass-radius-pill);
+  background: var(--danger);
   box-shadow: none;
-  color: white;
-  font-weight: 800;
+  color: var(--ldpass-color-on-primary);
+  font-weight: var(--ldpass-button-font-weight-strong);
   cursor: pointer;
+  transition:
+    background-color var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    transform var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard);
 }
 
 .danger-action:hover {
@@ -1355,7 +1552,61 @@ textarea {
 
 .danger-action:disabled {
   cursor: not-allowed;
-  opacity: 0.58;
+  opacity: var(--ldpass-disabled-opacity);
+}
+
+/* 操作按钮文案不换行，避免在窄容器里被挤压成竖排或被裁切。 */
+:is(.primary-action, .secondary-action, .danger-action) {
+  white-space: nowrap;
+}
+
+/* 与 yct-v2 相同的按压反馈：可交互基元统一缩放，禁用态不缩放。 */
+:is(
+    .primary-action,
+    .secondary-action,
+    .danger-action,
+    .pill-action,
+    .icon-button,
+    .account-entry,
+    .search-clear,
+    .detail-close-button,
+    .mini-icon-button,
+    .segmented-control button,
+    .segmented-control a,
+    .swatch-button
+  ):not(:disabled):active {
+  transform: scale(var(--ldpass-motion-scale-press));
+}
+
+/* 与 yct-v2 相同的统一焦点环：2px 实色主色 + 2px offset。 */
+:is(
+    .primary-action,
+    .secondary-action,
+    .danger-action,
+    .pill-action,
+    .icon-button,
+    .account-entry,
+    .category-item,
+    .search-clear,
+    .detail-close-button,
+    .segmented-control button,
+    .segmented-control a,
+    .swatch-button
+  ):focus-visible {
+  outline: var(--ldpass-focus-ring-width) solid var(--ldpass-focus-ring-color);
+  outline-offset: var(--ldpass-focus-ring-offset);
+}
+
+/* 触控设备把主要操作抬到 44px 命中区（视觉尺寸只对图标类生效）。 */
+@media (pointer: coarse) {
+  :is(.primary-action, .secondary-action, .danger-action, .pill-action) {
+    min-height: var(--ldpass-tap-target-min);
+  }
+
+  :is(.icon-button, .account-entry, .search-clear, .detail-close-button) {
+    min-width: var(--ldpass-tap-target-min);
+    min-height: var(--ldpass-tap-target-min);
+  }
 }
 
 .account-summary {
@@ -1365,7 +1616,7 @@ textarea {
   align-items: center;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--card-muted-bg);
 }
 
@@ -1382,7 +1633,7 @@ textarea {
 .provider-home-avatar {
   inline-size: 48px;
   block-size: 48px;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: linear-gradient(135deg, var(--brand-soft), var(--surface-muted));
 }
 
@@ -1443,7 +1694,7 @@ textarea {
   gap: 3px;
   min-width: 0;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
 }
 
@@ -1522,7 +1773,7 @@ textarea {
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
   color: var(--text);
   text-decoration: none;
@@ -1571,7 +1822,7 @@ textarea {
   gap: 14px;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
 }
 
@@ -1590,7 +1841,7 @@ textarea {
   gap: 14px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--card-muted-bg);
 }
 
@@ -1630,7 +1881,7 @@ textarea {
   height: 164px;
   padding: 8px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: white;
   filter: none;
 }
@@ -1661,7 +1912,7 @@ textarea {
   gap: 12px;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -1682,13 +1933,21 @@ textarea {
   font-weight: 700;
 }
 
+/* 设备条目里的操作按钮保持自身尺寸，不被正文挤压缩窄。 */
+.account-device-item > :is(button, a) {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+}
+
 .detail-panel {
   position: relative;
-  z-index: 800;
+  /* 低于详情面板弹窗（760）与主题弹窗（1000），避免盖住浮层遮罩。 */
+  z-index: 700;
   gap: 14px;
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
 }
 
@@ -1715,12 +1974,12 @@ textarea {
 }
 
 .detail-close-button {
-  width: 34px;
-  height: 34px;
+  width: var(--ldpass-control-size-md);
+  height: var(--ldpass-control-size-md);
   display: inline-grid;
   place-items: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--surface-muted);
   color: var(--muted);
   cursor: pointer;
@@ -1735,7 +1994,7 @@ textarea {
   display: grid;
   gap: 6px;
   padding: 14px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--brand-soft);
 }
 
@@ -1836,7 +2095,7 @@ textarea {
   align-items: center;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
   color: var(--text);
   text-align: left;
@@ -1887,7 +2146,7 @@ textarea {
   justify-content: space-between;
   gap: 10px;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -1928,7 +2187,7 @@ textarea {
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
   box-shadow: var(--shadow);
   overflow: auto;
@@ -1996,7 +2255,7 @@ textarea {
   display: inline-grid;
   place-items: center;
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--surface-muted);
   color: var(--muted);
   font-size: 12px;
@@ -2008,7 +2267,7 @@ textarea {
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -2140,7 +2399,7 @@ textarea {
 .detail-transfer-form textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -2152,8 +2411,8 @@ textarea {
 .detail-use-form input,
 .detail-use-form select,
 .detail-dispute-form select {
-  min-height: 40px;
-  padding: 0 12px;
+  min-height: var(--ldpass-field-height);
+  padding: 0 var(--ldpass-space-3);
 }
 
 .detail-dispute-form textarea,
@@ -2170,7 +2429,7 @@ textarea {
   min-height: 64px;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
 }
 
@@ -2217,7 +2476,7 @@ textarea {
   gap: 10px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
   color: var(--text);
   text-align: left;
@@ -2245,7 +2504,7 @@ textarea {
   gap: 4px 12px;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
   color: var(--text);
   text-align: left;
@@ -2287,7 +2546,7 @@ textarea {
 
 .inline-pin-form input {
   width: 80px;
-  min-height: 38px;
+  min-height: var(--ldpass-field-height);
 }
 
 .server-confirm-panel {
@@ -2331,7 +2590,7 @@ textarea {
 .detail-empty .material-symbols-rounded {
   width: 64px;
   height: 64px;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--surface-muted);
   color: var(--brand-dark);
   font-size: 34px;
@@ -2365,7 +2624,7 @@ textarea {
   gap: 18px;
   padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -2383,7 +2642,7 @@ textarea {
   height: 56px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--brand-soft);
   color: var(--brand-dark);
 }
@@ -2409,7 +2668,7 @@ textarea {
   margin: 0;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--field-bg);
 }
 
@@ -2423,7 +2682,7 @@ textarea {
   display: block;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--field-bg);
   color: var(--text);
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
@@ -2437,7 +2696,7 @@ textarea {
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--field-bg);
 }
 
@@ -2459,7 +2718,7 @@ textarea {
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--field-bg);
   color: var(--text);
   font: inherit;
@@ -2536,7 +2795,7 @@ textarea {
   display: flex;
   align-items: center;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
   color: var(--muted);
   line-height: 1.5;
@@ -2547,25 +2806,13 @@ textarea {
   gap: 14px;
 }
 
-.register-segments {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.account-verification-methods {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.legal-document-tabs {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .register-method-card {
   display: grid;
   align-content: start;
   gap: 14px;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--card-muted-bg);
 }
 
@@ -2580,7 +2827,7 @@ textarea {
   gap: 4px;
   padding: 12px;
   border: 1px solid var(--brand);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--brand-soft);
   color: var(--text);
   font-size: 13px;
@@ -2601,6 +2848,15 @@ textarea {
   color: #8a570c;
 }
 
+.local-dev-admin-login {
+  justify-items: start;
+  margin-top: 4px;
+}
+
+.local-dev-admin-login .secondary-action {
+  gap: 8px;
+}
+
 .flow-notice-muted {
   border-color: var(--line);
   background: var(--surface-muted);
@@ -2612,7 +2868,7 @@ textarea {
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
 }
 
@@ -2624,7 +2880,7 @@ textarea {
   width: min(100%, 24rem);
   aspect-ratio: 856 / 540;
   padding: 18px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: linear-gradient(135deg, #b9e4dc, #4d9e8f);
   background-position: center;
   background-size: cover;
@@ -2647,7 +2903,7 @@ textarea {
 .add-pass-preview-card small {
   justify-self: start;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--ldpass-radius-sm);
   background: rgba(17, 24, 39, 0.28);
   color: white;
   font-size: 12px;
@@ -2667,7 +2923,7 @@ textarea {
 .add-pass-preview-heading img {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   object-fit: contain;
 }
 
@@ -2764,7 +3020,7 @@ textarea {
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -2789,7 +3045,7 @@ textarea {
   display: block;
   max-width: 100%;
   padding: 8px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
   color: var(--text);
   font-size: 12px;
@@ -2834,11 +3090,11 @@ textarea {
 }
 
 .action-link-filters select {
-  min-height: 38px;
+  min-height: var(--ldpass-field-height);
   min-width: 0;
-  padding: 0 12px;
+  padding: 0 var(--ldpass-space-3);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--field-bg);
   color: var(--text);
 }
@@ -2863,7 +3119,7 @@ textarea {
   gap: 10px;
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -2873,7 +3129,7 @@ textarea {
   height: 34px;
   display: inline-grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
@@ -3034,29 +3290,30 @@ textarea {
 .backoffice-page-actions .secondary-action,
 .backoffice-page-actions .danger-action {
   position: relative;
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
-  min-height: 40px;
+  width: var(--ldpass-control-size-md);
+  min-width: var(--ldpass-control-size-md);
+  height: var(--ldpass-control-size-md);
+  min-height: var(--ldpass-control-size-md);
   display: inline-grid;
   place-items: center;
   padding: 0;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
 }
 
 .backoffice-page-actions .primary-action {
-  min-height: 40px;
+  min-height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 0 14px;
-  border-radius: 999px;
+  gap: var(--ldpass-space-1);
+  padding: 0 var(--ldpass-space-4);
+  border-radius: var(--ldpass-radius-pill);
   background: var(--brand);
-  color: white;
+  color: var(--ldpass-color-on-primary);
 }
 
 .backoffice-page-actions .secondary-action {
+  border-color: transparent;
   background: transparent;
 }
 
@@ -3107,20 +3364,28 @@ textarea {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 0 12px;
-  border-radius: 999px;
+  gap: var(--ldpass-space-2);
+  min-height: var(--ldpass-tap-target-min);
+  padding: 0 var(--ldpass-space-4);
+  border-radius: var(--ldpass-radius-pill);
   color: var(--muted);
   text-decoration: none;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 500;
+  transition:
+    background-color var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard),
+    color var(--ldpass-motion-duration-standard) var(--ldpass-motion-easing-standard);
 }
 
-.backoffice-nav a:hover,
+.backoffice-nav a:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
 .backoffice-nav a.is-active {
-  background: var(--brand-soft);
-  color: var(--brand-dark);
+  background: var(--ldpass-color-surface-selected);
+  color: var(--brand);
+  font-weight: 700;
 }
 
 .backoffice-nav .material-symbols-rounded {
@@ -3164,19 +3429,25 @@ textarea {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 0 12px;
-  border-radius: 8px;
+  gap: var(--ldpass-space-2);
+  min-height: var(--ldpass-tap-target-min);
+  padding: 0 var(--ldpass-space-3);
+  border-radius: var(--ldpass-radius-md);
   background: var(--bg);
   color: var(--muted);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 500;
+}
+
+.backoffice-mobile-nav-group a:hover {
+  background: var(--surface-muted);
+  color: var(--text);
 }
 
 .backoffice-mobile-nav-group a.is-active {
-  background: var(--brand-soft);
-  color: var(--brand-dark);
+  background: var(--ldpass-color-surface-selected);
+  color: var(--brand);
+  font-weight: 700;
 }
 
 .backoffice-content {
@@ -3209,7 +3480,7 @@ textarea {
   gap: 16px;
   padding: 24px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -3270,7 +3541,7 @@ textarea {
   align-items: center;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--card-muted-bg);
 }
 
@@ -3293,15 +3564,15 @@ textarea {
 }
 
 .admin-category-tag {
-  min-height: 24px;
+  min-height: var(--ldpass-chip-height);
   display: inline-grid;
   place-items: center;
-  padding: 0 9px;
-  border-radius: 999px;
+  padding: 0 var(--ldpass-chip-padding-x);
+  border-radius: var(--ldpass-radius-pill);
   background: var(--surface-muted);
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
+  font-size: var(--ldpass-chip-font-size);
+  font-weight: var(--ldpass-chip-font-weight);
   line-height: 1;
   vertical-align: middle;
 }
@@ -3349,7 +3620,7 @@ textarea {
   width: 38px;
   height: 38px;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
   color: var(--muted);
   font-size: 16px;
@@ -3364,13 +3635,13 @@ textarea {
 .admin-status-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
+  min-height: var(--ldpass-chip-height);
+  padding: 0 var(--ldpass-chip-padding-x);
+  border-radius: var(--ldpass-radius-pill);
   background: var(--brand-soft);
   color: var(--brand-dark);
-  font-size: 12px;
-  font-weight: 900;
+  font-size: var(--ldpass-chip-font-size);
+  font-weight: var(--ldpass-chip-font-weight);
 }
 
 .admin-dialog-layer {
@@ -3388,6 +3659,9 @@ textarea {
   inset: 0;
   border: 0;
   background: rgba(8, 14, 12, 0.42);
+  /* 与 yct-v2 的 dialog::backdrop 一致：遮罩带轻模糊。 */
+  -webkit-backdrop-filter: blur(var(--ldpass-material-blur-soft));
+  backdrop-filter: blur(var(--ldpass-material-blur-soft));
   cursor: pointer;
 }
 
@@ -3397,12 +3671,12 @@ textarea {
   width: min(100%, 30rem);
   max-height: min(760px, calc(100svh - 40px));
   display: grid;
-  gap: 14px;
+  gap: var(--ldpass-space-4);
   overflow: auto;
-  padding: 18px;
-  border-radius: 8px;
+  padding: var(--ldpass-space-5);
+  border-radius: var(--ldpass-dialog-radius);
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--ldpass-shadow-floating);
 }
 
 .admin-pass-dialog-panel {
@@ -3430,7 +3704,7 @@ textarea {
   gap: 8px;
   margin: 0;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -3477,7 +3751,7 @@ textarea {
 .admin-dialog-form input,
 .admin-dialog-form textarea {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--ldpass-field-height);
 }
 
 .admin-dialog-actions {
@@ -3494,10 +3768,10 @@ textarea {
 
 .inline-admin-input {
   width: 112px;
-  min-height: 38px;
-  padding: 0 12px;
+  min-height: var(--ldpass-field-height);
+  padding: 0 var(--ldpass-space-3);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--field-bg);
   color: var(--text);
   font: inherit;
@@ -3519,7 +3793,7 @@ textarea {
   align-items: flex-end;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -3570,7 +3844,7 @@ textarea {
 
 .admin-adjustment-panel input,
 .admin-adjustment-panel select {
-  min-height: 42px;
+  min-height: var(--ldpass-field-height);
 }
 
 .admin-list-section {
@@ -3591,7 +3865,7 @@ textarea {
   align-items: start;
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -3632,7 +3906,7 @@ textarea {
 .provider-issue-form select,
 .provider-ticket-form select,
 .card-template-variant-form select {
-  min-height: 42px;
+  min-height: var(--ldpass-field-height);
 }
 
 .card-template-variant-form {
@@ -3644,6 +3918,77 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 二元开关：与 yct-v2 的 switch-control 同构（原生 checkbox 承载语义，视觉轨 46×28）。 */
+.inline-toggle.is-switch {
+  position: relative;
+  min-height: var(--ldpass-tap-target-min);
+  cursor: pointer;
+}
+
+.inline-toggle.is-switch > input[type='checkbox'] {
+  position: absolute;
+  inset-inline-start: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch-track {
+  position: relative;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 28px;
+  border-radius: var(--ldpass-radius-pill);
+  background: var(--surface-muted);
+  transition: background-color var(--ldpass-motion-duration-fast)
+    var(--ldpass-motion-easing-standard);
+}
+
+.switch-track::after {
+  display: block;
+  width: 22px;
+  height: 22px;
+  margin: 3px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 2px 6px rgba(17, 24, 23, 0.18);
+  content: '';
+  transition:
+    transform var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard),
+    scale var(--ldpass-motion-duration-fast) var(--ldpass-motion-easing-standard);
+}
+
+.inline-toggle.is-switch > input:checked + .switch-track {
+  background: var(--brand);
+}
+
+.inline-toggle.is-switch > input:checked + .switch-track::after {
+  transform: translateX(18px);
+}
+
+.inline-toggle.is-switch > input:not(:disabled):is(:hover, :focus-visible) + .switch-track {
+  background: color-mix(in srgb, var(--ldpass-color-text) 9%, var(--surface-muted));
+}
+
+.inline-toggle.is-switch
+  > input:not(:disabled):is(:hover, :focus-visible):checked
+  + .switch-track {
+  background: color-mix(in srgb, var(--ldpass-color-text) 9%, var(--brand));
+}
+
+.inline-toggle.is-switch > input:not(:disabled):is(:hover, :focus-visible) + .switch-track::after {
+  scale: 1.08;
+}
+
+.inline-toggle.is-switch > input:focus-visible + .switch-track {
+  outline: var(--ldpass-focus-ring-width) solid var(--ldpass-focus-ring-color);
+  outline-offset: var(--ldpass-focus-ring-offset);
+}
+
+.inline-toggle.is-switch > input:disabled + .switch-track {
+  opacity: var(--ldpass-disabled-opacity);
+  cursor: not-allowed;
 }
 
 .template-rule-grid {
@@ -3700,7 +4045,7 @@ textarea {
   gap: 10px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -3709,10 +4054,10 @@ textarea {
 }
 
 .location-rule-heading select {
-  min-height: 38px;
-  padding: 0 12px;
+  min-height: var(--ldpass-field-height);
+  padding: 0 var(--ldpass-space-3);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--field-bg);
   color: var(--text);
   font: inherit;
@@ -3739,7 +4084,7 @@ textarea {
   width: min(100%, 24rem);
   aspect-ratio: 856 / 540;
   padding: 18px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background-color: #4d9e8f;
   background-image: linear-gradient(135deg, #b9e4dc, #4d9e8f);
   background-position: center;
@@ -3768,7 +4113,7 @@ textarea {
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: rgba(255, 255, 255, 0.76);
   object-fit: contain;
 }
@@ -3792,7 +4137,7 @@ textarea {
   align-self: end;
   justify-self: start;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--ldpass-radius-sm);
   background: rgba(17, 24, 39, 0.28);
   opacity: 0.92;
   backdrop-filter: blur(6px);
@@ -3873,7 +4218,7 @@ textarea {
 
 .audit-filter-grid input,
 .audit-filter-grid select {
-  min-height: 42px;
+  min-height: var(--ldpass-field-height);
 }
 
 .audit-filter-actions {
@@ -3908,20 +4253,20 @@ textarea {
 .dispute-status-form textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--field-bg);
   color: var(--text);
   font: inherit;
 }
 
 .dispute-status-form select {
-  min-height: 42px;
-  padding: 0 12px;
+  min-height: var(--ldpass-field-height);
+  padding: 0 var(--ldpass-space-3);
 }
 
 .dispute-status-form input {
-  min-height: 42px;
-  padding: 0 12px;
+  min-height: var(--ldpass-field-height);
+  padding: 0 var(--ldpass-space-3);
 }
 
 .dispute-status-form textarea {
@@ -3949,7 +4294,7 @@ textarea {
   margin: 0;
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--field-bg);
   color: var(--text);
   font: inherit;
@@ -3986,7 +4331,7 @@ textarea {
   align-items: flex-end;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -4000,7 +4345,7 @@ textarea {
 
 .theme-schedule-item input,
 .theme-schedule-item select {
-  min-height: 42px;
+  min-height: var(--ldpass-field-height);
 }
 
 .theme-schedule-item .inline-toggle {
@@ -4015,7 +4360,7 @@ textarea {
   gap: 14px;
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--card-muted-bg);
 }
 
@@ -4059,7 +4404,7 @@ textarea {
 .storage-meter {
   overflow: hidden;
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--ldpass-radius-pill);
   background: var(--brand-soft);
 }
 
@@ -4085,7 +4430,7 @@ textarea {
   display: grid;
   gap: 4px;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--ldpass-radius-md);
   background: var(--surface-muted);
 }
 
@@ -4134,7 +4479,7 @@ input[type='radio'] {
     block-size: 40px;
     display: grid;
     place-items: center;
-    border-radius: 999px;
+    border-radius: var(--ldpass-radius-pill);
     background: var(--surface-muted);
   }
 
@@ -4180,7 +4525,7 @@ input[type='radio'] {
 
   .backoffice-shell-provider .backoffice-mobile-nav-group {
     padding: 12px;
-    border-radius: 8px;
+    border-radius: var(--ldpass-radius-md);
   }
 
   .backoffice-shell-provider .backoffice-mobile-nav-group + .backoffice-mobile-nav-group {
@@ -4546,7 +4891,7 @@ input[type='radio'] {
     justify-content: space-between;
     padding: 8px;
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: var(--ldpass-radius-pill);
     background: var(--chrome-surface);
     box-shadow: var(--shadow);
     backdrop-filter: blur(18px);
@@ -4554,7 +4899,7 @@ input[type='radio'] {
 
   .category-item {
     min-width: 48px;
-    border-radius: 999px;
+    border-radius: var(--ldpass-radius-pill);
   }
 
   .pass-stack-panel,
@@ -4701,6 +5046,61 @@ input[type='radio'] {
   cursor: not-allowed;
 }
 
+/* 滑杆与雨城通（yct-v2）同款：关闭原生外观后自绘轨道、进度与把手。 */
+.theme-range-control input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+.theme-range-control input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--ldpass-radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--brand) 0 var(--ldpass-range-progress, 0%),
+    var(--line) var(--ldpass-range-progress, 0%) 100%
+  );
+}
+
+.theme-range-control input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: var(--ldpass-radius-pill);
+  background: var(--line);
+}
+
+.theme-range-control input[type='range']::-moz-range-progress {
+  height: 4px;
+  border-radius: var(--ldpass-radius-pill);
+  background: var(--brand);
+}
+
+.theme-range-control input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 0;
+  border-radius: var(--ldpass-radius-pill);
+  background: var(--surface);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 18%);
+}
+
+.theme-range-control input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: var(--ldpass-radius-pill);
+  background: var(--surface);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 18%);
+}
+
+.theme-range-control input[type='range']:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+}
+
 :root:not([data-embedded='true'])[data-material-mode='performance']
   :is(.topbar, .backoffice-topbar) {
   border-color: var(--line);
@@ -4716,9 +5116,6 @@ input[type='radio'] {
     .auth-topbar > .theme-settings,
     .backoffice-topbar > .backoffice-topbar-back,
     .theme-popover,
-    .category-rail,
-    .backoffice-nav,
-    .backoffice-mobile-nav,
     .detail-panel,
     .detail-module-slot.is-dialog .detail-module-panel,
     .admin-dialog-panel,
@@ -4749,58 +5146,276 @@ input[type='radio'] {
     .backoffice-topbar > .backoffice-topbar-back
   ) {
   padding: 4px;
-  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
-  border-radius: 999px;
+  border: 0;
+  border-radius: var(--ldpass-radius-pill);
   background: color-mix(in srgb, var(--surface) var(--ldpass-material-action-surface), transparent);
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: contrast(var(--ldpass-material-contrast))
-    brightness(var(--ldpass-material-brightness)) saturate(var(--ldpass-material-saturation))
-    blur(var(--ldpass-material-blur));
-  backdrop-filter: contrast(var(--ldpass-material-contrast))
-    brightness(var(--ldpass-material-brightness)) saturate(var(--ldpass-material-saturation))
-    blur(var(--ldpass-material-blur));
-  text-shadow: 0 1px 4px
-    color-mix(in srgb, var(--surface) var(--ldpass-material-text-shadow-strength), transparent);
+  box-shadow: var(--ldpass-material-surface-shadow);
+  -webkit-backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  text-shadow: var(--ldpass-material-text-shadow);
 }
 
 :root[data-material-mode='advanced']
   :is(.brand span, .backoffice-title span, .backoffice-title strong) {
-  text-shadow:
-    0 1px 5px
-      color-mix(in srgb, var(--surface) var(--ldpass-material-text-shadow-strength), transparent),
-    0 2px 10px color-mix(in srgb, var(--text) 18%, transparent);
+  text-shadow: var(--ldpass-material-text-shadow);
 }
 
 :root[data-material-mode='advanced']
   :is(
     .theme-popover,
-    .category-rail,
-    .backoffice-nav,
-    .backoffice-mobile-nav,
     .detail-panel,
     .detail-module-slot.is-dialog .detail-module-panel,
     .admin-dialog-panel,
     .backoffice-page-actions-floating
   ) {
+  border: 0;
   background: color-mix(
     in srgb,
     var(--surface) var(--ldpass-material-floating-surface),
     transparent
   );
-  -webkit-backdrop-filter: contrast(var(--ldpass-material-contrast))
-    brightness(var(--ldpass-material-brightness)) saturate(var(--ldpass-material-saturation))
-    blur(var(--ldpass-material-blur));
-  backdrop-filter: contrast(var(--ldpass-material-contrast))
-    brightness(var(--ldpass-material-brightness)) saturate(var(--ldpass-material-saturation))
-    blur(var(--ldpass-material-blur));
-  text-shadow: 0 1px 4px
-    color-mix(in srgb, var(--surface) var(--ldpass-material-text-shadow-strength), transparent);
+  -webkit-backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  text-shadow: var(--ldpass-material-text-shadow);
+  box-shadow: var(--ldpass-material-surface-shadow);
+}
+
+/* 首页分类栏与后台侧边栏不整体承载材质，只让当前选中项呈现液态表面。 */
+:root[data-material-mode='advanced']
+  :is(
+    .category-rail > .category-item.is-active,
+    .backoffice-nav a.is-active,
+    .backoffice-mobile-nav-group a.is-active
+  ) {
+  background: color-mix(in srgb, var(--ldpass-color-surface-selected) 72%, transparent);
+  box-shadow: var(--ldpass-material-surface-shadow);
+  -webkit-backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  text-shadow: var(--ldpass-material-text-shadow);
+}
+
+/* 每块材质建立底色边界；内部填充色由内容阴影桥接层写入并自然继承给透明子元素。 */
+:root[data-material-mode='advanced'] :where([data-liquid-material]) {
+  --ldpass-material-content-background: var(--surface);
+  --ldpass-material-surface-base-background: var(--surface);
+}
+
+/* 在内容自身解析阴影，避免悬停祖先预先解析的颜色盖过更近的填充底色。 */
+:root[data-material-mode='advanced'] :where([data-liquid-material], [data-liquid-material] *) {
+  --ldpass-material-content-shadow-color: color-mix(
+    in srgb,
+    color-mix(
+        in srgb,
+        var(--ldpass-material-content-background) 60%,
+        var(--ldpass-material-surface-base-background)
+      )
+      var(--ldpass-material-text-shadow-strength),
+    transparent
+  );
+  --ldpass-material-resolved-shadow-core: var(
+    --ldpass-material-interaction-shadow-core,
+    var(--ldpass-material-content-shadow-core)
+  );
+  --ldpass-material-resolved-shadow-halo: var(
+    --ldpass-material-interaction-shadow-halo,
+    var(--ldpass-material-content-shadow-halo)
+  );
+  --ldpass-material-resolved-shadow-offset: var(--ldpass-material-interaction-shadow-offset, 1px);
+  --ldpass-material-text-shadow:
+    0 0 var(--ldpass-material-resolved-shadow-core) var(--ldpass-material-content-shadow-color),
+    0 var(--ldpass-material-resolved-shadow-offset) var(--ldpass-material-resolved-shadow-halo)
+      var(--ldpass-material-content-shadow-color);
+  --ldpass-material-icon-filter: drop-shadow(
+      0 0 calc(var(--ldpass-material-resolved-shadow-core) / 2)
+        var(--ldpass-material-content-shadow-color)
+    )
+    drop-shadow(
+      0 calc(var(--ldpass-material-resolved-shadow-offset) / 2)
+        calc(var(--ldpass-material-resolved-shadow-halo) / 2)
+        var(--ldpass-material-content-shadow-color)
+    );
+  text-shadow: var(--ldpass-material-text-shadow);
+}
+
+/* 内部按钮不独立叠加玻璃；清除旧样式留下的模糊、内描边和内阴影。 */
+:root[data-material-mode='advanced']
+  [data-liquid-material]
+  :is(button, a, summary, [role='button']):not([data-liquid-material]) {
+  --ldpass-material-resting-shadow: 0 0 0 transparent;
+  border-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--ldpass-material-resting-shadow);
+}
+
+:root[data-material-mode='advanced'] [data-liquid-material] [data-material-nested] {
+  border: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--ldpass-material-resting-shadow, 0 0 0 transparent);
+}
+
+/* 分段轨道与独立控件各自只混合一次颜色 token，容器不再叠第二层模糊。 */
+:root[data-material-mode='advanced'] [data-liquid-material] .segmented-control {
+  background: var(--ldpass-material-control-surface);
+  border-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+:root[data-material-mode='advanced']
+  [data-liquid-material]
+  :is(
+    .segmented-control button.is-selected,
+    .segmented-control a.is-selected,
+    .segmented-control button.is-active,
+    .segmented-control a.is-active
+  ) {
+  --ldpass-material-resting-shadow: var(--ldpass-material-thumb-shadow);
+  background: var(--ldpass-material-neutral-surface);
+  /* 选中项尺寸与父材质不同，仅保留自身的轻模糊。 */
+  -webkit-backdrop-filter: saturate(var(--ldpass-material-saturation))
+    blur(var(--ldpass-material-blur-soft));
+  backdrop-filter: saturate(var(--ldpass-material-saturation))
+    blur(var(--ldpass-material-blur-soft));
+}
+
+/* 透光材质内的选中项同样只在悬停/聚焦时叠加强调色。 */
+:root[data-material-mode='advanced']
+  [data-liquid-material]
+  :is(
+    .segmented-control button.is-selected,
+    .segmented-control a.is-selected,
+    .segmented-control button.is-active,
+    .segmented-control a.is-active
+  ):is(:hover, :focus-visible) {
+  background: var(--ldpass-material-selected-panel-state);
+}
+
+:root[data-material-mode='advanced']
+  [data-liquid-material]
+  :is(.icon-button, .search-clear, .detail-close-button):not(
+    .is-active,
+    :hover,
+    :focus-visible
+  ) {
+  background: transparent;
+}
+
+/* 字体图标和文字共用材质底色阴影，SVG 仅对实际图形投影，不给图标添加内阴影。 */
+:root[data-material-mode='advanced']
+  [data-liquid-material]
+  :where(.material-symbols-rounded, svg, [data-icon]) {
+  filter: none;
+  box-shadow: none;
+  text-shadow: var(--ldpass-material-text-shadow);
+}
+
+:root[data-material-mode='advanced']
+  [data-liquid-material]
+  :where(svg, [data-material-symbol-mask]) {
+  text-shadow: none;
+  filter: var(--ldpass-material-icon-filter);
+}
+
+:root[data-material-mode='advanced'] [data-liquid-material] :where(svg *) {
+  text-shadow: none;
+}
+
+/* 强调按钮材质化：主色半透明填充 + 背景滤镜 + 外投影，按下/禁用态退出液态材质。 */
+:root[data-material-mode='advanced'] [data-liquid-material] .primary-action:not(:disabled) {
+  border: 0;
+  background: color-mix(
+    in srgb,
+    var(--brand) calc(var(--ldpass-material-action-surface) * 1.5),
+    transparent
+  );
+  color: color-mix(in srgb, var(--ldpass-color-on-primary) 96%, var(--brand));
+  text-shadow: none;
+  box-shadow: var(--ldpass-material-floating-shadow);
+  -webkit-backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+}
+
+:root[data-material-mode='advanced'] [data-liquid-material] .danger-action:not(:disabled) {
+  border: 0;
+  background: color-mix(
+    in srgb,
+    var(--danger) calc(var(--ldpass-material-action-surface) * 1.5),
+    transparent
+  );
+  color: color-mix(in srgb, var(--ldpass-color-on-primary) 96%, var(--danger));
+  text-shadow: none;
+  box-shadow: var(--ldpass-material-floating-shadow);
+  -webkit-backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+}
+
+/* 材质内的普通按钮：半透明液态胶囊，去掉描边，只保留外投影。 */
+:root[data-material-mode='advanced'] [data-liquid-material] .secondary-action:not(:disabled) {
+  border: 0;
+  background: color-mix(in srgb, var(--surface) var(--ldpass-material-action-surface), transparent);
+  box-shadow: var(--ldpass-material-floating-shadow);
+  -webkit-backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+  backdrop-filter: var(--ldpass-material-distortion-filter, blur(0px))
+    contrast(var(--ldpass-material-contrast)) brightness(var(--ldpass-material-brightness))
+    saturate(var(--ldpass-material-saturation)) blur(var(--ldpass-material-blur));
+}
+
+/* 弹窗标题栏渐变遮罩：由伪元素承担「渐变背景 + 渐变滤镜」，
+ * mask 让 backdrop-filter 强度随遮罩透明度同步衰减。 */
+:root[data-material-mode='advanced']
+  .detail-module-slot.is-dialog
+  .detail-module-toolbar {
+  border-bottom-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root[data-material-mode='advanced']
+  .detail-module-slot.is-dialog
+  .detail-module-toolbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--surface) var(--ldpass-material-title-surface), transparent);
+  -webkit-backdrop-filter: blur(var(--ldpass-material-blur-soft));
+  backdrop-filter: blur(var(--ldpass-material-blur-soft));
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 50%) 60%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgb(0 0 0 / 50%) 60%, transparent 100%);
 }
 
 :root[data-material-mode='performance'] {
   --ldpass-material-hover-state: var(--surface-muted);
-  --ldpass-material-selected-state: var(--brand-soft);
-  --ldpass-material-selected-panel-state: var(--surface);
+  --ldpass-material-selected-state: var(--ldpass-color-surface-selected);
+  --ldpass-material-selected-panel-state: var(--ldpass-color-surface-selected);
 }
 
 :root[data-material-mode]
@@ -4838,8 +5453,24 @@ input[type='radio'] {
   :is(
     .segmented-control button.is-selected,
     .segmented-control a.is-selected,
-    .swatch-button.is-selected
+    .segmented-control button.is-active,
+    .segmented-control a.is-active
   ) {
+  background: var(--ldpass-material-hover-state);
+}
+
+/* 材质模式下同样把强调色留给选中项的悬停/聚焦态。 */
+:root[data-material-mode]
+  :is(
+    .segmented-control button.is-selected,
+    .segmented-control a.is-selected,
+    .segmented-control button.is-active,
+    .segmented-control a.is-active
+  ):is(:hover, :focus-visible) {
+  background: var(--ldpass-material-selected-panel-state);
+}
+
+:root[data-material-mode] .swatch-button.is-selected {
   background: var(--ldpass-material-selected-panel-state);
 }
 
@@ -4940,9 +5571,6 @@ input[type='radio'] {
       .auth-topbar > .theme-settings,
       .backoffice-topbar > .backoffice-topbar-back,
       .theme-popover,
-      .category-rail,
-      .backoffice-nav,
-      .backoffice-mobile-nav,
       .detail-panel,
       .detail-module-slot.is-dialog .detail-module-panel,
       .admin-dialog-panel,

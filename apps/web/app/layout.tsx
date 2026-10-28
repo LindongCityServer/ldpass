@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 import { EmbeddedModeScript } from './embedded-mode-script';
+import { LiquidMaterialBridge } from './liquid-material-bridge';
 import { PlatformStatusBanner } from './platform-status-banner';
 import { ServiceWorkerRegistration } from './service-worker-registration';
 import { SiteLegalFooter } from './site-legal-footer';
 import { StaticAssetReloadGuard } from './static-asset-reload-guard';
 import { ThemeScript } from './theme-script';
 import { UiEffectsBridge } from './ui-effects-bridge';
+import '@ldpass/ui/tokens.css';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -44,6 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body>
         <UiEffectsBridge />
+        <LiquidMaterialBridge />
         <StaticAssetReloadGuard />
         <ServiceWorkerRegistration />
         <PlatformStatusBanner />
