@@ -27,19 +27,41 @@ export function readHeader(request: ApiRequestLike, name: string): string | unde
   return value;
 }
 
+export function isTrustingProxyHeaders(): boolean {
+  return process.env.TRUST_PROXY_HEADERS?.trim().toLowerCase() !== 'false';
+}
+
 export function readClientIp(request: ApiRequestLike): string {
-  const forwardedFor = readHeader(request, 'x-forwarded-for');
-  if (forwardedFor) {
-    return normalizeClientIp(forwardedFor.split(',')[0]?.trim() || 'unknown');
+  const candidates = isTrustingProxyHeaders()
+    ? [
+        readHeader(request, 'x-forwarded-for')?.split(',')[0],
+        readHeader(request, 'cf-connecting-ip'),
+        readHeader(request, 'x-real-ip'),
+        request.ip,
+        request.socket?.remoteAddress,
+      ]
+    : [request.socket?.remoteAddress, request.ip];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeClientIp(candidate ?? '');
+    if (isIpLiteral(normalized)) {
+      return normalized;
+    }
   }
 
-  return normalizeClientIp(
-    readHeader(request, 'cf-connecting-ip') ??
-      readHeader(request, 'x-real-ip') ??
-      request.ip ??
-      request.socket?.remoteAddress ??
-      'unknown',
-  );
+  return 'unknown';
+}
+
+function isIpLiteral(value: string): boolean {
+  return isIpv4(value) || isIpv6(value);
+}
+
+function isIpv6(value: string): boolean {
+  if (!value.includes(':')) {
+    return false;
+  }
+
+  return /^[0-9a-f:.]+$/i.test(value);
 }
 
 export function readClientIpRegion(request: ApiRequestLike): IpRegion {

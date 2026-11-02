@@ -13,7 +13,12 @@ import {
   type RouteHttpMethod,
   type Type,
 } from './framework.js';
-import type { ApiRequestLike, ApiResponseLike } from './shared/auth/request-context.js';
+import type {
+  ApiRequestLike,
+  ApiResponseLike,
+} from './shared/auth/request-context.js';
+import { isTrustingProxyHeaders } from './shared/auth/request-context.js';
+import { assertProductionSecretConfiguration } from './shared/auth/secret-config.js';
 
 type ControllerInstance = object;
 
@@ -94,6 +99,13 @@ async function getApplicationContext(): Promise<ApiApplicationContext> {
 }
 
 async function createApplicationContext(): Promise<ApiApplicationContext> {
+  try {
+    assertProductionSecretConfiguration();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    throw error;
+  }
+
   const context = new ApiApplicationContext(AppModule);
   await context.init();
   return context;
@@ -242,17 +254,21 @@ function createRequestLike(request: Request, url: URL, rawBody: Buffer): ApiRequ
     url: `${url.pathname}${url.search}`,
     rawBody,
   };
-  const forwardedIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const remoteAddress = request.headers.get('x-real-ip');
 
-  if (forwardedIp) {
-    requestLike.ip = forwardedIp;
-  }
+  // 仅在显式信任反向代理时把转发头当作客户端地址，避免客户端伪造来源 IP。
+  if (isTrustingProxyHeaders()) {
+    const forwardedIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const remoteAddress = request.headers.get('x-real-ip');
 
-  if (remoteAddress) {
-    requestLike.socket = {
-      remoteAddress,
-    };
+    if (forwardedIp) {
+      requestLike.ip = forwardedIp;
+    }
+
+    if (remoteAddress) {
+      requestLike.socket = {
+        remoteAddress,
+      };
+    }
   }
 
   return requestLike;

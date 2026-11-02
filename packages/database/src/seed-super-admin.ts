@@ -16,9 +16,31 @@ if (!process.env.DATABASE_URL && process.env.NODE_ENV !== 'production') {
 
 const { prisma } = await import('./index.js');
 
+const minPepperLength = 16;
+const placeholderPattern = /replace-with|请替换|示例|changeme/i;
+
+function readPepper(purpose: string): string {
+  const key = purpose === 'pin' ? 'PIN_PEPPER' : 'PASSWORD_PEPPER';
+  const value = process.env[key]?.trim();
+
+  if (!value) {
+    throw new Error(`${key} must be configured before seeding credentials.`);
+  }
+
+  if (value.length < minPepperLength) {
+    throw new Error(`${key} must be at least ${minPepperLength} characters.`);
+  }
+
+  if (process.env.NODE_ENV === 'production' && placeholderPattern.test(value)) {
+    throw new Error(`${key} still uses a placeholder value; replace it before seeding in production.`);
+  }
+
+  return value;
+}
+
 async function hashSecret(secret: string, purpose: string): Promise<string> {
   const salt = randomBytes(16).toString('base64url');
-  const pepper = process.env.PASSWORD_PEPPER ?? process.env.PIN_PEPPER ?? process.env.SESSION_SECRET ?? '';
+  const pepper = readPepper(purpose);
   const derived = (await scryptAsync(`${purpose}:${pepper}:${secret}`, salt, 64)) as Buffer;
   return `scrypt$${salt}$${derived.toString('base64url')}`;
 }

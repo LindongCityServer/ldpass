@@ -21,6 +21,11 @@ import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import type { AuthenticatedProviderAccount } from '../../shared/auth/provider-auth.service.js';
 import { SecretHashService } from '../../shared/auth/secret-hash.service.js';
+import {
+  assertPinThrottleAllowed,
+  recordPinThrottleFailure,
+  resetPinThrottle,
+} from '../../shared/auth/auth-throttle.js';
 import type { AuthenticatedUser } from '../../shared/auth/session-auth.service.js';
 import {
   readBdslmChatContent,
@@ -2667,9 +2672,25 @@ export class ActionLinksService {
       throw new BadRequestException('请先在账户页设置 PIN。');
     }
 
-    if (!(await this.secretHash.verifySecret(pin, existingUser.pinHash, 'pin'))) {
+    assertPinThrottleAllowed(user.id);
+
+    const pinValid = await this.secretHash.verifySecretAndUpgrade(
+      pin,
+      existingUser.pinHash,
+      'pin',
+      (upgradedHash) =>
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: { pinHash: upgradedHash },
+        }),
+    );
+
+    if (!pinValid) {
+      recordPinThrottleFailure(user.id);
       throw new UnauthorizedException('PIN 不正确。');
     }
+
+    resetPinThrottle(user.id);
 
     await this.eventBus.publish({
       type: 'PinVerificationSucceeded',

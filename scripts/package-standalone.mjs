@@ -76,6 +76,19 @@ copyFile(
   resolve(repoRoot, 'docs/deployment-node24-standalone.md'),
   resolve(packageDir, 'README.md'),
 );
+copyFile(
+  resolve(repoRoot, 'docs/deployment-node24-standalone.md'),
+  resolve(packageDir, 'docs/deployment-node24-standalone.md'),
+);
+copyFile(
+  resolve(repoRoot, 'docs/deployment-windows-bt.md'),
+  resolve(packageDir, 'docs/deployment-windows-bt.md'),
+);
+copyFile(resolve(repoRoot, 'docs/migration-guide.md'), resolve(packageDir, 'MIGRATION.md'));
+copyFile(
+  resolve(repoRoot, 'docs/migration-guide.md'),
+  resolve(packageDir, 'docs/migration-guide.md'),
+);
 logStep('复制 trace 依赖');
 copyTracedFiles();
 logStep('复制运行时 npm 包');
@@ -300,6 +313,12 @@ function writePackageMetadata() {
         runtimeEntry: 'start.mjs',
         server: 'apps/web/server.js',
         databaseSchema: 'packages/database/prisma/schema.prisma',
+        documents: {
+          readme: 'README.md',
+          migration: 'MIGRATION.md',
+          node24Deployment: 'docs/deployment-node24-standalone.md',
+          windowsBtDeployment: 'docs/deployment-windows-bt.md',
+        },
       },
       null,
       2,

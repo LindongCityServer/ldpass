@@ -41,6 +41,10 @@ D:\wwwroot\ldpass\
 - `ACTION_LINK_EXPIRY_SWEEP_BATCH_SIZE`：单次最多清理的过期操作链接数量，默认 100。
 - `PASSWORD_PEPPER`：密码哈希额外 pepper，必须和数据库分开备份。
 - `PIN_PEPPER`：PIN 哈希额外 pepper，必须和数据库分开备份。
+- `PASSWORD_PEPPER_LEGACY` / `PIN_PEPPER_LEGACY`：更换 pepper 时填入旧值，用户下次成功登录或校验 PIN 后会自动迁移到新 pepper；全部迁移完成后再删除。
+- `WEBHOOK_SECRET_ENCRYPTION_KEY_LEGACY` / `PROVIDER_API_KEY_SECRET_LEGACY`：更换加密密钥时填入旧值，旧密文仍可解密。
+- `AUTH_LOGIN_*` / `AUTH_PIN_*`：登录与 PIN 失败限流阈值，默认账号 5 次失败锁定 15 分钟。
+- `TRUST_PROXY_HEADERS`：反向代理部署保持 `true`；直接暴露公网时设为 `false`，避免伪造来源 IP。
 - `BDSLM_BASE_URL`：当前 BDSLM 服务地址。
 - `BDSLM_POLL_INTERVAL_MS`：聊天轮询间隔，第一阶段默认 1000。
 - `BDSLM_REQUEST_TIMEOUT_MS`：单次 BDSLM HTTP 请求超时时间，默认 5000。

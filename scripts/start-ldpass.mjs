@@ -16,6 +16,8 @@ process.env.HOSTNAME = process.env.HOSTNAME || '0.0.0.0';
 process.env.PROJECT_ROOT_PATH = process.env.PROJECT_ROOT_PATH || packageRoot;
 process.env.PROJECT_DATA_PATH = process.env.PROJECT_DATA_PATH || resolve(packageRoot, 'data');
 
+assertProductionSecrets();
+
 const serverPath = [
   resolve(packageRoot, 'apps/web/server.js'),
   resolve(packageRoot, 'apps/web/.next/standalone/apps/web/server.js'),
@@ -72,4 +74,50 @@ function unquoteEnvValue(value) {
   }
 
   return value;
+}
+
+function assertProductionSecrets() {
+  if ((process.env.NODE_ENV || 'production') !== 'production') {
+    return;
+  }
+
+  const requiredKeys = [
+    'SESSION_SECRET',
+    'PROVIDER_API_KEY_SECRET',
+    'WEBHOOK_SECRET_ENCRYPTION_KEY',
+    'PASSWORD_PEPPER',
+    'PIN_PEPPER',
+  ];
+  const problems = [];
+
+  for (const key of requiredKeys) {
+    const value = (process.env[key] || '').trim();
+
+    if (!value) {
+      problems.push(`${key} 未配置`);
+      continue;
+    }
+
+    if (value.length < 16) {
+      problems.push(`${key} 长度不足 16 个字符`);
+      continue;
+    }
+
+    if (/replace-with|请替换|示例|changeme/i.test(value)) {
+      problems.push(`${key} 仍是示例占位符`);
+    }
+  }
+
+  if (problems.length === 0) {
+    return;
+  }
+
+  console.error('[ldpass] 生产环境密钥配置不安全，已拒绝启动：');
+  for (const problem of problems) {
+    console.error(`  - ${problem}`);
+  }
+  console.error('[ldpass] 请为每个密钥生成独立的随机值，例如：');
+  console.error('  node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'base64url\'))"');
+  console.error('[ldpass] 替换 pepper 前请先阅读 PASSWORD_PEPPER_LEGACY / PIN_PEPPER_LEGACY 的迁移说明。');
+  process.exit(1);
 }

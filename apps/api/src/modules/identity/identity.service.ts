@@ -28,6 +28,15 @@ import {
 } from '../../shared/bdslm/chat-message.js';
 import { SecretHashService } from '../../shared/auth/secret-hash.service.js';
 import {
+  assertLoginThrottleAllowed,
+  assertPinThrottleAllowed,
+  createLoginThrottleKeys,
+  recordLoginThrottleFailure,
+  recordPinThrottleFailure,
+  resetLoginThrottle,
+  resetPinThrottle,
+} from '../../shared/auth/auth-throttle.js';
+import {
   anonymizeUserAuditLogs,
   createDeletedUserIdentity,
 } from '../../shared/auth/user-anonymization.js';
@@ -379,17 +388,33 @@ export class IdentityService {
 
   async login(dto: LoginDto, request?: ApiRequestLike): Promise<LoginResult> {
     const identifier = dto.identifier.trim();
+    const throttleKeys = createLoginThrottleKeys(identifier, request);
+    assertLoginThrottleAllowed(throttleKeys);
+
     const isEmail = identifier.includes('@');
     const user = await this.prisma.user.findUnique({
       where: isEmail ? { email: identifier.toLowerCase() } : { username: identifier },
     });
 
-    if (
-      !user ||
-      !(await this.secretHash.verifySecret(dto.password, user.passwordHash, 'password'))
-    ) {
+    const passwordValid = user
+      ? await this.secretHash.verifySecretAndUpgrade(
+          dto.password,
+          user.passwordHash,
+          'password',
+          (upgradedHash) =>
+            this.prisma.user.update({
+              where: { id: user.id },
+              data: { passwordHash: upgradedHash },
+            }),
+        )
+      : false;
+
+    if (!user || !passwordValid) {
+      recordLoginThrottleFailure(throttleKeys);
       throw new UnauthorizedException('用户名、邮箱或密码不正确。');
     }
+
+    resetLoginThrottle(throttleKeys);
 
     if (user.status === 'Deleted') {
       throw new UnauthorizedException('账户不存在或已经被删除。');
@@ -646,15 +671,29 @@ export class IdentityService {
     request?: ApiRequestLike,
   ): Promise<{ user: PublicUser; device: LoginDeviceResult | null }> {
     const identifier = dto.identifier.trim();
+    const throttleKeys = createLoginThrottleKeys(identifier, request);
+    assertLoginThrottleAllowed(throttleKeys);
+
     const isEmail = identifier.includes('@');
     const user = await this.prisma.user.findUnique({
       where: isEmail ? { email: identifier.toLowerCase() } : { username: identifier },
     });
 
-    if (
-      !user ||
-      !(await this.secretHash.verifySecret(dto.password, user.passwordHash, 'password'))
-    ) {
+    const passwordValid = user
+      ? await this.secretHash.verifySecretAndUpgrade(
+          dto.password,
+          user.passwordHash,
+          'password',
+          (upgradedHash) =>
+            this.prisma.user.update({
+              where: { id: user.id },
+              data: { passwordHash: upgradedHash },
+            }),
+        )
+      : false;
+
+    if (!user || !passwordValid) {
+      recordLoginThrottleFailure(throttleKeys);
       throw new UnauthorizedException('用户名、邮箱或密码不正确。');
     }
 
@@ -672,10 +711,27 @@ export class IdentityService {
       );
     }
 
+    assertPinThrottleAllowed(user.id);
+
     const pinVerificationId = randomUUID();
-    if (!(await this.secretHash.verifySecret(dto.secondFactor, user.pinHash, 'pin'))) {
+    const pinValid = await this.secretHash.verifySecretAndUpgrade(
+      dto.secondFactor,
+      user.pinHash,
+      'pin',
+      (upgradedHash) =>
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: { pinHash: upgradedHash },
+        }),
+    );
+
+    if (!pinValid) {
+      recordPinThrottleFailure(user.id);
       throw new UnauthorizedException('管理员 PIN 不正确。');
     }
+
+    resetPinThrottle(user.id);
+    resetLoginThrottle(throttleKeys);
 
     const device = await this.recordLoginDevice(user.id, dto, request);
 
@@ -935,9 +991,25 @@ export class IdentityService {
       throw new BadRequestException('当前账户尚未设置 PIN，请先到账户页设置。');
     }
 
-    if (!(await this.secretHash.verifySecret(dto.pin, existingUser.pinHash, 'pin'))) {
+    assertPinThrottleAllowed(user.id);
+
+    const pinValid = await this.secretHash.verifySecretAndUpgrade(
+      dto.pin,
+      existingUser.pinHash,
+      'pin',
+      (upgradedHash) =>
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: { pinHash: upgradedHash },
+        }),
+    );
+
+    if (!pinValid) {
+      recordPinThrottleFailure(user.id);
       throw new UnauthorizedException('PIN 不正确。');
     }
+
+    resetPinThrottle(user.id);
 
     const verificationId = randomUUID();
     const purpose = this.normalizeAccountVerificationPurpose(dto.purpose);

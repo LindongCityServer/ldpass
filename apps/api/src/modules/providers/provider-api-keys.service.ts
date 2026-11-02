@@ -859,22 +859,62 @@ export class ProviderApiKeysService {
       throw new InternalServerErrorException('API 密钥密文格式无效。');
     }
 
-    const decipher = createDecipheriv('aes-256-gcm', this.readEncryptionKey(), Buffer.from(iv, 'base64url'));
-    decipher.setAuthTag(Buffer.from(authTag, 'base64url'));
-    const plaintext = Buffer.concat([
-      decipher.update(Buffer.from(ciphertext, 'base64url')),
-      decipher.final(),
-    ]);
-    return plaintext.toString('utf8');
+    let lastError: unknown = null;
+
+    for (const key of this.readEncryptionKeys()) {
+      try {
+        const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64url'));
+        decipher.setAuthTag(Buffer.from(authTag, 'base64url'));
+        const plaintext = Buffer.concat([
+          decipher.update(Buffer.from(ciphertext, 'base64url')),
+          decipher.final(),
+        ]);
+        return plaintext.toString('utf8');
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new InternalServerErrorException('API 密钥密文解密失败。');
+  }
+
+  private readEncryptionKeys(): Buffer[] {
+    const primarySecret = process.env.PROVIDER_API_KEY_SECRET ?? process.env.SESSION_SECRET ?? '';
+    const legacySecret = process.env.PROVIDER_API_KEY_SECRET_LEGACY ?? '';
+    const seen = new Set<string>();
+    const keys: Buffer[] = [];
+
+    for (const rawSecret of [primarySecret, legacySecret]) {
+      const value = rawSecret.trim();
+      if (value.length < 16) {
+        continue;
+      }
+
+      const key = createHash('sha256')
+        .update(`ldpass:provider-api-key-delivery:${value}`)
+        .digest();
+      const fingerprint = key.toString('base64');
+      if (seen.has(fingerprint)) {
+        continue;
+      }
+
+      seen.add(fingerprint);
+      keys.push(key);
+    }
+
+    return keys;
   }
 
   private readEncryptionKey(): Buffer {
-    const rawSecret = process.env.PROVIDER_API_KEY_SECRET ?? process.env.SESSION_SECRET ?? '';
-    if (rawSecret.trim().length < 16) {
+    const keys = this.readEncryptionKeys();
+
+    if (keys.length === 0) {
       throw new InternalServerErrorException('缺少 PROVIDER_API_KEY_SECRET 或 SESSION_SECRET，无法安全交付 API 密钥。');
     }
 
-    return createHash('sha256').update(`ldpass:provider-api-key-delivery:${rawSecret}`).digest();
+    return keys[0] as Buffer;
   }
 
   private toApiKeyView(apiKey: {

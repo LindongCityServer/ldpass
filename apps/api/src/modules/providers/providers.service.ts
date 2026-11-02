@@ -6,6 +6,13 @@ import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import { SecretHashService } from '../../shared/auth/secret-hash.service.js';
 import type { AuthenticatedProviderAccount } from '../../shared/auth/provider-auth.service.js';
+import {
+  assertLoginThrottleAllowed,
+  createLoginThrottleKeys,
+  recordLoginThrottleFailure,
+  resetLoginThrottle,
+} from '../../shared/auth/auth-throttle.js';
+import type { ApiRequestLike } from '../../shared/auth/request-context.js';
 import { PrismaService } from '../../shared/database/prisma.service.js';
 import type { ProviderLoginDto, RegisterProviderDto, SubmitProviderProfileChangeDto } from './dto.js';
 
@@ -194,7 +201,18 @@ export class ProvidersService {
       throw new ConflictException('该提供方当前不能通过入驻入口重新提交资料。');
     }
 
-    if (!(await this.secretHash.verifySecret(dto.password, account.passwordHash, 'provider-password'))) {
+    if (
+      !(await this.secretHash.verifySecretAndUpgrade(
+        dto.password,
+        account.passwordHash,
+        'provider-password',
+        (upgradedHash) =>
+          this.prisma.providerAccount.update({
+            where: { id: account.id },
+            data: { passwordHash: upgradedHash },
+          }),
+      ))
+    ) {
       throw new UnauthorizedException('负责人密码不正确，不能重新提交该提供方申请。');
     }
 
@@ -287,7 +305,10 @@ export class ProvidersService {
     };
   }
 
-  async login(dto: ProviderLoginDto) {
+  async login(dto: ProviderLoginDto, request?: ApiRequestLike) {
+    const throttleKeys = createLoginThrottleKeys(dto.identifier, request);
+    assertLoginThrottleAllowed(throttleKeys);
+
     const identifier = dto.identifier.trim().toLowerCase();
     const providerSlug = dto.providerSlug?.trim().toLowerCase();
     const accounts = await this.prisma.providerAccount.findMany({
@@ -311,14 +332,28 @@ export class ProvidersService {
 
     const matchedAccounts = [];
     for (const account of accounts) {
-      if (await this.secretHash.verifySecret(dto.password, account.passwordHash, 'provider-password')) {
+      if (
+        await this.secretHash.verifySecretAndUpgrade(
+          dto.password,
+          account.passwordHash,
+          'provider-password',
+          (upgradedHash) =>
+            this.prisma.providerAccount.update({
+              where: { id: account.id },
+              data: { passwordHash: upgradedHash },
+            }),
+        )
+      ) {
         matchedAccounts.push(account);
       }
     }
 
     if (matchedAccounts.length === 0) {
+      recordLoginThrottleFailure(throttleKeys);
       throw new UnauthorizedException('邮箱、发卡方标识或密码不正确。');
     }
+
+    resetLoginThrottle(throttleKeys);
 
     if (matchedAccounts.length > 1) {
       throw new BadRequestException('该邮箱匹配多个发卡方账号，请填写发卡方标识后再登录。');

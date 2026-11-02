@@ -77,6 +77,23 @@ PORT=3200
 HOSTNAME=0.0.0.0
 ```
 
+这些密钥不能再保留 `replace-with` 示例值：`deploy-start.mjs` 与 `start.mjs` 会在启动前检查，发现占位符或长度不足会直接退出。
+
+### 更换 pepper（已有用户数据时）
+
+不要把旧 pepper 直接覆盖掉，否则所有已存密码和 PIN 哈希都会立即失效。正确顺序：
+
+1. 把当前 `PASSWORD_PEPPER`、`PIN_PEPPER` 的旧值分别填入 `PASSWORD_PEPPER_LEGACY`、`PIN_PEPPER_LEGACY`。
+2. 再把 `PASSWORD_PEPPER`、`PIN_PEPPER` 换成新的随机值并重启。
+3. 用户下次成功登录或校验 PIN 时，系统会用新 pepper 重算哈希并自动写回数据库。
+4. 确认所有用户与发卡方账号都完成迁移后，删除两个 `*_LEGACY` 变量。
+
+更换 `WEBHOOK_SECRET_ENCRYPTION_KEY` 或 `PROVIDER_API_KEY_SECRET` 时，同样先把旧值填入对应的 `WEBHOOK_SECRET_ENCRYPTION_KEY_LEGACY`、`PROVIDER_API_KEY_SECRET_LEGACY`，旧密文仍可解密。注意 API Key 的 HMAC 指纹无法迁移，更换 `PROVIDER_API_KEY_SECRET` 后已发出的 API Key 必须重新签发。
+
+### 登录与 PIN 限流
+
+`AUTH_LOGIN_*`、`AUTH_PIN_*` 控制内存限流阈值，默认同一账号 5 次失败后锁定 15 分钟，同 IP 20 次。部署在反向代理之后时保持 `TRUST_PROXY_HEADERS=true`；直接暴露公网时设为 `false`。
+
 `file:./data/ldpass.sqlite` 会解析到独立包根目录下的 `data/ldpass.sqlite`。如果要把数据放到共享目录，可以把 `data` 做成软链，或改成绝对路径。
 
 启动脚本会把相对的 SQLite `DATABASE_URL` 规范化为绝对路径，避免 Next.js standalone 进入 `apps/web` 工作目录后误读到另一个空数据库。

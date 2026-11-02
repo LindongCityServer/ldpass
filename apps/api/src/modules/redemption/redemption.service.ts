@@ -5,6 +5,11 @@ import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import { SecretHashService } from '../../shared/auth/secret-hash.service.js';
 import {
+  assertPinThrottleAllowed,
+  recordPinThrottleFailure,
+  resetPinThrottle,
+} from '../../shared/auth/auth-throttle.js';
+import {
   readBdslmChatContent,
   readBdslmChatMessageId,
   readBdslmChatSender,
@@ -858,7 +863,22 @@ export class RedemptionService {
       throw new BadRequestException('请先在账户页设置 PIN。');
     }
 
-    if (!(await this.secretHash.verifySecret(pin, existingUser.pinHash, 'pin'))) {
+    assertPinThrottleAllowed(user.id);
+
+    const pinValid = await this.secretHash.verifySecretAndUpgrade(
+      pin,
+      existingUser.pinHash,
+      'pin',
+      (upgradedHash) =>
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: { pinHash: upgradedHash },
+        }),
+    );
+
+    if (!pinValid) {
+      recordPinThrottleFailure(user.id);
+
       if (redemptionRequest.status === 'WaitingVerification' && redemptionRequest.expiresAt > new Date()) {
         const failureMessage = await this.recordVerificationFailure(redemptionRequest, user, 'INVALID_PIN', 'PIN 不正确。');
         throw new UnauthorizedException(failureMessage);
@@ -866,6 +886,8 @@ export class RedemptionService {
 
       throw new UnauthorizedException('PIN 不正确。');
     }
+
+    resetPinThrottle(user.id);
 
     await this.eventBus.publish({
       type: 'PinVerificationSucceeded',
@@ -903,9 +925,25 @@ export class RedemptionService {
       throw new UnauthorizedException('管理员账号尚未设置 PIN，不能执行冲正。');
     }
 
-    if (!(await this.secretHash.verifySecret(pin, adminUser.pinHash, 'pin'))) {
+    assertPinThrottleAllowed(admin.id);
+
+    const pinValid = await this.secretHash.verifySecretAndUpgrade(
+      pin,
+      adminUser.pinHash,
+      'pin',
+      (upgradedHash) =>
+        this.prisma.user.update({
+          where: { id: admin.id },
+          data: { pinHash: upgradedHash },
+        }),
+    );
+
+    if (!pinValid) {
+      recordPinThrottleFailure(admin.id);
       throw new UnauthorizedException('管理员 PIN 不正确，不能执行冲正。');
     }
+
+    resetPinThrottle(admin.id);
 
     await this.eventBus.publish({
       type: 'PinVerificationSucceeded',

@@ -22,7 +22,7 @@ export class ProvidersController {
     @Req() request: ApiRequestLike,
     @Res({ passthrough: true }) response: ApiResponseLike,
   ) {
-    const result = await this.providersService.login(dto);
+    const result = await this.providersService.login(dto, request);
     await this.providerAuth.createSession(result.providerAccount.id, request, response);
 
     return result;

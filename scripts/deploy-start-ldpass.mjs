@@ -28,7 +28,7 @@ mkdirSync(process.env.PROJECT_DATA_PATH, { recursive: true });
 mkdirSync(resolve(packageRoot, 'logs'), { recursive: true });
 
 prepareSqliteDatabaseFile();
-warnForPlaceholderSecrets();
+assertProductionSecrets();
 syncDatabaseSchema();
 
 console.log('[ldpass] 部署准备完成。');
@@ -151,21 +151,46 @@ function getSqliteDatabasePath() {
   return rawPath;
 }
 
-function warnForPlaceholderSecrets() {
-  const placeholderKeys = [
+function assertProductionSecrets() {
+  const requiredKeys = [
     'SESSION_SECRET',
     'PROVIDER_API_KEY_SECRET',
     'WEBHOOK_SECRET_ENCRYPTION_KEY',
     'PASSWORD_PEPPER',
     'PIN_PEPPER',
   ];
+  const problems = [];
 
-  for (const key of placeholderKeys) {
-    const value = process.env[key] || '';
-    if (value.includes('replace-with') || value.includes('替换')) {
-      console.warn(`[ldpass] 警告：${key} 仍像是示例值，生产环境请替换为随机密钥。`);
+  for (const key of requiredKeys) {
+    const value = (process.env[key] || '').trim();
+
+    if (!value) {
+      problems.push(`${key} 未配置`);
+      continue;
+    }
+
+    if (value.length < 16) {
+      problems.push(`${key} 长度不足 16 个字符`);
+      continue;
+    }
+
+    if (/replace-with|请替换|示例|changeme/i.test(value)) {
+      problems.push(`${key} 仍是示例占位符`);
     }
   }
+
+  if (problems.length === 0) {
+    return;
+  }
+
+  console.error('[ldpass] 生产环境密钥配置不安全，已拒绝启动：');
+  for (const problem of problems) {
+    console.error(`  - ${problem}`);
+  }
+  console.error('[ldpass] 请为每个密钥生成独立的随机值，例如：');
+  console.error('  node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'base64url\'))"');
+  console.error('[ldpass] 替换 pepper 前请先阅读 PASSWORD_PEPPER_LEGACY / PIN_PEPPER_LEGACY 的迁移说明。');
+  process.exit(1);
 }
 
 function syncDatabaseSchema() {

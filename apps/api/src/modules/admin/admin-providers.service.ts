@@ -4,6 +4,11 @@ import type { Prisma } from '@ldpass/database';
 import type { EventBus } from '@ldpass/event-bus';
 import { EVENT_BUS } from '@ldpass/event-bus';
 import { SecretHashService } from '../../shared/auth/secret-hash.service.js';
+import {
+  assertPinThrottleAllowed,
+  recordPinThrottleFailure,
+  resetPinThrottle,
+} from '../../shared/auth/auth-throttle.js';
 import type { AuthenticatedUser } from '../../shared/auth/session-auth.service.js';
 import { PrismaService } from '../../shared/database/prisma.service.js';
 import type {
@@ -827,9 +832,25 @@ export class AdminProvidersService {
       throw new BadRequestException('管理员账户尚未设置 PIN，不能执行敏感操作。');
     }
 
-    if (!(await this.secretHash.verifySecret(pin, adminUser.pinHash, 'pin'))) {
+    assertPinThrottleAllowed(admin.id);
+
+    const pinValid = await this.secretHash.verifySecretAndUpgrade(
+      pin,
+      adminUser.pinHash,
+      'pin',
+      (upgradedHash) =>
+        this.prisma.user.update({
+          where: { id: admin.id },
+          data: { pinHash: upgradedHash },
+        }),
+    );
+
+    if (!pinValid) {
+      recordPinThrottleFailure(admin.id);
       throw new UnauthorizedException('管理员 PIN 不正确。');
     }
+
+    resetPinThrottle(admin.id);
 
     await this.eventBus.publish({
       type: 'PinVerificationSucceeded',

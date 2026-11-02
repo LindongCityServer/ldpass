@@ -6,8 +6,8 @@ const LOCAL_DEV_ADMIN_LOGIN_ENV = 'LDPASS_LOCAL_DEV_ADMIN_LOGIN';
 /**
  * 本地开发用的管理员免密登录开关。
  *
- * 只有在非 production 运行时才会启用，且实际请求必须来自本机回环地址；
- * 生产构建或显式设置 LDPASS_LOCAL_DEV_ADMIN_LOGIN=0 都会关闭该入口。
+ * 默认关闭，必须显式设置 LDPASS_LOCAL_DEV_ADMIN_LOGIN=1 才会启用；
+ * 生产运行或非本机回环请求都会被拒绝。
  */
 export function isLocalDevAdminLoginEnabled(): boolean {
   if (process.env.NODE_ENV === 'production') {
@@ -15,12 +15,12 @@ export function isLocalDevAdminLoginEnabled(): boolean {
   }
 
   const configuredValue = process.env[LOCAL_DEV_ADMIN_LOGIN_ENV]?.trim().toLowerCase();
-  return configuredValue !== '0' && configuredValue !== 'false' && configuredValue !== 'off';
+  return configuredValue === '1' || configuredValue === 'true' || configuredValue === 'on';
 }
 
 export function resolveRequestHostname(request: ApiRequestLike): string | null {
-  const forwardedHost = readHeader(request, 'x-forwarded-host')?.split(',')[0]?.trim();
-  const host = forwardedHost || readHeader(request, 'host');
+  // 只信任 Host 头，避免客户端伪造 X-Forwarded-Host 绕过回环判断。
+  const host = readHeader(request, 'host');
 
   if (!host) {
     return null;

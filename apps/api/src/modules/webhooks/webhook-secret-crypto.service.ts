@@ -24,21 +24,68 @@ export class WebhookSecretCryptoService {
       throw new InternalServerErrorException('Webhook 密钥格式无效。');
     }
 
-    const decipher = createDecipheriv('aes-256-gcm', this.readKey(), Buffer.from(iv, 'base64url'));
-    decipher.setAuthTag(Buffer.from(authTag, 'base64url'));
-    const plaintext = Buffer.concat([
-      decipher.update(Buffer.from(ciphertext, 'base64url')),
-      decipher.final(),
-    ]);
-    return plaintext.toString('utf8');
+    let lastError: unknown = null;
+
+    for (const key of this.readKeys()) {
+      try {
+        const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64url'));
+        decipher.setAuthTag(Buffer.from(authTag, 'base64url'));
+        const plaintext = Buffer.concat([
+          decipher.update(Buffer.from(ciphertext, 'base64url')),
+          decipher.final(),
+        ]);
+        return plaintext.toString('utf8');
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new InternalServerErrorException('Webhook 密钥解密失败。');
+  }
+
+  private readKeys(): Buffer[] {
+    const primarySecret =
+      process.env.WEBHOOK_SECRET_ENCRYPTION_KEY ??
+      process.env.PROVIDER_API_KEY_SECRET ??
+      process.env.SESSION_SECRET ??
+      '';
+    const legacySecret = process.env.WEBHOOK_SECRET_ENCRYPTION_KEY_LEGACY ?? '';
+
+    return this.buildKeys([primarySecret, legacySecret]);
+  }
+
+  private buildKeys(rawSecrets: string[]): Buffer[] {
+    const seen = new Set<string>();
+    const keys: Buffer[] = [];
+
+    for (const rawSecret of rawSecrets) {
+      const value = rawSecret.trim();
+      if (value.length < 16) {
+        continue;
+      }
+
+      const key = createHash('sha256').update(`ldpass:webhook-secret:${value}`).digest();
+      const fingerprint = key.toString('base64');
+      if (seen.has(fingerprint)) {
+        continue;
+      }
+
+      seen.add(fingerprint);
+      keys.push(key);
+    }
+
+    return keys;
   }
 
   private readKey(): Buffer {
-    const rawSecret = process.env.WEBHOOK_SECRET_ENCRYPTION_KEY ?? process.env.PROVIDER_API_KEY_SECRET ?? process.env.SESSION_SECRET ?? '';
-    if (rawSecret.trim().length < 16) {
+    const keys = this.readKeys();
+
+    if (keys.length === 0) {
       throw new InternalServerErrorException('缺少 WEBHOOK_SECRET_ENCRYPTION_KEY，无法安全保存 Webhook 签名密钥。');
     }
 
-    return createHash('sha256').update(`ldpass:webhook-secret:${rawSecret}`).digest();
+    return keys[0] as Buffer;
   }
 }
