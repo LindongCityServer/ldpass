@@ -79,6 +79,15 @@ PIN_PEPPER_LEGACY="旧的 PASSWORD_PEPPER"
 
 可以直接更换，代价是所有已登录会话立即失效，用户需要重新登录。业务数据不受影响。
 
+设备指纹同样基于 `SESSION_SECRET` 计算。为了避免换密钥后所有设备被判定为新设备（未绑定服务器账号的用户可能因此卡在新设备验证），请在第一次更换时把旧值填入：
+
+```env
+SESSION_SECRET="新随机值"
+SESSION_SECRET_LEGACY="旧值"
+```
+
+旧值只用于识别并迁移历史设备指纹，**不参与会话认证**，因此不会削弱会话安全。确认用户设备都已迁移后，删除 `SESSION_SECRET_LEGACY`。
+
 ### 3.3 更换 `PROVIDER_API_KEY_SECRET`
 
 该变量同时承担两个职责：

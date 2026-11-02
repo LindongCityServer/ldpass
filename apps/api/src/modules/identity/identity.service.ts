@@ -2546,14 +2546,16 @@ export class IdentityService {
     const lastLoginIpRegion = lastLoginIp ? await this.ipRegionService.resolve(lastLoginIp) : null;
     const lastLoginAt = new Date();
 
-    const existingDevice = await this.prisma.device.findUnique({
-      where: {
-        userId_fingerprintHash: {
-          userId,
-          fingerprintHash,
+    const existingDevice =
+      (await this.prisma.device.findUnique({
+        where: {
+          userId_fingerprintHash: {
+            userId,
+            fingerprintHash,
+          },
         },
-      },
-    });
+      })) ??
+      (await this.findAndMigrateLegacyDevice(userId, clientDeviceId, fingerprintHash));
 
     const activeDeviceCount = await this.prisma.device.count({
       where: {
@@ -3117,14 +3119,106 @@ export class IdentityService {
   }
 
   private hashDeviceFingerprint(userId: string, clientDeviceId: string): string {
-    const secret = process.env.SESSION_SECRET;
-    if (!secret) {
-      throw new Error('SESSION_SECRET is not configured.');
-    }
+    return this.hashDeviceFingerprintWithSecret(
+      userId,
+      clientDeviceId,
+      this.readSessionSecrets().primary,
+    );
+  }
 
+  private hashDeviceFingerprintWithSecret(
+    userId: string,
+    clientDeviceId: string,
+    secret: string,
+  ): string {
     return createHmac('sha256', secret)
       .update(`device:${userId}:${clientDeviceId}`)
       .digest('base64url');
+  }
+
+  /**
+   * 会话 token 只使用主 SESSION_SECRET；旧值仅用于识别并迁移历史设备指纹，
+   * 不参与任何登录态认证，避免旧占位符继续具备伪造会话的能力。
+   */
+  private readSessionSecrets(): { primary: string; legacy: string[] } {
+    const primary = process.env.SESSION_SECRET;
+    if (!primary) {
+      throw new Error('SESSION_SECRET is not configured.');
+    }
+
+    const legacy = process.env.SESSION_SECRET_LEGACY?.trim();
+
+    return {
+      primary,
+      legacy: legacy && legacy !== primary ? [legacy] : [],
+    };
+  }
+
+  private async findAndMigrateLegacyDevice(
+    userId: string,
+    clientDeviceId: string,
+    nextFingerprintHash: string,
+  ): Promise<{ id: string; fingerprintHash: string; revokedAt: Date | null } | null> {
+    for (const legacySecret of this.readSessionSecrets().legacy) {
+      const legacyFingerprintHash = this.hashDeviceFingerprintWithSecret(
+        userId,
+        clientDeviceId,
+        legacySecret,
+      );
+
+      const legacyDevice = await this.prisma.device.findUnique({
+        where: {
+          userId_fingerprintHash: {
+            userId,
+            fingerprintHash: legacyFingerprintHash,
+          },
+        },
+        select: {
+          id: true,
+          fingerprintHash: true,
+          revokedAt: true,
+        },
+      });
+
+      if (!legacyDevice) {
+        continue;
+      }
+
+      try {
+        return await this.prisma.device.update({
+          where: {
+            id: legacyDevice.id,
+          },
+          data: {
+            fingerprintHash: nextFingerprintHash,
+          },
+          select: {
+            id: true,
+            fingerprintHash: true,
+            revokedAt: true,
+          },
+        });
+      } catch {
+        // 并发登录可能已经完成迁移，回读新指纹记录即可。
+        const migratedDevice = await this.prisma.device.findUnique({
+          where: {
+            userId_fingerprintHash: {
+              userId,
+              fingerprintHash: nextFingerprintHash,
+            },
+          },
+          select: {
+            id: true,
+            fingerprintHash: true,
+            revokedAt: true,
+          },
+        });
+
+        return migratedDevice ?? legacyDevice;
+      }
+    }
+
+    return null;
   }
 
   private normalizeRedirectUri(value: string): string {
