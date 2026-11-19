@@ -16,6 +16,10 @@ pnpm package:standalone
 - `dist/ldpass-node24/`：可直接上传的独立目录。
 - `dist/ldpass-node24.tar`：Linux/macOS 默认生成未压缩归档。Windows 默认跳过 tar 归档，避免压缩 `node_modules` 时间过长或卡住。
 
+当前打包脚本从根 `package.json` 读取版本号，并写入包内 `package.json` 与
+`DEPLOYMENT-MANIFEST.json` 的 `version` 字段；清单同时记录 `builtAt` 和 `nextBuildId`，
+可用于核对线上实际运行的构建。
+
 Windows 上推荐直接上传 `dist/ldpass-node24/` 目录。如果确实需要归档，可以显式开启：
 
 ```powershell
@@ -78,6 +82,21 @@ HOSTNAME=0.0.0.0
 ```
 
 这些密钥不能再保留 `replace-with` 示例值：`deploy-start.mjs` 与 `start.mjs` 会在启动前检查，发现占位符或长度不足会直接退出。
+
+### QQ 绑定（0.2.0 新增）
+
+如果要启用 QQ 官方机器人绑定能力，在 `.env` 中补充：
+
+```env
+# 与机器人侧完全一致，至少 24 位独立随机串；未配置时内部接口失败关闭（503）
+QQ_BOT_LINK_SECRET="替换为独立随机串"
+# 生成绑定网页链接的站点根地址；留空时回退 WEB_ORIGIN，再回退请求 Host
+LDPASS_PUBLIC_ORIGIN="https://ldpass.example.com"
+# 可选：绑定码/网页 token 的 HMAC 专用密钥；留空时使用 SESSION_SECRET
+QQ_LINK_HASH_SECRET=""
+```
+
+接口契约、机器人调用示例和群聊限制见包内 `docs/qq-link-integration.md`。
 
 ### 更换 pepper（已有用户数据时）
 

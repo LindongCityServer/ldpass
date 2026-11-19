@@ -20,6 +20,8 @@ import type {
   VerificationMethod,
   WalletActionLinkKind,
   WalletActionLinkSelectionScope,
+  YctQqLinkFailureReason,
+  YctQqLinkScope,
 } from './domain.js';
 
 export interface BaseEvent {
@@ -1414,6 +1416,157 @@ export interface StorageAlertResolved extends BaseEvent {
   };
 }
 
+export interface QqLinkCodeIssued extends BaseEvent {
+  type: 'QqLinkCodeIssued';
+  payload: {
+    userId: string;
+    codeId: string;
+    scope: YctQqLinkScope;
+    expiresAt: string;
+  };
+}
+
+export interface QqLinkCodeConsumeSucceeded extends BaseEvent {
+  type: 'QqLinkCodeConsumeSucceeded';
+  payload: {
+    qqLinkId: string;
+    codeId: string;
+    userId: string;
+    scope: YctQqLinkScope;
+    openIdHash: string;
+    openIdMasked: string;
+    created: boolean;
+  };
+}
+
+export interface QqLinkCodeConsumeFailed extends BaseEvent {
+  type: 'QqLinkCodeConsumeFailed';
+  payload: {
+    reason: YctQqLinkFailureReason;
+    scope: YctQqLinkScope;
+    openIdHash: string;
+    openIdMasked: string;
+    codeId?: string;
+    codeFingerprint?: string;
+  };
+}
+
+export interface QqLinkTokenIssued extends BaseEvent {
+  type: 'QqLinkTokenIssued';
+  payload: {
+    tokenId: string;
+    scope: YctQqLinkScope;
+    expiresAt: string;
+    openIdHash: string;
+    openIdMasked: string;
+    groupOpenIdHash?: string;
+    groupOpenIdMasked?: string;
+  };
+}
+
+export interface QqLinkTokenClaimed extends BaseEvent {
+  type: 'QqLinkTokenClaimed';
+  payload: {
+    tokenId: string;
+    userId: string;
+    scope: YctQqLinkScope;
+    openIdHash: string;
+    openIdMasked: string;
+    groupOpenIdHash: string;
+    groupOpenIdMasked: string;
+  };
+}
+
+export interface QqLinkTokenClaimFailed extends BaseEvent {
+  type: 'QqLinkTokenClaimFailed';
+  payload: {
+    reason: YctQqLinkFailureReason;
+    scope: YctQqLinkScope;
+    userId: string;
+    tokenId?: string;
+    openIdHash?: string;
+    openIdMasked?: string;
+    groupOpenIdHash?: string;
+    groupOpenIdMasked?: string;
+  };
+}
+
+export interface QqLinkTokenConsumeSucceeded extends BaseEvent {
+  type: 'QqLinkTokenConsumeSucceeded';
+  payload: {
+    qqLinkId: string;
+    tokenId: string;
+    userId: string;
+    scope: YctQqLinkScope;
+    openIdHash: string;
+    openIdMasked: string;
+    created: boolean;
+  };
+}
+
+export interface QqLinkTokenConsumeFailed extends BaseEvent {
+  type: 'QqLinkTokenConsumeFailed';
+  payload: {
+    reason: YctQqLinkFailureReason;
+    scope: YctQqLinkScope;
+    userId?: string;
+    tokenId?: string;
+    openIdHash?: string;
+    openIdMasked?: string;
+  };
+}
+
+export interface QqLinkGroupConfirmSucceeded extends BaseEvent {
+  type: 'QqLinkGroupConfirmSucceeded';
+  payload: {
+    qqLinkId: string;
+    tokenId: string;
+    userId: string;
+    scope: YctQqLinkScope;
+    openIdHash: string;
+    openIdMasked: string;
+    groupOpenIdHash: string;
+    groupOpenIdMasked: string;
+    created: boolean;
+  };
+}
+
+export interface QqLinkGroupConfirmFailed extends BaseEvent {
+  type: 'QqLinkGroupConfirmFailed';
+  payload: {
+    reason: YctQqLinkFailureReason;
+    scope: YctQqLinkScope;
+    tokenId?: string;
+    openIdHash?: string;
+    openIdMasked?: string;
+    groupOpenIdHash?: string;
+    groupOpenIdMasked?: string;
+  };
+}
+
+export interface QqLinkRevoked extends BaseEvent {
+  type: 'QqLinkRevoked';
+  payload: {
+    qqLinkId: string;
+    userId: string;
+    scope: YctQqLinkScope;
+    revokedBy: 'user' | 'qq_bot';
+    groupOpenIdMasked?: string;
+  };
+}
+
+export interface QqLinkUnlinkFailed extends BaseEvent {
+  type: 'QqLinkUnlinkFailed';
+  payload: {
+    reason: YctQqLinkFailureReason;
+    scope: YctQqLinkScope;
+    openIdHash: string;
+    openIdMasked: string;
+    groupOpenIdHash?: string;
+    groupOpenIdMasked?: string;
+  };
+}
+
 export type DomainEvent =
   | UserRegistrationSubmitted
   | UserRegistrationApproved
@@ -1539,6 +1692,18 @@ export type DomainEvent =
   | LegalDocumentUpdated
   | PlatformStatusUpdated
   | StorageAlertRaised
-  | StorageAlertResolved;
+  | StorageAlertResolved
+  | QqLinkCodeIssued
+  | QqLinkCodeConsumeSucceeded
+  | QqLinkCodeConsumeFailed
+  | QqLinkTokenIssued
+  | QqLinkTokenClaimed
+  | QqLinkTokenClaimFailed
+  | QqLinkTokenConsumeSucceeded
+  | QqLinkTokenConsumeFailed
+  | QqLinkGroupConfirmSucceeded
+  | QqLinkGroupConfirmFailed
+  | QqLinkRevoked
+  | QqLinkUnlinkFailed;
 
 export type DomainEventType = DomainEvent['type'];

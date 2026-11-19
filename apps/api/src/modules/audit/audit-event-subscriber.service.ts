@@ -126,6 +126,18 @@ const auditedEventTypes: DomainEventType[] = [
   'PlatformStatusUpdated',
   'StorageAlertRaised',
   'StorageAlertResolved',
+  'QqLinkCodeIssued',
+  'QqLinkCodeConsumeSucceeded',
+  'QqLinkCodeConsumeFailed',
+  'QqLinkTokenIssued',
+  'QqLinkTokenClaimed',
+  'QqLinkTokenClaimFailed',
+  'QqLinkTokenConsumeSucceeded',
+  'QqLinkTokenConsumeFailed',
+  'QqLinkGroupConfirmSucceeded',
+  'QqLinkGroupConfirmFailed',
+  'QqLinkRevoked',
+  'QqLinkUnlinkFailed',
 ];
 
 @Injectable()
@@ -201,6 +213,9 @@ export class AuditEventSubscriberService implements OnModuleInit, OnModuleDestro
   } {
     const payload = event.payload as Record<string, unknown>;
     const orderedSubjectKeys = [
+      'qqLinkId',
+      'codeId',
+      'tokenId',
       'topUpId',
       'avatarChangeRequestId',
       'apiKeyChangeRequestId',
@@ -257,6 +272,9 @@ export class AuditEventSubscriberService implements OnModuleInit, OnModuleDestro
       alertId: 'storage_alert',
       approvalId: 'device_login_approval',
       clientApplicationId: 'client_application',
+      codeId: 'qq_link_code',
+      tokenId: 'qq_link_token',
+      qqLinkId: 'qq_link',
       deviceId: 'device',
       disputeId: 'dispute',
       endpointId: 'provider_webhook_endpoint',

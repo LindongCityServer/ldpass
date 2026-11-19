@@ -260,6 +260,29 @@ enum ServerVerificationPurpose {
   pass_top_up
 }
 
+enum YctQqLinkScope {
+  c2c
+  group
+}
+
+enum YctQqLinkStatus {
+  active
+  revoked
+}
+
+enum YctQqLinkCodeStatus {
+  active
+  used
+  expired
+  revoked
+}
+
+enum YctQqLinkTokenStatus {
+  active
+  used
+  expired
+}
+
 model User {
   id                     String     @id @default(uuid())
   username               String     @unique
@@ -295,6 +318,10 @@ model User {
   rideAuthorizations   RideAuthorization[]
   topUpRequests         PassTopUpRequest[]
   avatarChangeRequests  UserAvatarChangeRequest[]
+  qqLinks               YctQqLink[]
+  qqLinkCodes           YctQqLinkCode[]
+  consumedQqLinkTokens  YctQqLinkToken[]              @relation("ConsumedQqLinkTokens")
+  claimedQqLinkTokens   YctQqLinkToken[]              @relation("ClaimedQqLinkTokens")
 
   @@index([status, createdAt])
   @@index([role, status])
@@ -1140,4 +1167,79 @@ model PlatformStatus {
   updatedById         String?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
+}
+
+// 临东通账号与 QQ 官方机器人 openid 的绑定关系。
+// 只保存机器人事件里的 openid，不保存 QQ 号；groupOpenId 仅用于群身份。
+// activeKey 只在 status=active 时有值，借助 SQLite 唯一索引允许 NULL 的特性，
+// 在数据库层保证“同一身份只有一个 active 绑定”：c2c 为 c2c:<openid>，
+// group 为 group:<groupOpenId>:<openid>，等价于 (qqOpenId, qqScope, groupOpenId) 的
+// active 唯一约束；解绑时置空，因此 revoked 历史记录可以保留且允许重新绑定。
+// 注意：不能改用静态 @@unique([qqOpenId, qqScope, groupOpenId])，否则 revoked 历史行
+// 会阻止同一身份重新绑定；也不能让 activeOpenIdKey 唯一，否则同一 openid 无法同时拥有
+// 单聊身份和多个群的群身份。activeOpenIdKey 仅为兼容历史数据保留，不再参与唯一性判断。
+model YctQqLink {
+  id              String          @id
+  ldpassUserId    String
+  qqOpenId        String
+  qqScope         YctQqLinkScope
+  groupOpenId     String?
+  status          YctQqLinkStatus @default(active)
+  activeKey       String?         @unique
+  activeOpenIdKey String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  lastSeenAt      DateTime?
+
+  user User @relation(fields: [ldpassUserId], references: [id], onDelete: Cascade)
+
+  @@index([ldpassUserId, status, createdAt])
+  @@index([qqOpenId, status])
+  @@index([qqScope, groupOpenId])
+}
+
+// 网页生成的一次性绑定码。只保存 HMAC 哈希，不保存明文。
+// activeUserId 唯一：同一用户最多一个 active 绑定码，重新生成时旧码立即失效。
+model YctQqLinkCode {
+  id           String              @id @default(uuid())
+  ldpassUserId String
+  codeHash     String              @unique
+  status       YctQqLinkCodeStatus @default(active)
+  activeUserId String?             @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  user User @relation(fields: [ldpassUserId], references: [id], onDelete: Cascade)
+
+  @@index([ldpassUserId, status, expiresAt])
+  @@index([status, expiresAt])
+}
+
+// 机器人发出的“一次性绑定网页”token。只保存 HMAC 哈希，5 分钟有效且一次性。
+// 群聊 token 还会在网页登录后记录 claimedByUserId / claimedAt：网页只做“认领 + 展示确认码”，
+// 真正的消费必须由 group_openid + member_openid 一致的群内 /确认 触发。
+// 确认码由 tokenHash + claimedByUserId + claimedAt 经 HMAC 派生，不落库、不写日志。
+model YctQqLinkToken {
+  id               String               @id @default(uuid())
+  tokenHash        String               @unique
+  qqOpenId         String
+  qqScope          YctQqLinkScope
+  groupOpenId      String?
+  status           YctQqLinkTokenStatus @default(active)
+  expiresAt        DateTime
+  usedAt           DateTime?
+  consumedByUserId String?
+  claimedByUserId  String?
+  claimedAt        DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  consumedBy User? @relation("ConsumedQqLinkTokens", fields: [consumedByUserId], references: [id], onDelete: SetNull)
+  claimedBy  User? @relation("ClaimedQqLinkTokens", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([qqOpenId, status, expiresAt])
+  @@index([qqScope, groupOpenId, status])
+  @@index([status, expiresAt])
 }

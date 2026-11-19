@@ -26,6 +26,8 @@ const webNextDir = resolve(webDir, '.next');
 const packageDir = resolve(repoRoot, 'dist/ldpass-node24');
 const archivePath = resolve(repoRoot, 'dist/ldpass-node24.tar');
 const gzipArchivePath = resolve(repoRoot, 'dist/ldpass-node24.tar.gz');
+const repoPackage = readPackageData(repoRoot);
+const packageVersion = repoPackage.version || '0.0.0';
 
 const packageResolvePaths = [repoRoot, webDir, apiDir, databaseDir];
 const runtimePackages = [
@@ -89,6 +91,10 @@ copyFile(
   resolve(repoRoot, 'docs/migration-guide.md'),
   resolve(packageDir, 'docs/migration-guide.md'),
 );
+copyFile(
+  resolve(repoRoot, 'docs/qq-link-integration.md'),
+  resolve(packageDir, 'docs/qq-link-integration.md'),
+);
 logStep('复制 trace 依赖');
 copyTracedFiles();
 logStep('复制运行时 npm 包');
@@ -107,6 +113,7 @@ writePackageMetadata();
 logStep('创建归档包');
 createArchive();
 
+console.log(`[ldpass] version: ${packageVersion}`);
 console.log(`[ldpass] standalone package: ${packageDir}`);
 if (existsSync(archivePath)) {
   console.log(`[ldpass] archive: ${archivePath}`);
@@ -283,6 +290,7 @@ function writePackageMetadata() {
     `${JSON.stringify(
       {
         name: 'ldpass-node24-standalone',
+        version: packageVersion,
         private: true,
         type: 'module',
         scripts: {
@@ -305,9 +313,11 @@ function writePackageMetadata() {
     `${JSON.stringify(
       {
         name: 'ldpass',
+        version: packageVersion,
         packageKind: 'next-traced-standalone',
         nodeMajor: 24,
         builtAt: new Date().toISOString(),
+        nextBuildId: readFileSync(resolve(webNextDir, 'BUILD_ID'), 'utf8').trim(),
         deployEntry: 'deploy-start.mjs',
         windowsDeployEntry: 'deploy-start.cmd',
         runtimeEntry: 'start.mjs',
@@ -318,6 +328,7 @@ function writePackageMetadata() {
           migration: 'MIGRATION.md',
           node24Deployment: 'docs/deployment-node24-standalone.md',
           windowsBtDeployment: 'docs/deployment-windows-bt.md',
+          qqLinkIntegration: 'docs/qq-link-integration.md',
         },
       },
       null,

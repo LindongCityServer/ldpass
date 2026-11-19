@@ -57,6 +57,31 @@ export type TemplateStatus =
 
 export type VerificationMethod = 'server_account' | 'pin';
 
+export type YctQqLinkScope = 'c2c' | 'group';
+
+export type YctQqLinkStatus = 'active' | 'revoked';
+
+export type YctQqLinkFailureReason =
+  | 'code_invalid'
+  | 'code_expired'
+  | 'code_used'
+  | 'openid_already_linked'
+  | 'link_conflict'
+  | 'group_not_supported'
+  | 'group_mismatch'
+  | 'openid_mismatch'
+  | 'confirm_code_invalid'
+  | 'group_confirm_required'
+  | 'token_not_claimed'
+  | 'token_claimed'
+  | 'account_inactive'
+  | 'invalid_request'
+  | 'rate_limited'
+  | 'token_invalid'
+  | 'token_expired'
+  | 'token_used'
+  | 'not_linked';
+
 export type ThemeAccentTone = 'teal' | 'red' | 'gray';
 
 export type LegalDocumentKey = 'terms' | 'privacy' | 'provider_agreement';

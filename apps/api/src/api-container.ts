@@ -3,6 +3,7 @@ import {
   readModuleMetadata,
   type FactoryProvider,
   type InjectionToken,
+  type OnModuleDestroy,
   type OnModuleInit,
   type Provider,
   type Type,
@@ -40,6 +41,22 @@ export class ApiApplicationContext {
     }
 
     this.initialized = true;
+  }
+
+  /**
+   * 按初始化逆序关闭带 onModuleDestroy 的实例，主要供测试与优雅停机使用。
+   * 关闭后再次 get() 会重新实例化，因此不会破坏后续请求。
+   */
+  async destroy(): Promise<void> {
+    const instances = [...this.instances.values()].reverse();
+    this.instances.clear();
+    this.initialized = false;
+
+    for (const instance of instances) {
+      if (isModuleDestroy(instance)) {
+        await instance.onModuleDestroy();
+      }
+    }
   }
 
   async get<T>(token: InjectionToken<T>): Promise<T> {
@@ -153,6 +170,15 @@ function isModuleInit(instance: unknown): instance is OnModuleInit {
     instance !== null &&
     'onModuleInit' in instance &&
     typeof (instance as OnModuleInit).onModuleInit === 'function'
+  );
+}
+
+function isModuleDestroy(instance: unknown): instance is OnModuleDestroy {
+  return (
+    typeof instance === 'object' &&
+    instance !== null &&
+    'onModuleDestroy' in instance &&
+    typeof (instance as OnModuleDestroy).onModuleDestroy === 'function'
   );
 }
 

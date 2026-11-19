@@ -72,6 +72,23 @@ interface DeviceLoginApprovalsResponse {
   approvals: DeviceLoginApproval[];
 }
 
+interface AccountQqLink {
+  id: string;
+  scope: 'c2c' | 'group';
+  groupOpenId: string | null;
+  createdAt: string;
+  lastSeenAt: string | null;
+}
+
+interface AccountQqLinksResponse {
+  links: AccountQqLink[];
+}
+
+interface QqLinkCodeResponse {
+  code: string;
+  expiresAt: string;
+}
+
 interface AccountPreferencesResponse {
   user: NonNullable<SessionResponse['user']>;
 }
@@ -109,6 +126,7 @@ type AccountDialog =
   | 'password'
   | 'pin'
   | 'server'
+  | 'qqLinks'
   | 'deviceApprovals'
   | 'devices'
   | 'review'
@@ -149,10 +167,15 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
     useState<ProviderSessionResponse['providerAccount']>(null);
   const [devices, setDevices] = useState<AccountDevice[]>([]);
   const [deviceApprovals, setDeviceApprovals] = useState<DeviceLoginApproval[]>([]);
+  const [qqLinks, setQqLinks] = useState<AccountQqLink[]>([]);
+  const [qqLinkCode, setQqLinkCode] = useState<QqLinkCodeResponse | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDevicesLoading, setIsDevicesLoading] = useState(false);
   const [isDeviceApprovalsLoading, setIsDeviceApprovalsLoading] = useState(false);
+  const [isQqLinksLoading, setIsQqLinksLoading] = useState(false);
+  const [isGeneratingQqLinkCode, setIsGeneratingQqLinkCode] = useState(false);
+  const [revokingQqLinkId, setRevokingQqLinkId] = useState<string | null>(null);
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
@@ -198,15 +221,18 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
         if (result.user.status !== 'Active') {
           setDevices([]);
           setDeviceApprovals([]);
+          setQqLinks([]);
           setMessage(formatInactiveAccountMessage(result.user.status));
           return;
         }
 
         setIsDevicesLoading(true);
         setIsDeviceApprovalsLoading(true);
-        const [devicesResult, approvalsResult] = await Promise.all([
+        setIsQqLinksLoading(true);
+        const [devicesResult, approvalsResult, qqLinksResult] = await Promise.all([
           getJson<AccountDevicesResponse>('/api/auth/account/devices'),
           getJson<DeviceLoginApprovalsResponse>('/api/auth/account/device-login-approvals'),
+          getJson<AccountQqLinksResponse>('/api/account/qq-links'),
         ]);
 
         if (!isMounted) {
@@ -215,6 +241,7 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
 
         setDevices(devicesResult.devices);
         setDeviceApprovals(approvalsResult.approvals);
+        setQqLinks(qqLinksResult.links);
       } catch (error) {
         if (isMounted) {
           setMessage(error instanceof Error ? error.message : '读取会话失败。');
@@ -224,6 +251,7 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
           setIsLoading(false);
           setIsDevicesLoading(false);
           setIsDeviceApprovalsLoading(false);
+          setIsQqLinksLoading(false);
         }
       }
     };
@@ -597,6 +625,58 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
     }
   };
 
+  const generateQqLinkCode = async () => {
+    setIsGeneratingQqLinkCode(true);
+    setMessage(null);
+
+    try {
+      const result = await postJson<QqLinkCodeResponse>('/api/account/qq-link/code');
+      setQqLinkCode(result);
+      setMessage('绑定码已生成，请私聊 QQ 机器人发送 /绑定 绑定码。');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '生成 QQ 绑定码失败。');
+    } finally {
+      setIsGeneratingQqLinkCode(false);
+    }
+  };
+
+  const copyQqLinkCode = async () => {
+    if (!qqLinkCode) {
+      return;
+    }
+
+    try {
+      await window.navigator.clipboard.writeText(qqLinkCode.code);
+      setMessage('绑定码已复制。');
+    } catch {
+      setMessage('当前浏览器无法自动复制，请手动选择绑定码复制。');
+    }
+  };
+
+  const revokeQqLink = async (link: AccountQqLink) => {
+    const scopeLabel = link.scope === 'c2c' ? '单聊' : '群';
+    if (
+      !window.confirm(
+        `解绑这个 QQ ${scopeLabel}身份吗？解绑后该 QQ 将不能再通过机器人使用此临东通账号的绑定能力。`,
+      )
+    ) {
+      return;
+    }
+
+    setRevokingQqLinkId(link.id);
+    setMessage(null);
+
+    try {
+      await deleteJson(`/api/account/qq-links/${encodeURIComponent(link.id)}`);
+      setQqLinks((currentLinks) => currentLinks.filter((item) => item.id !== link.id));
+      setMessage('QQ 绑定已解除。');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '解绑 QQ 失败。');
+    } finally {
+      setRevokingQqLinkId(null);
+    }
+  };
+
   const resolveDeviceApproval = async (
     approval: DeviceLoginApproval,
     action: 'approve' | 'reject',
@@ -823,6 +903,28 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
                 <div>
                   <strong>服务器账号</strong>
                   <small>{serverAccountLabel}</small>
+                </div>
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  chevron_right
+                </span>
+              </button>
+              <button
+                className="account-setting-item"
+                type="button"
+                onClick={() => setActiveDialog('qqLinks')}
+              >
+                <span className="material-symbols-rounded" aria-hidden="true">
+                  forum
+                </span>
+                <div>
+                  <strong>QQ 绑定</strong>
+                  <small>
+                    {isQqLinksLoading
+                      ? '读取中'
+                      : qqLinks.length > 0
+                        ? `${qqLinks.length} 个 QQ 身份已绑定`
+                        : '未绑定 QQ'}
+                  </small>
                 </div>
                 <span className="material-symbols-rounded" aria-hidden="true">
                   chevron_right
@@ -1125,6 +1227,90 @@ export function AccountPanel({ initialDialog = null }: { initialDialog?: Account
                 </form>
               ) : null}
 
+              {activeDialog === 'qqLinks' ? (
+                <section className="stacked-form" aria-label="QQ 绑定">
+                  <p className="empty-note">
+                    绑定后可通过 QQ
+                    官方机器人使用临东通相关指令。单聊请私聊机器人发送 /绑定；群聊请在群内
+                    @机器人 发送 /绑定，按网页提示回群发送 /确认 确认码。
+                  </p>
+
+                  {isQqLinksLoading ? <p className="empty-note">正在读取 QQ 绑定。</p> : null}
+
+                  {!isQqLinksLoading && qqLinks.length === 0 ? (
+                    <p className="empty-note">当前没有已绑定的 QQ 身份。</p>
+                  ) : null}
+
+                  {qqLinks.length > 0 ? (
+                    <div className="account-device-list">
+                      {qqLinks.map((link) => (
+                        <article className="account-device-item" key={link.id}>
+                          <div>
+                            <strong>{link.scope === 'c2c' ? '单聊已绑定' : '群身份已绑定'}</strong>
+                            <span>绑定时间：{formatAccountDate(link.createdAt)}</span>
+                            <span>
+                              最近使用：
+                              {link.lastSeenAt ? formatAccountDate(link.lastSeenAt) : '尚未使用'}
+                            </span>
+                            {link.groupOpenId ? <span>群标识：{link.groupOpenId}</span> : null}
+                          </div>
+                          <button
+                            className="danger-action"
+                            type="button"
+                            disabled={revokingQqLinkId === link.id}
+                            onClick={() => void revokeQqLink(link)}
+                          >
+                            {revokingQqLinkId === link.id ? '解绑中' : '解绑'}
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {qqLinkCode ? (
+                    <div className="flow-notice" role="status" aria-live="polite">
+                      <strong>{qqLinkCode.code}</strong>
+                      <span>有效期至 {formatAccountDate(qqLinkCode.expiresAt)}。</span>
+                      <span>请私聊 QQ 机器人发送 /绑定 {qqLinkCode.code}</span>
+                      <div className="form-actions compact-actions">
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          onClick={() => void copyQqLinkCode()}
+                        >
+                          <span className="material-symbols-rounded" aria-hidden="true">
+                            content_copy
+                          </span>
+                          <span>复制绑定码</span>
+                        </button>
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          disabled={isGeneratingQqLinkCode}
+                          onClick={() => void generateQqLinkCode()}
+                        >
+                          {isGeneratingQqLinkCode ? '生成中' : '重新生成'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="form-actions compact-actions">
+                      <button
+                        className="primary-action"
+                        type="button"
+                        disabled={isGeneratingQqLinkCode}
+                        onClick={() => void generateQqLinkCode()}
+                      >
+                        <span className="material-symbols-rounded" aria-hidden="true">
+                          key
+                        </span>
+                        <span>{isGeneratingQqLinkCode ? '生成中' : '生成绑定码'}</span>
+                      </button>
+                    </div>
+                  )}
+                </section>
+              ) : null}
+
               {activeDialog === 'deviceApprovals' ? (
                 <section className="stacked-form" aria-label="新设备登录确认">
                   {isDeviceApprovalsLoading ? (
@@ -1284,6 +1470,7 @@ function getAccountDialogTitle(dialog: AccountDialog): string {
     password: '密码',
     pin: 'PIN',
     server: '服务器账号',
+    qqLinks: 'QQ 绑定',
     deviceApprovals: '新设备确认',
     devices: '登录设备',
     review: '审核信息',
@@ -1304,6 +1491,15 @@ function formatDeviceSystem(system: AccountDevice['system']): string {
   };
 
   return labels[system];
+}
+
+function formatAccountDate(value: string | null): string {
+  if (!value) {
+    return '未知';
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '未知' : date.toLocaleString('zh-CN');
 }
 
 function formatIpRegion(region: IpRegionLike | null): string {

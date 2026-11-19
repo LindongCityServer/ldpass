@@ -1,6 +1,6 @@
 {
   "name": "ldpass",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "packageManager": "pnpm@10.14.0",
   "scripts": {
@@ -15,7 +15,8 @@
     "db:deploy": "pnpm --filter @ldpass/database db:deploy",
     "db:push": "pnpm --filter @ldpass/database db:push",
     "db:studio": "pnpm --filter @ldpass/database db:studio",
-    "seed:super-admin": "pnpm --filter @ldpass/database seed:super-admin"
+    "seed:super-admin": "pnpm --filter @ldpass/database seed:super-admin",
+    "test:qq-link": "pnpm --filter @ldpass/api test:qq-link"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

@@ -1,4 +1,4 @@
-const cacheName = 'ldpass-app-shell-v3';
+const cacheName = 'ldpass-app-shell-v4';
 const appShellUrls = [
   '/',
   '/manifest.webmanifest',
@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (isBackofficePath(url.pathname)) {
+  if (isBackofficePath(url.pathname) || isSensitivePath(url.pathname)) {
     return;
   }
 
@@ -68,6 +68,17 @@ function isBackofficePath(pathname) {
     pathname.startsWith('/admin/') ||
     pathname === '/provider' ||
     pathname.startsWith('/provider/')
+  );
+}
+
+// 绑定 token / 登录 next 参数都可能在 URL 里。页面已经返回 no-store，
+// 这里再显式跳过 Service Worker 缓存，避免 token 被写进 Cache Storage。
+function isSensitivePath(pathname) {
+  return (
+    pathname === '/account/link/qq' ||
+    pathname.startsWith('/account/link/qq/') ||
+    pathname === '/login' ||
+    pathname.startsWith('/login/')
   );
 }
 

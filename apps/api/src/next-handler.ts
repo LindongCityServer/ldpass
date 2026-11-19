@@ -93,6 +93,23 @@ export async function handleNextApiRequest(
   }
 }
 
+/**
+ * 关闭当前 application context（断开数据库连接、注销事件订阅）。
+ * 供测试和优雅停机使用；关闭后下一次请求会重新创建 context。
+ */
+export async function shutdownNextApiApplication(): Promise<void> {
+  const contextPromise = applicationContextPromise;
+  applicationContextPromise = null;
+  compiledRoutes = null;
+
+  if (!contextPromise) {
+    return;
+  }
+
+  const context = await contextPromise.catch(() => null);
+  await context?.destroy();
+}
+
 async function getApplicationContext(): Promise<ApiApplicationContext> {
   applicationContextPromise ??= createApplicationContext();
   return applicationContextPromise;

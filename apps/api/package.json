@@ -1,6 +1,6 @@
 {
   "name": "@ldpass/api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "./dist/next-handler.js",
@@ -15,7 +15,8 @@
     "build": "tsc -b tsconfig.json",
     "check": "pnpm typecheck",
     "lint": "pnpm typecheck",
-    "typecheck": "tsc -b tsconfig.json"
+    "typecheck": "tsc -b tsconfig.json",
+    "test:qq-link": "pnpm --filter @ldpass/database db:generate && pnpm build && node test/qq-link.e2e.test.mjs"
   },
   "dependencies": {
     "@ldpass/contracts": "workspace:*",
