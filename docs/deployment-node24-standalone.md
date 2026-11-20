@@ -98,6 +98,23 @@ QQ_LINK_HASH_SECRET=""
 
 接口契约、机器人调用示例和群聊限制见包内 `docs/qq-link-integration.md`。
 
+### QQ 登录（0.3.0）
+
+如果要启用「使用 QQ 登录」（QQ 互联网站应用），在 `.env` 中补充：
+
+```env
+QQ_CONNECT_ENABLED=true
+# QQ 互联 APP ID / APP KEY；任一为空时登录页不显示入口，接口返回 503
+QQ_CONNECT_APP_ID=""
+QQ_CONNECT_APP_KEY=""
+# 必须与 QQ 互联后台登记的网站回调地址逐字一致（协议 + 域名 + path），否则报 100010
+QQ_CONNECT_REDIRECT_URI="https://ldpass.example.com/api/auth/qq/callback"
+```
+
+回调地址固定为 `<站点域名>/api/auth/qq/callback`。首次上线时 `deploy-start.mjs` 的 `prisma db push` 会补建 `QqConnectBinding` 表（本次发布同时补齐 0.2.1 的 `YctQqLink*` 三张表），无需手工迁移。
+
+登录流程、state 设计、失败提示码与本地调试限制见包内 `docs/qq-connect-login.md`。
+
 ### 更换 pepper（已有用户数据时）
 
 不要把旧 pepper 直接覆盖掉，否则所有已存密码和 PIN 哈希都会立即失效。正确顺序：

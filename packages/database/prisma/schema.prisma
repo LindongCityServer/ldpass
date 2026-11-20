@@ -322,6 +322,7 @@ model User {
   qqLinkCodes           YctQqLinkCode[]
   consumedQqLinkTokens  YctQqLinkToken[]              @relation("ConsumedQqLinkTokens")
   claimedQqLinkTokens   YctQqLinkToken[]              @relation("ClaimedQqLinkTokens")
+  qqConnectBindings     QqConnectBinding[]
 
   @@index([status, createdAt])
   @@index([role, status])
@@ -1242,4 +1243,25 @@ model YctQqLinkToken {
   @@index([qqOpenId, status, expiresAt])
   @@index([qqScope, groupOpenId, status])
   @@index([status, expiresAt])
+}
+
+// 临东通账号与 QQ 互联（网站应用 OAuth2.0）openid 的绑定关系。
+// QQ 互联的 openid 按 appid 隔离，与 QQ 官方机器人事件里的 openid 不是同一个身份空间，
+// 所以单独建表，不复用 YctQqLink，避免两套身份互相污染。
+// openId 全局唯一：一个 QQ 身份只能绑定一个临东通账号；头像与昵称只是展示快照，随时可能过期。
+model QqConnectBinding {
+  id          String    @id @default(uuid())
+  userId      String
+  openId      String    @unique
+  unionId     String?
+  nickname    String?
+  avatarUrl   String?
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([unionId])
 }

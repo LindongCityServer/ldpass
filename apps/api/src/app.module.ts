@@ -14,6 +14,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PassTemplatesModule } from './modules/pass-templates/pass-templates.module.js';
 import { PlatformModule } from './modules/platform/platform.module.js';
 import { ProvidersModule } from './modules/providers/providers.module.js';
+import { QqConnectModule } from './modules/qq-connect/qq-connect.module.js';
 import { QqLinksModule } from './modules/qq-links/qq-links.module.js';
 import { RedemptionModule } from './modules/redemption/redemption.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
@@ -35,6 +36,7 @@ import { EventBusModule } from './shared/event-bus/event-bus.module.js';
     WalletModule,
     ProvidersModule,
     QqLinksModule,
+    QqConnectModule,
     CardTemplateVariantsModule,
     PassTemplatesModule,
     IssuingModule,

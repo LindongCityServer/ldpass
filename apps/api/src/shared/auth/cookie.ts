@@ -107,7 +107,7 @@ function readCookieDomainHost(value: string): string {
   return value.split('/')[0]?.split(':')[0] ?? value;
 }
 
-function shouldUseSecureCookie(request: ApiRequestLike): boolean {
+export function shouldUseSecureCookie(request: ApiRequestLike): boolean {
   const configuredValue = process.env.AUTH_COOKIE_SECURE?.trim().toLowerCase();
   if (configuredValue === 'true') {
     return true;

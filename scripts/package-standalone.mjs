@@ -95,6 +95,10 @@ copyFile(
   resolve(repoRoot, 'docs/qq-link-integration.md'),
   resolve(packageDir, 'docs/qq-link-integration.md'),
 );
+copyFile(
+  resolve(repoRoot, 'docs/qq-connect-login.md'),
+  resolve(packageDir, 'docs/qq-connect-login.md'),
+);
 logStep('复制 trace 依赖');
 copyTracedFiles();
 logStep('复制运行时 npm 包');
@@ -329,6 +333,7 @@ function writePackageMetadata() {
           node24Deployment: 'docs/deployment-node24-standalone.md',
           windowsBtDeployment: 'docs/deployment-windows-bt.md',
           qqLinkIntegration: 'docs/qq-link-integration.md',
+          qqConnectLogin: 'docs/qq-connect-login.md',
         },
       },
       null,

@@ -8,6 +8,7 @@ interface LoginPageProps {
     redirect_uri?: string;
     state?: string;
     next?: string;
+    qq?: string;
   }>;
 }
 
@@ -20,6 +21,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       : {}),
     ...(resolvedSearchParams?.state ? { initialState: resolvedSearchParams.state } : {}),
     ...(resolvedSearchParams?.next ? { initialNext: resolvedSearchParams.next } : {}),
+    ...(resolvedSearchParams?.qq ? { initialQqStatus: resolvedSearchParams.qq } : {}),
   };
 
   return (

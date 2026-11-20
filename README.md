@@ -11,7 +11,7 @@
 - `packages/event-bus`：事件总线抽象。
 - `packages/ui`：共享前端 UI 与品牌资源约定。
 
-详细产品需求见 `docs/requirements.md`，阶段实现目标见 `docs/implementation-goals.md`，后台入口见 `docs/backoffice-login-guide.md`，QQ 绑定联调说明见 `docs/qq-link-integration.md`。
+详细产品需求见 `docs/requirements.md`，阶段实现目标见 `docs/implementation-goals.md`，后台入口见 `docs/backoffice-login-guide.md`，QQ 绑定联调说明见 `docs/qq-link-integration.md`，QQ 登录接入说明见 `docs/qq-connect-login.md`。
 
 ## 本地准备
 

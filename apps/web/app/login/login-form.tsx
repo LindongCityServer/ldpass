@@ -63,6 +63,7 @@ interface LoginFormProps {
   initialRedirectUri?: string;
   initialState?: string;
   initialNext?: string;
+  initialQqStatus?: string;
 }
 
 const loginRequestTimeoutMs = 45000;
@@ -72,8 +73,12 @@ export function LoginForm({
   initialRedirectUri,
   initialState,
   initialNext,
+  initialQqStatus,
 }: LoginFormProps) {
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(() =>
+    readQqStatusMessage(initialQqStatus),
+  );
+  const [qqLoginEnabled, setQqLoginEnabled] = useState(false);
   const [redirectValidation, setRedirectValidation] = useState<LoginRedirectValidation | null>(
     null,
   );
@@ -169,6 +174,26 @@ export function LoginForm({
       safeInternalNext ? '登录后将继续之前的操作。' : '站内回跳地址无效，登录后将返回钱包。',
     );
   }, [initialClientId, initialRedirectUri, initialNext, safeInternalNext]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getJson<{ enabled: boolean }>('/api/auth/qq/status')
+      .then((result) => {
+        if (isMounted) {
+          setQqLoginEnabled(result.enabled);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setQqLoginEnabled(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -432,8 +457,43 @@ export function LoginForm({
           <span>{isValidatingRedirect ? '校验中' : isSubmitting ? '登录中' : '继续'}</span>
         </button>
       </div>
+      {qqLoginEnabled ? (
+        <div className="form-actions">
+          <a className="secondary-action" href={qqLoginHref}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              link
+            </span>
+            <span>使用 QQ 登录</span>
+          </a>
+        </div>
+      ) : null}
     </form>
   );
+}
+
+const qqLoginHref = `/api/auth/qq/start?redirect=${encodeURIComponent('/account')}`;
+
+function readQqStatusMessage(status?: string): string | null {
+  switch (status) {
+    case 'unbound':
+      return '这个 QQ 还没有绑定临东通账号。请先用账号密码登录，登录后再点一次「使用 QQ 登录」完成绑定。';
+    case 'state':
+      return 'QQ 登录已超时或校验失败，请重新点击「使用 QQ 登录」。';
+    case 'denied':
+      return '你取消了 QQ 授权。';
+    case 'failed':
+      return 'QQ 登录失败，请稍后重试。';
+    case 'conflict':
+      return '这个 QQ 已经绑定到其他临东通账号，请先在原账号解绑。';
+    case 'inactive':
+      return '当前账号尚未激活，暂时不能绑定 QQ。';
+    case 'unavailable':
+      return '这个 QQ 绑定的账号已被删除，无法用于登录。';
+    case 'disabled':
+      return 'QQ 登录暂未开放。';
+    default:
+      return null;
+  }
 }
 
 function readRedirectTarget(validation: LoginRedirectValidation | null): string | null {
